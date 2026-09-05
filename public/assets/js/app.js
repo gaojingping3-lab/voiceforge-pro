@@ -77,6 +77,18 @@ function saveModalKeys() {
 onEngineChange();
 syncModalInputs();
 
+// 配置自动迁移：检测到旧的OpenAI默认地址时自动重置为DeepSeek
+(function migrateConfig() {
+    const oldUrls = ['https://api.openai.com/v1', 'https://api.openai.com', 'https://api.groq.com/openai/v1'];
+    const currentUrl = localStorage.getItem('LLM_URL');
+    if (currentUrl && oldUrls.includes(currentUrl.trim())) {
+        localStorage.removeItem('LLM_URL');
+        localStorage.removeItem('LLM_MODEL');
+        // 保留用户的Key，只重置地址和模型
+        console.log('已自动迁移大模型配置为DeepSeek默认值');
+    }
+})();
+
 // Text character count
 const ttsText = document.getElementById('tts-text');
 const charCount = document.getElementById('char-count');
