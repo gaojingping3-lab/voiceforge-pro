@@ -322,22 +322,35 @@ async function sendChatMessage() {
 
     try {
         // 通过 Cloudflare Pages Functions 同源中转，规避浏览器 CORS 预检挂起问题
-        const res = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${llmKey}`
-            },
-            body: JSON.stringify({
-                baseUrl: llmUrl,
-                model: llmModel,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: text }
-                ],
-                temperature: 0.8
-            })
-        });
+        // 带自动重试的请求（失败时重试一次，应对网络波动和临时限流）
+        let res;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${llmKey}`
+                    },
+                    body: JSON.stringify({
+                        baseUrl: llmUrl,
+                        model: llmModel,
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            { role: 'user', content: text }
+                        ],
+                        temperature: 0.8
+                    })
+                });
+                break; // 成功就跳出循环
+            } catch (e) {
+                if (attempt === 0) {
+                    await new Promise(r => setTimeout(r, 1000)); // 等1秒再重试
+                    continue;
+                }
+                throw e; // 第二次还失败就抛出
+            }
+        }
 
         if (!res.ok) {
             const errText = await res.text();
