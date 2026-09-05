@@ -207,7 +207,8 @@ async function generateAndPlayAudio(text) {
     const apiKey = document.getElementById('main-api-key').value.trim();
     const format = document.getElementById('tts-format').value;
     const speed = parseFloat(document.getElementById('tts-speed').value);
-    const prompt = document.getElementById('tts-prompt').value.trim();
+    // AI对话朗读时不传情感参数，保持纯克隆声音的真实度
+    const prompt = '';
 
     if (!apiKey) {
         console.warn('未配置 TTS API Key，跳过语音播放');
