@@ -464,6 +464,8 @@ let isChatAudioPlaying = false; // 播放锁，防止重复点击
 
 async function playChatMessage(bubble) {
     const text = bubble.innerText;
+    // 朗读时去掉括号里的内容（中英文括号都处理），显示不变
+    const speakText = text.replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '').trim();
 
     // 播放锁：正在播放中，忽略新的点击
     if (isChatAudioPlaying) return;
@@ -493,7 +495,7 @@ async function playChatMessage(bubble) {
     }
 
     try {
-        const res = await callTTS(text, engine, voiceId, apiKey, format, speed);
+        const res = await callTTS(speakText, engine, voiceId, apiKey, format, speed);
         if (!res.ok) throw new Error('TTS请求失败');
         const audioBlob = await res.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
