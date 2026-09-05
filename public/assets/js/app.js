@@ -421,3 +421,91 @@ function clearChat() {
     const container = document.getElementById('chat-messages');
     container.innerHTML = '<div class="chat chat-start"><div class="chat-bubble bg-base-200 text-base-content">你好呀，我是安。今天想跟我聊点什么？</div></div>';
 }
+
+// ============================================
+// 声音克隆功能
+// ============================================
+let cloneSelectedFile = null;
+
+// 文件选择时显示预览
+document.getElementById('clone-file').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    cloneSelectedFile = file;
+    const infoBox = document.getElementById('clone-file-info');
+    document.getElementById('clone-file-name').innerText = file.name;
+    document.getElementById('clone-file-size').innerText = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+    const preview = document.getElementById('clone-file-preview');
+    preview.src = URL.createObjectURL(file);
+    infoBox.classList.remove('hidden');
+});
+
+// 显示克隆状态
+function showCloneStatus(msg, type) {
+    const status = document.getElementById('clone-status');
+    status.classList.remove('hidden', 'alert-info', 'alert-success', 'alert-error', 'alert-warning');
+    status.classList.add(type === 'success' ? 'alert-success' : type === 'error' ? 'alert-error' : 'alert-info');
+    status.innerText = msg;
+}
+
+// 上传并创建声音模型
+document.getElementById('btn-clone').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-clone');
+    const name = document.getElementById('clone-name').value.trim();
+    const refText = document.getElementById('clone-ref-text').value.trim();
+    const apiKey = document.getElementById('main-api-key').value.trim();
+
+    if (!cloneSelectedFile) {
+        showCloneStatus('❌ 请先选择音频文件', 'error');
+        return;
+    }
+    if (!apiKey) {
+        showCloneStatus('❌ 请先在顶部填写 Fish API 密钥', 'error');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> 创建中...';
+    showCloneStatus('⏳ 正在上传音频并创建声音模型，请稍候...', 'info');
+
+    try {
+        const formData = new FormData();
+        formData.append('title', name || cloneSelectedFile.name.replace(/\.[^.]+$/, '') || '我的克隆声音');
+        formData.append('visibility', 'private');
+        formData.append('type', 'tts');
+        formData.append('train_mode', 'fast');
+        formData.append('enhance_audio_quality', 'true');
+        if (refText) formData.append('texts', JSON.stringify([refText]));
+        formData.append('voices', cloneSelectedFile);
+
+        const resp = await fetch('/api/fish/model', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + apiKey },
+            body: formData
+        });
+
+        const data = await resp.json();
+        if (!resp.ok) {
+            const errMsg = data.message || data.error || data.detail || data.msg || ('HTTP ' + resp.status);
+            showCloneStatus('❌ 创建失败：' + errMsg, 'error');
+            return;
+        }
+
+        const voiceId = data.id || data._id || data.voiceId || data.model_id;
+        if (!voiceId) {
+            showCloneStatus('❌ 创建失败：未返回声音ID', 'error');
+            return;
+        }
+
+        // 自动填入声音ID到文本转语音页
+        document.getElementById('voice-id').value = voiceId;
+        localStorage.setItem('FISH_VOICE_ID', voiceId);
+        showCloneStatus('✅ 创建成功！声音ID：' + voiceId + '，已自动填入文本转语音页', 'success');
+
+    } catch (e) {
+        showCloneStatus('❌ 网络错误：' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-microchip mr-2"></i> 上传并创建模型';
+    }
+});
