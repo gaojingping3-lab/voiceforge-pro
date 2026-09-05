@@ -272,8 +272,8 @@ async function sendChatMessage() {
     const loadingBubble = appendChatMessage('安正在思考...', 'ai');
 
     try {
-        // 浏览器直接调用大模型 API（用用户本地IP，避免Cloudflare代理被地区限制）
-        const res = await fetch(`${llmUrl}/chat/completions`, {
+        // 通过 Cloudflare Pages Functions 同源中转，规避浏览器 CORS 预检挂起问题
+        const res = await fetch('/api/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
