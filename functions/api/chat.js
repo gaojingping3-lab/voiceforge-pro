@@ -1,4 +1,4 @@
-// functions/api/chat.js - DeepSeek API 同源中转（解决浏览器 CORS 预检挂起问题）
+// functions/api/chat.js - 大模型 API 同源中转（支持动态 Base URL，可切换任意 OpenAI 兼容接口）
 export async function onRequest(context) {
   const { request } = context;
 
@@ -19,19 +19,25 @@ export async function onRequest(context) {
   }
 
   try {
-    const body = await request.text();
+    const bodyText = await request.text();
+    const body = JSON.parse(bodyText);
 
-    // 2. 由 Cloudflare 边缘节点向 DeepSeek 发起请求
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
+    // 2. 从请求体读取动态 Base URL（支持切换任意 OpenAI 兼容接口）
+    const baseUrl = body.baseUrl || "https://api.deepseek.com";
+    // 移除 baseUrl 字段，不转发给目标 API
+    delete body.baseUrl;
+
+    // 3. 由 Cloudflare 边缘节点向目标 API 发起请求
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": request.headers.get("Authorization") || "",
       },
-      body: body,
+      body: JSON.stringify(body),
     });
 
-    // 3. 返回响应并追加 CORS 允许头
+    // 4. 返回响应并追加 CORS 允许头
     const newResponse = new Response(response.body, response);
     newResponse.headers.set("Access-Control-Allow-Origin", "*");
     return newResponse;

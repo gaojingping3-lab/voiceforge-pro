@@ -282,9 +282,10 @@ async function sendChatMessage() {
                 'Authorization': `Bearer ${llmKey}`
             },
             body: JSON.stringify({
+                baseUrl: llmUrl,
                 model: llmModel,
                 messages: [
-                    { role: 'system', content: '你叫"安"，是一位温柔、善解人意、轻声细语的聊天伙伴。请用简短、亲切、富有情感的语气回复，每句话不超过50字。' },
+                    { role: 'system', content: '你是安。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。' },
                     { role: 'user', content: text }
                 ],
                 temperature: 0.8
