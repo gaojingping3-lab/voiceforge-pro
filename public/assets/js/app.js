@@ -59,7 +59,7 @@ function syncModalInputs() {
     document.getElementById('modal-key-aliyun').value = localStorage.getItem('ALIYUN_KEY') || '';
     document.getElementById('modal-llm-url').value = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
     document.getElementById('modal-llm-key').value = localStorage.getItem('LLM_KEY') || '';
-    document.getElementById('modal-llm-model').value = localStorage.getItem('LLM_MODEL') || 'deepseek-chat';
+    document.getElementById('modal-llm-model').value = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
 }
 
 function saveModalKeys() {
@@ -68,7 +68,7 @@ function saveModalKeys() {
     localStorage.setItem('ALIYUN_KEY', document.getElementById('modal-key-aliyun').value.trim());
     localStorage.setItem('LLM_URL', document.getElementById('modal-llm-url').value.trim() || 'https://api.deepseek.com');
     localStorage.setItem('LLM_KEY', document.getElementById('modal-llm-key').value.trim());
-    localStorage.setItem('LLM_MODEL', document.getElementById('modal-llm-model').value.trim() || 'deepseek-chat');
+    localStorage.setItem('LLM_MODEL', document.getElementById('modal-llm-model').value.trim() || 'deepseek-v4-flash');
     onEngineChange();
     settings_modal.close();
 }
@@ -258,7 +258,7 @@ async function sendChatMessage() {
 
     const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
     const llmKey = localStorage.getItem('LLM_KEY') || '';
-    const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-chat';
+    const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
 
     if (!llmKey) {
         alert('请先点击右上角齿轮 ⚙️ 设置大模型 API Key！');
