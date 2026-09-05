@@ -300,11 +300,13 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
         sfxSuccess();
 
         // Save to History
-        saveHistory({
+        await saveHistory({
             time: new Date().toLocaleTimeString(),
             engine: engine,
             text: text.length > 25 ? text.substring(0, 25) + '...' : text,
-            url: audioUrl
+            url: audioUrl,
+            audioBlob: audioBlob,
+            format: format
         });
 
     } catch (err) {
@@ -318,11 +320,35 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
 });
 
 // History Storage
-function saveHistory(item) {
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+async function saveHistory(item) {
     let list = JSON.parse(localStorage.getItem('vf_history') || '[]');
+    // 如果有audioBlob，转成base64保存
+    if (item.audioBlob) {
+        item.audioData = await blobToBase64(item.audioBlob);
+        item.format = item.format || 'mp3';
+        delete item.audioBlob;
+    }
     list.unshift(item);
-    if (list.length > 15) list.pop();
-    localStorage.setItem('vf_history', JSON.stringify(list));
+    // 限制保存最近5条（base64数据较大，避免超出localStorage限制）
+    if (list.length > 5) list.pop();
+    try {
+        localStorage.setItem('vf_history', JSON.stringify(list));
+    } catch (e) {
+        // 存储空间不足时，删除最旧的记录
+        if (list.length > 1) {
+            list.pop();
+            localStorage.setItem('vf_history', JSON.stringify(list));
+        }
+    }
 }
 
 function renderHistory() {
@@ -332,16 +358,20 @@ function renderHistory() {
         tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-6">暂无生成记录</td></tr>';
         return;
     }
-    tbody.innerHTML = list.map(item => `
+    tbody.innerHTML = list.map((item, index) => {
+        // 如果有base64数据，生成可下载的链接
+        const downloadUrl = item.audioData || item.url || '#';
+        const fileName = `voice_${item.time.replace(/:/g, '')}.${item.format || 'mp3'}`;
+        return `
         <tr>
             <td class="font-mono text-xs">${item.time}</td>
             <td><span class="badge badge-sm badge-outline">${item.engine}</span></td>
             <td class="text-xs max-w-[200px] truncate">${item.text}</td>
             <td>
-                <a href="${item.url}" download="voice.mp3" class="btn btn-xs btn-ghost text-primary"><i class="fa-solid fa-download"></i></a>
+                <a href="${downloadUrl}" download="${fileName}" class="btn btn-xs btn-ghost text-primary"><i class="fa-solid fa-download"></i></a>
             </td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
 }
 
 function clearHistory() {
