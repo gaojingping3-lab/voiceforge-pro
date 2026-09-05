@@ -296,6 +296,7 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
         downloadBtn.href = audioUrl;
         downloadBtn.download = `voice_${Date.now()}.${format}`;
         playerBox.classList.remove('hidden');
+        stopAllAudio(); // 停止所有其他音频
         audioPlayer.play().catch(() => {});
         sfxSuccess();
 
@@ -405,7 +406,7 @@ async function generateAndPlayAudio(text) {
         }
         const audioBlob = await res.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
-        stopChatAudio(); // 先停止之前的播放
+        stopAllAudio(); // 先停止之前的播放
         currentChatAudio = new Audio(audioUrl);
         await currentChatAudio.play().catch(() => {});
     } catch (err) {
@@ -417,10 +418,17 @@ async function generateAndPlayAudio(text) {
 let chatHistory = []; // 对话历史记忆，最多保留20条消息
 let currentChatAudio = null; // 当前正在播放的聊天音频
 
-function stopChatAudio() {
+// 停止所有音频播放（聊天音频 + TTS页面播放器）
+function stopAllAudio() {
+    // 停止聊天音频
     if (currentChatAudio) {
         currentChatAudio.pause();
         currentChatAudio = null;
+    }
+    // 停止TTS页面的播放器
+    const audioPlayer = document.getElementById('audio-playback');
+    if (audioPlayer) {
+        audioPlayer.pause();
     }
 }
 
@@ -451,7 +459,7 @@ function appendChatMessage(text, type) {
 
 // 播放指定文本的语音（聊天消息用）
 async function playChatMessage(text) {
-    stopChatAudio();
+    stopAllAudio();
     const engine = document.getElementById('tts-engine').value;
     const voiceId = document.getElementById('voice-id').value.trim();
     const apiKey = document.getElementById('main-api-key').value.trim();
@@ -507,7 +515,7 @@ async function sendChatMessage() {
     input.value = '';
 
     // 发送新消息时，停止上一条AI回复的朗读
-    stopChatAudio();
+    stopAllAudio();
 
     // 把用户消息加入历史记忆
     chatHistory.push({ role: 'user', content: text });
