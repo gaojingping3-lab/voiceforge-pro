@@ -57,18 +57,18 @@ function syncModalInputs() {
     document.getElementById('modal-key-fish').value = localStorage.getItem('FISH_KEY') || '';
     document.getElementById('modal-key-sili').value = localStorage.getItem('SILICONFLOW_KEY') || '';
     document.getElementById('modal-key-aliyun').value = localStorage.getItem('ALIYUN_KEY') || '';
-    document.getElementById('modal-llm-url').value = localStorage.getItem('LLM_URL') || 'https://openrouter.ai/api/v1';
+    document.getElementById('modal-llm-url').value = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
     document.getElementById('modal-llm-key').value = localStorage.getItem('LLM_KEY') || '';
-    document.getElementById('modal-llm-model').value = localStorage.getItem('LLM_MODEL') || 'deepseek/deepseek-chat';
+    document.getElementById('modal-llm-model').value = localStorage.getItem('LLM_MODEL') || 'deepseek-chat';
 }
 
 function saveModalKeys() {
     localStorage.setItem('FISH_KEY', document.getElementById('modal-key-fish').value.trim());
     localStorage.setItem('SILICONFLOW_KEY', document.getElementById('modal-key-sili').value.trim());
     localStorage.setItem('ALIYUN_KEY', document.getElementById('modal-key-aliyun').value.trim());
-    localStorage.setItem('LLM_URL', document.getElementById('modal-llm-url').value.trim() || 'https://openrouter.ai/api/v1');
+    localStorage.setItem('LLM_URL', document.getElementById('modal-llm-url').value.trim() || 'https://api.deepseek.com');
     localStorage.setItem('LLM_KEY', document.getElementById('modal-llm-key').value.trim());
-    localStorage.setItem('LLM_MODEL', document.getElementById('modal-llm-model').value.trim() || 'deepseek/deepseek-chat');
+    localStorage.setItem('LLM_MODEL', document.getElementById('modal-llm-model').value.trim() || 'deepseek-chat');
     onEngineChange();
     settings_modal.close();
 }
@@ -256,9 +256,9 @@ async function sendChatMessage() {
     const text = input.value.trim();
     if (!text) return;
 
-    const llmUrl = localStorage.getItem('LLM_URL') || 'https://openrouter.ai/api/v1';
+    const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
     const llmKey = localStorage.getItem('LLM_KEY') || '';
-    const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek/deepseek-chat';
+    const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-chat';
 
     if (!llmKey) {
         alert('请先点击右上角齿轮 ⚙️ 设置大模型 API Key！');
