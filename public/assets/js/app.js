@@ -272,15 +272,14 @@ async function sendChatMessage() {
     const loadingBubble = appendChatMessage('安正在思考...', 'ai');
 
     try {
-        // 通过 Cloudflare Functions 代理调用大模型（解决浏览器 CORS 问题）
-        const res = await fetch('/api/llm/chat', {
+        // 浏览器直接调用大模型 API（用用户本地IP，避免Cloudflare代理被地区限制）
+        const res = await fetch(`${llmUrl}/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Local-LLM-Key': llmKey
+                'Authorization': `Bearer ${llmKey}`
             },
             body: JSON.stringify({
-                baseUrl: llmUrl,
                 model: llmModel,
                 messages: [
                     { role: 'system', content: '你叫"安"，是一位温柔、善解人意、轻声细语的聊天伙伴。请用简短、亲切、富有情感的语气回复，每句话不超过50字。' },
