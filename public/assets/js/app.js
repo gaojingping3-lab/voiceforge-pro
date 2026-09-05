@@ -449,8 +449,8 @@ function appendChatMessage(text, type) {
         playBtn.className = 'absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
         playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
         playBtn.title = '播放语音';
-        // 点击时读取bubble当前的实际文本，而不是创建时的文字
-        playBtn.onclick = () => playChatMessage(bubble.innerText);
+        // 点击时传bubble元素，方便检查缓存
+        playBtn.onclick = () => playChatMessage(bubble);
         div.appendChild(playBtn);
     }
 
@@ -462,12 +462,24 @@ function appendChatMessage(text, type) {
 // 播放指定文本的语音（聊天消息用）
 let isChatAudioPlaying = false; // 播放锁，防止重复点击
 
-async function playChatMessage(text) {
+async function playChatMessage(bubble) {
+    const text = bubble.innerText;
+
     // 播放锁：正在播放中，忽略新的点击
     if (isChatAudioPlaying) return;
     isChatAudioPlaying = true;
 
     stopAllAudio();
+
+    // 如果有缓存的音频，直接播放，不用再调用API
+    if (bubble.cachedAudioUrl) {
+        currentChatAudio = new Audio(bubble.cachedAudioUrl);
+        currentChatAudio.onended = () => { isChatAudioPlaying = false; };
+        currentChatAudio.onerror = () => { isChatAudioPlaying = false; };
+        await currentChatAudio.play().catch(() => { isChatAudioPlaying = false; });
+        return;
+    }
+
     const engine = document.getElementById('tts-engine').value;
     const voiceId = document.getElementById('voice-id').value.trim();
     const apiKey = document.getElementById('main-api-key').value.trim();
@@ -485,6 +497,8 @@ async function playChatMessage(text) {
         if (!res.ok) throw new Error('TTS请求失败');
         const audioBlob = await res.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
+        // 缓存到bubble上，下次播放直接用
+        bubble.cachedAudioUrl = audioUrl;
         currentChatAudio = new Audio(audioUrl);
         // 播放结束后释放锁
         currentChatAudio.onended = () => { isChatAudioPlaying = false; };
