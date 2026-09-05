@@ -12,7 +12,39 @@ function switchTab(tabId) {
 
     document.getElementById(`${tabId}-section`).classList.remove('hidden');
     if (tabId === 'history') renderHistory();
+    sfxClick();
 }
+
+// ============================================
+// 音效系统（Web Audio API 生成，无需音频文件）
+// ============================================
+let audioCtx = null;
+function getAudioCtx() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return audioCtx;
+}
+function playTone(freq, duration, type, volume, delay = 0) {
+    try {
+        const ctx = getAudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type || 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(volume || 0.05, ctx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + duration);
+    } catch (e) { /* 忽略音效错误 */ }
+}
+function sfxClick() { playTone(700, 0.06, 'sine', 0.04); playTone(400, 0.05, 'sine', 0.03, 0.01); }
+function sfxStart() { playTone(400, 0.1, 'sine', 0.05); playTone(600, 0.1, 'sine', 0.04, 0.08); playTone(800, 0.12, 'sine', 0.03, 0.16); }
+function sfxSuccess() { playTone(523, 0.12, 'sine', 0.06); playTone(659, 0.12, 'sine', 0.05, 0.1); playTone(784, 0.18, 'sine', 0.04, 0.2); }
+function sfxError() { playTone(300, 0.15, 'sawtooth', 0.04); playTone(200, 0.2, 'sawtooth', 0.03, 0.12); }
+function sfxSave() { playTone(600, 0.08, 'triangle', 0.05); playTone(900, 0.1, 'triangle', 0.04, 0.06); }
 
 // Theme toggler
 const themeToggle = document.getElementById('theme-toggle');
@@ -117,6 +149,7 @@ function saveModalKeys() {
     localStorage.setItem('LLM_MODEL', document.getElementById('modal-llm-model').value.trim() || 'deepseek-v4-flash');
     localStorage.setItem('LLM_SYSTEM', document.getElementById('modal-llm-system').value.trim());
     onEngineChange();
+    sfxSave();
     settings_modal.close();
 }
 
@@ -145,13 +178,41 @@ syncModalInputs();
 const ttsText = document.getElementById('tts-text');
 const charCount = document.getElementById('char-count');
 ttsText.addEventListener('input', () => {
-    charCount.innerText = `${ttsText.value.length} 字`;
+    const len = ttsText.value.length;
+    charCount.innerText = `${len} 字`;
+    // Fish Audio 费用预估：约每字符消耗1 credit
+    document.getElementById('cost-estimate').innerText = len.toLocaleString();
 });
 
 // 统一 TTS 调用函数（Fish引擎使用参考版本参数，声音更真实）
 async function callTTS(text, engine, voiceId, apiKey, format, speed) {
     if (engine === 'fish') {
-        // Fish Audio - 使用通配路由 + 真实克隆参数
+        // 检查是否开启零样本克隆
+        const useZeroShot = document.getElementById('zeroshot-toggle')?.checked && zeroshotAudioBuffer;
+
+        if (useZeroShot) {
+            // 零样本克隆：用 msgpack 格式发送音频数据
+            const refText = document.getElementById('zeroshot-text')?.value.trim() || '';
+            const body = {
+                text: text,
+                references: [{ audio: new Uint8Array(zeroshotAudioBuffer), text: refText }],
+                model: 'fish-speech-1.4',
+                format: format || 'mp3',
+                normalize_loudness: true
+            };
+            const msgpackData = msgpackEncode(body);
+            const res = await fetch('/api/fish/v1/tts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/msgpack',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: msgpackData
+            });
+            return res;
+        }
+
+        // 普通模式：使用声音ID
         const res = await fetch('/api/fish/v1/tts', {
             method: 'POST',
             headers: {
@@ -210,6 +271,7 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
 
     btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> 正在合成中...';
     btn.disabled = true;
+    sfxStart();
 
     try {
         let audioBlob = null;
@@ -235,6 +297,7 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
         downloadBtn.download = `voice_${Date.now()}.${format}`;
         playerBox.classList.remove('hidden');
         audioPlayer.play().catch(() => {});
+        sfxSuccess();
 
         // Save to History
         saveHistory({
@@ -246,6 +309,7 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
 
     } catch (err) {
         console.error(err);
+        sfxError();
         alert(`合成失败: ${err.message}`);
     } finally {
         btn.innerHTML = originalText;
@@ -364,6 +428,7 @@ async function sendChatMessage() {
     input.value = '';
 
     const loadingBubble = appendChatMessage('安正在思考...', 'ai');
+    sfxStart();
 
     try {
         // 通过 Cloudflare Pages Functions 同源中转，规避浏览器 CORS 预检挂起问题
@@ -409,10 +474,12 @@ async function sendChatMessage() {
 
         // 自动用克隆声音朗读 AI 回复
         generateAndPlayAudio(reply);
+        sfxSuccess();
 
     } catch (err) {
         loadingBubble.innerText = '出错啦: ' + err.message;
         console.error(err);
+        sfxError();
     }
 }
 
@@ -509,3 +576,150 @@ document.getElementById('btn-clone').addEventListener('click', async () => {
         btn.innerHTML = '<i class="fa-solid fa-microchip mr-2"></i> 上传并创建模型';
     }
 });
+
+// ============================================
+// 声音收藏功能
+// ============================================
+function getFavVoices() {
+    try {
+        return JSON.parse(localStorage.getItem('fav_voices') || '[]');
+    } catch (e) {
+        return [];
+    }
+}
+function saveFavVoices(list) {
+    localStorage.setItem('fav_voices', JSON.stringify(list));
+}
+function toggleFavVoice() {
+    const voiceId = document.getElementById('voice-id').value.trim();
+    if (!voiceId) {
+        alert('请先输入声音ID');
+        return;
+    }
+    let list = getFavVoices();
+    const exist = list.find(v => v.id === voiceId);
+    if (exist) {
+        list = list.filter(v => v.id !== voiceId);
+        alert('已取消收藏');
+    } else {
+        const name = prompt('给这个声音起个名字：', '我的声音' + (list.length + 1));
+        if (name === null) return;
+        list.push({ id: voiceId, name: name || voiceId, time: new Date().toLocaleString() });
+        alert('收藏成功！');
+        sfxSave();
+    }
+    saveFavVoices(list);
+}
+function renderFavList() {
+    const list = getFavVoices();
+    const container = document.getElementById('fav-list');
+    if (!list.length) {
+        container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">暂无收藏的声音</p>';
+        return;
+    }
+    container.innerHTML = list.map((v, i) => `
+        <div class="flex items-center justify-between bg-base-200 rounded-lg p-3">
+            <div class="flex-1 min-w-0">
+                <div class="font-bold text-sm">${v.name}</div>
+                <div class="text-xs text-gray-500 font-mono truncate">${v.id}</div>
+            </div>
+            <div class="flex gap-1 ml-2">
+                <button class="btn btn-primary btn-xs" onclick="useFavVoice('${v.id}')">使用</button>
+                <button class="btn btn-error btn-xs" onclick="deleteFavVoice(${i})">删除</button>
+            </div>
+        </div>
+    `).join('');
+}
+function useFavVoice(id) {
+    document.getElementById('voice-id').value = id;
+    localStorage.setItem('FISH_VOICE_ID', id);
+    fav_modal.close();
+    sfxClick();
+    alert('已切换到该声音');
+}
+function deleteFavVoice(index) {
+    if (!confirm('确定删除这个收藏吗？')) return;
+    let list = getFavVoices();
+    list.splice(index, 1);
+    saveFavVoices(list);
+    renderFavList();
+    sfxClick();
+}
+// 打开收藏弹窗时渲染列表
+document.addEventListener('click', (e) => {
+    if (e.target.closest('[onclick*="fav_modal.showModal"]')) {
+        setTimeout(renderFavList, 50);
+    }
+});
+
+// ============================================
+// 零样本克隆功能
+// ============================================
+let zeroshotAudioBuffer = null;
+
+function toggleZeroShot() {
+    const checked = document.getElementById('zeroshot-toggle').checked;
+    document.getElementById('zeroshot-box').classList.toggle('hidden', !checked);
+    sfxClick();
+}
+
+document.getElementById('zeroshot-file').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    zeroshotAudioBuffer = await file.arrayBuffer();
+    document.getElementById('zeroshot-filename').innerText = file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)';
+    document.getElementById('zeroshot-audio').src = URL.createObjectURL(file);
+    document.getElementById('zeroshot-preview').classList.remove('hidden');
+});
+
+// msgpack 编码（Fish Audio 零样本克隆需要）
+function msgpackEncode(value) {
+    const bufs = [];
+    function enc(v) {
+        if (v === null || v === undefined) bufs.push(new Uint8Array([0xc0]));
+        else if (typeof v === 'boolean') bufs.push(new Uint8Array([v ? 0xc3 : 0xc2]));
+        else if (typeof v === 'number') {
+            if (Number.isInteger(v)) {
+                if (v >= 0 && v <= 127) bufs.push(new Uint8Array([v]));
+                else if (v >= -32 && v < 0) bufs.push(new Uint8Array([0xe0 | (v + 32)]));
+                else if (v >= 0 && v <= 255) bufs.push(new Uint8Array([0xcc, v]));
+                else if (v >= -32768 && v <= 32767) { const b = new ArrayBuffer(3); new DataView(b).setUint8(0,0xcd); new DataView(b).setInt16(1,v); bufs.push(new Uint8Array(b)); }
+                else { const b = new ArrayBuffer(5); new DataView(b).setUint8(0,0xce); new DataView(b).setUint32(1,v>>>0); bufs.push(new Uint8Array(b)); }
+            } else { const b = new ArrayBuffer(9); new DataView(b).setUint8(0,0xcb); new DataView(b).setFloat64(1,v); bufs.push(new Uint8Array(b)); }
+        }
+        else if (typeof v === 'string') {
+            const bytes = new TextEncoder().encode(v), len = bytes.length;
+            if (len <= 31) bufs.push(new Uint8Array([0xa0 | len]));
+            else if (len <= 255) bufs.push(new Uint8Array([0xd9, len]));
+            else if (len <= 65535) { const b = new ArrayBuffer(3); new DataView(b).setUint8(0,0xda); new DataView(b).setUint16(1,len); bufs.push(new Uint8Array(b)); }
+            else { const b = new ArrayBuffer(5); new DataView(b).setUint8(0,0xdb); new DataView(b).setUint32(1,len); bufs.push(new Uint8Array(b)); }
+            bufs.push(bytes);
+        }
+        else if (v instanceof Uint8Array || v instanceof ArrayBuffer) {
+            const bytes = v instanceof ArrayBuffer ? new Uint8Array(v) : v, len = bytes.length;
+            if (len <= 255) bufs.push(new Uint8Array([0xc4, len]));
+            else if (len <= 65535) { const b = new ArrayBuffer(3); new DataView(b).setUint8(0,0xc5); new DataView(b).setUint16(1,len); bufs.push(new Uint8Array(b)); }
+            else { const b = new ArrayBuffer(5); new DataView(b).setUint8(0,0xc6); new DataView(b).setUint32(1,len); bufs.push(new Uint8Array(b)); }
+            bufs.push(bytes);
+        }
+        else if (Array.isArray(v)) {
+            const len = v.length;
+            if (len <= 15) bufs.push(new Uint8Array([0x90 | len]));
+            else if (len <= 65535) { const b = new ArrayBuffer(3); new DataView(b).setUint8(0,0xdc); new DataView(b).setUint16(1,len); bufs.push(new Uint8Array(b)); }
+            else { const b = new ArrayBuffer(5); new DataView(b).setUint8(0,0xdd); new DataView(b).setUint32(1,len); bufs.push(new Uint8Array(b)); }
+            v.forEach(enc);
+        }
+        else if (typeof v === 'object') {
+            const keys = Object.keys(v), len = keys.length;
+            if (len <= 15) bufs.push(new Uint8Array([0x80 | len]));
+            else if (len <= 65535) { const b = new ArrayBuffer(3); new DataView(b).setUint8(0,0xde); new DataView(b).setUint16(1,len); bufs.push(new Uint8Array(b)); }
+            else { const b = new ArrayBuffer(5); new DataView(b).setUint8(0,0xdf); new DataView(b).setUint32(1,len); bufs.push(new Uint8Array(b)); }
+            keys.forEach(k => { enc(k); enc(v[k]); });
+        }
+    }
+    enc(value);
+    const total = bufs.reduce((s,b) => s+b.length, 0);
+    const result = new Uint8Array(total);
+    let off = 0; bufs.forEach(b => { result.set(b, off); off += b.length; });
+    return result;
+}

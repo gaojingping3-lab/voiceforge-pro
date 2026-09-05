@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>VoiceForge Pro | 多模态语音合成与克隆</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="VoiceForge">
     <link href="https://cdn.jsdelivr.net/npm/daisyui@3.9.0/dist/full.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -82,8 +86,33 @@
                         </select>
                     </div>
                     <div class="form-control w-full">
-                        <label class="label py-1"><span class="label-text font-bold">模型 ID (Voice/Ref ID)</span></label>
+                        <label class="label py-1">
+                            <span class="label-text font-bold">模型 ID (Voice/Ref ID)</span>
+                            <span class="label-text-alt">
+                                <button class="btn btn-ghost btn-xs text-primary" onclick="toggleFavVoice()" title="收藏/取消收藏">⭐</button>
+                                <button class="btn btn-ghost btn-xs text-secondary" onclick="fav_modal.showModal()" title="我的收藏">📋</button>
+                            </span>
+                        </label>
                         <input type="text" id="voice-id" placeholder="留空为默认音色" class="input input-bordered input-sm w-full font-mono text-sm" />
+                    </div>
+
+                    <!-- 零样本克隆切换 -->
+                    <div class="form-control w-full mt-2">
+                        <label class="cursor-pointer label py-1 justify-start gap-2">
+                            <input type="checkbox" id="zeroshot-toggle" class="checkbox checkbox-sm checkbox-primary" onchange="toggleZeroShot()" />
+                            <span class="label-text text-sm font-bold">使用上传音频（零样本克隆，无需创建模型）</span>
+                        </label>
+                    </div>
+
+                    <!-- 零样本克隆上传区域 -->
+                    <div id="zeroshot-box" class="hidden bg-base-200/50 rounded-lg p-3 mt-2 space-y-2">
+                        <div class="text-xs text-gray-500">上传 5~30 秒清晰人声音频，直接用于合成，无需先创建模型</div>
+                        <input type="file" id="zeroshot-file" class="file-input file-input-bordered file-input-xs w-full" accept=".mp3,.wav,.m4a,.ogg,audio/*" />
+                        <input type="text" id="zeroshot-text" placeholder="音频里说的原话（可选，提升相似度）" class="input input-bordered input-xs w-full" />
+                        <div id="zeroshot-preview" class="hidden">
+                            <div class="text-xs font-bold" id="zeroshot-filename"></div>
+                            <audio id="zeroshot-audio" controls class="w-full h-8 mt-1"></audio>
+                        </div>
                     </div>
                     <div class="form-control w-full">
                         <label class="label py-1"><span class="label-text font-bold">格式</span></label>
@@ -98,7 +127,7 @@
                 <div class="form-control w-full mb-3">
                     <label class="label py-1">
                         <span class="label-text font-bold">文本内容</span>
-                        <span id="char-count" class="label-text-alt text-gray-500">0 字</span>
+                        <span class="label-text-alt text-gray-500"><span id="char-count">0 字</span> · 预计 <span id="cost-estimate">0</span> credits</span>
                     </label>
                     <textarea id="tts-text" class="textarea textarea-bordered h-36 text-base leading-relaxed resize-none font-sans" placeholder="输入要合成的文字内容..."></textarea>
                 </div>
@@ -348,6 +377,23 @@
             <div class="modal-action mt-6">
                 <form method="dialog">
                     <button class="btn btn-primary">我知道了</button>
+                </form>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 收藏声音弹窗 -->
+    <dialog id="fav_modal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box bg-base-100 max-w-lg">
+            <h3 class="font-bold text-xl mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-star text-warning"></i> 收藏的声音
+            </h3>
+            <div id="fav-list" class="space-y-2 max-h-64 overflow-y-auto">
+                <p class="text-gray-500 text-sm text-center py-4">暂无收藏的声音</p>
+            </div>
+            <div class="modal-action mt-4">
+                <form method="dialog">
+                    <button class="btn btn-sm">关闭</button>
                 </form>
             </div>
         </div>
