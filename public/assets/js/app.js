@@ -413,6 +413,8 @@ async function generateAndPlayAudio(text) {
 }
 
 // 添加聊天气泡
+let chatHistory = []; // 对话历史记忆，最多保留20条消息
+
 function appendChatMessage(text, type) {
     const container = document.getElementById('chat-messages');
     const div = document.createElement('div');
@@ -457,10 +459,21 @@ async function sendChatMessage() {
     appendChatMessage(text, 'user');
     input.value = '';
 
+    // 把用户消息加入历史记忆
+    chatHistory.push({ role: 'user', content: text });
+    // 限制最多保留20条消息（约10轮对话）
+    if (chatHistory.length > 20) chatHistory.shift();
+
     const loadingBubble = appendChatMessage('安正在思考...', 'ai');
     sfxStart();
 
     try {
+        // 构建消息：system + 历史对话
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            ...chatHistory
+        ];
+
         // 通过 Cloudflare Pages Functions 同源中转，规避浏览器 CORS 预检挂起问题
         // 带自动重试的请求（失败时重试一次，应对网络波动和临时限流）
         let res;
@@ -475,10 +488,7 @@ async function sendChatMessage() {
                     body: JSON.stringify({
                         baseUrl: llmUrl,
                         model: llmModel,
-                        messages: [
-                            { role: 'system', content: systemPrompt },
-                            { role: 'user', content: text }
-                        ],
+                        messages: messages,
                         temperature: 0.8
                     })
                 });
@@ -502,6 +512,10 @@ async function sendChatMessage() {
 
         loadingBubble.innerText = reply;
 
+        // 把AI回复加入历史记忆
+        chatHistory.push({ role: 'assistant', content: reply });
+        if (chatHistory.length > 20) chatHistory.shift();
+
         // 自动用克隆声音朗读 AI 回复
         generateAndPlayAudio(reply);
         sfxSuccess();
@@ -517,6 +531,7 @@ async function sendChatMessage() {
 function clearChat() {
     const container = document.getElementById('chat-messages');
     container.innerHTML = '<div class="chat chat-start"><div class="chat-bubble bg-base-200 text-base-content">你好呀，我是安。今天想跟我聊点什么？</div></div>';
+    chatHistory = []; // 清空记忆
 }
 
 // ============================================
