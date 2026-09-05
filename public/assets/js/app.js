@@ -6,6 +6,7 @@ function switchTab(tabId) {
     if (activeTab) activeTab.classList.add('tab-active', 'text-primary');
 
     document.getElementById('tts-section').classList.add('hidden');
+    document.getElementById('chat-section').classList.add('hidden');
     document.getElementById('clone-section').classList.add('hidden');
     document.getElementById('history-section').classList.add('hidden');
 
@@ -56,12 +57,18 @@ function syncModalInputs() {
     document.getElementById('modal-key-fish').value = localStorage.getItem('FISH_KEY') || '';
     document.getElementById('modal-key-sili').value = localStorage.getItem('SILICONFLOW_KEY') || '';
     document.getElementById('modal-key-aliyun').value = localStorage.getItem('ALIYUN_KEY') || '';
+    document.getElementById('modal-llm-url').value = localStorage.getItem('LLM_URL') || 'https://api.openai.com/v1';
+    document.getElementById('modal-llm-key').value = localStorage.getItem('LLM_KEY') || '';
+    document.getElementById('modal-llm-model').value = localStorage.getItem('LLM_MODEL') || 'gpt-4o-mini';
 }
 
 function saveModalKeys() {
     localStorage.setItem('FISH_KEY', document.getElementById('modal-key-fish').value.trim());
     localStorage.setItem('SILICONFLOW_KEY', document.getElementById('modal-key-sili').value.trim());
     localStorage.setItem('ALIYUN_KEY', document.getElementById('modal-key-aliyun').value.trim());
+    localStorage.setItem('LLM_URL', document.getElementById('modal-llm-url').value.trim() || 'https://api.openai.com/v1');
+    localStorage.setItem('LLM_KEY', document.getElementById('modal-llm-key').value.trim());
+    localStorage.setItem('LLM_MODEL', document.getElementById('modal-llm-model').value.trim() || 'gpt-4o-mini');
     onEngineChange();
     settings_modal.close();
 }
@@ -187,4 +194,121 @@ function renderHistory() {
 function clearHistory() {
     localStorage.removeItem('vf_history');
     renderHistory();
+}
+
+// ============================================
+// AI 语音对话功能
+// ============================================
+
+// 可复用的 TTS 生成播放函数（复用当前页面的引擎/声音/密钥配置）
+async function generateAndPlayAudio(text) {
+    const engine = document.getElementById('tts-engine').value;
+    const voiceId = document.getElementById('voice-id').value.trim();
+    const apiKey = document.getElementById('main-api-key').value.trim();
+    const format = document.getElementById('tts-format').value;
+    const speed = parseFloat(document.getElementById('tts-speed').value);
+    const prompt = document.getElementById('tts-prompt').value.trim();
+
+    if (!apiKey) {
+        console.warn('未配置 TTS API Key，跳过语音播放');
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/${engine}/tts`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Local-Api-Key': apiKey
+            },
+            body: JSON.stringify({ text, voiceId, format, speed, prompt })
+        });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP ${res.status}`);
+        }
+        const audioBlob = await res.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        await audio.play().catch(() => {});
+    } catch (err) {
+        console.error('语音播放失败:', err);
+    }
+}
+
+// 添加聊天气泡
+function appendChatMessage(text, type) {
+    const container = document.getElementById('chat-messages');
+    const div = document.createElement('div');
+    div.className = `chat chat-${type === 'user' ? 'end' : 'start'}`;
+    const bubble = document.createElement('div');
+    bubble.className = `chat-bubble ${type === 'user' ? 'bg-primary text-white' : 'bg-base-200 text-base-content'}`;
+    bubble.innerText = text;
+    div.appendChild(bubble);
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    return bubble;
+}
+
+// 发送聊天消息
+async function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.openai.com/v1';
+    const llmKey = localStorage.getItem('LLM_KEY') || '';
+    const llmModel = localStorage.getItem('LLM_MODEL') || 'gpt-4o-mini';
+
+    if (!llmKey) {
+        alert('请先点击右上角齿轮 ⚙️ 设置大模型 API Key！');
+        settings_modal.showModal();
+        return;
+    }
+
+    appendChatMessage(text, 'user');
+    input.value = '';
+
+    const loadingBubble = appendChatMessage('安正在思考...', 'ai');
+
+    try {
+        const res = await fetch(`${llmUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${llmKey}`
+            },
+            body: JSON.stringify({
+                model: llmModel,
+                messages: [
+                    { role: 'system', content: '你叫"安"，是一位温柔、善解人意、轻声细语的聊天伙伴。请用简短、亲切、富有情感的语气回复，每句话不超过50字。' },
+                    { role: 'user', content: text }
+                ],
+                temperature: 0.8
+            })
+        });
+
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`大模型请求失败: ${res.status} ${errText.substring(0, 100)}`);
+        }
+
+        const data = await res.json();
+        const reply = data.choices[0].message.content;
+
+        loadingBubble.innerText = reply;
+
+        // 自动用克隆声音朗读 AI 回复
+        generateAndPlayAudio(reply);
+
+    } catch (err) {
+        loadingBubble.innerText = '出错啦: ' + err.message;
+        console.error(err);
+    }
+}
+
+// 清空聊天记录
+function clearChat() {
+    const container = document.getElementById('chat-messages');
+    container.innerHTML = '<div class="chat chat-start"><div class="chat-bubble bg-base-200 text-base-content">你好呀，我是安。今天想跟我聊点什么？</div></div>';
 }

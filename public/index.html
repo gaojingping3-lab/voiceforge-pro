@@ -41,6 +41,7 @@
     <main class="container mx-auto max-w-3xl p-4 mt-4">
         <div class="tabs tabs-boxed mb-4 bg-base-100/80 backdrop-blur p-1 rounded-xl shadow-sm">
             <a class="tab tab-active text-base font-medium h-12 flex-1 rounded-lg" id="tab-tts" onclick="switchTab('tts')"><i class="fa-solid fa-keyboard mr-2"></i>文本转语音</a>
+            <a class="tab text-base font-medium h-12 flex-1 rounded-lg" id="tab-chat" onclick="switchTab('chat')"><i class="fa-solid fa-comments mr-2"></i>AI语音对话</a>
             <a class="tab text-base font-medium h-12 flex-1 rounded-lg" id="tab-clone" onclick="switchTab('clone')"><i class="fa-solid fa-dna mr-2"></i>声音克隆</a>
             <a class="tab text-base font-medium h-12 flex-1 rounded-lg" id="tab-history" onclick="switchTab('history')"><i class="fa-solid fa-clock-rotate-left mr-2"></i>历史记录</a>
         </div>
@@ -120,6 +121,30 @@
             </div>
         </div>
 
+        <!-- AI Chat Section -->
+        <div id="chat-section" class="card glass-panel shadow-xl hidden">
+            <div class="card-body p-4 sm:p-6">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="card-title text-lg"><i class="fa-solid fa-comments text-primary"></i> 与安 语音对话</h2>
+                    <button class="btn btn-ghost btn-xs" onclick="clearChat()"><i class="fa-solid fa-trash"></i> 清空</button>
+                </div>
+                <div class="alert alert-info py-2 px-3 text-xs mb-3">
+                    <i class="fa-solid fa-info-circle"></i>
+                    <span>AI 回复会自动用你当前选中的克隆声音朗读。需先在「文本转语音」页配置好 API Key 和声音 ID。</span>
+                </div>
+                <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 h-80 sm:h-96 overflow-y-auto flex flex-col gap-3 mb-3">
+                    <div class="chat chat-start">
+                        <div class="chat-bubble bg-base-200 text-base-content">你好呀，我是安。今天想跟我聊点什么？</div>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="chat-input" placeholder="跟安说点什么..." class="input input-bordered input-sm flex-1" onkeypress="if(event.key==='Enter')sendChatMessage()" />
+                    <button id="btn-chat-send" class="btn btn-primary btn-sm px-5 rounded-full" onclick="sendChatMessage()">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
         <!-- Clone Section -->
         <div id="clone-section" class="card glass-panel shadow-xl hidden">
             <div class="card-body p-6">
@@ -194,6 +219,19 @@
             <div class="form-control mb-6">
                 <label class="label py-1"><span class="label-text text-sm">阿里云 AppKey / Token</span></label>
                 <input type="password" id="modal-key-aliyun" class="input input-bordered input-sm w-full font-mono" placeholder="阿里云鉴权凭证" />
+            </div>
+            <div class="divider my-2 text-xs">AI 对话配置</div>
+            <div class="form-control mb-3">
+                <label class="label py-1"><span class="label-text text-sm">大模型 API 地址 (Base URL)</span></label>
+                <input type="text" id="modal-llm-url" class="input input-bordered input-sm w-full font-mono" placeholder="https://api.openai.com/v1" />
+            </div>
+            <div class="form-control mb-3">
+                <label class="label py-1"><span class="label-text text-sm">大模型 API Key</span></label>
+                <input type="password" id="modal-llm-key" class="input input-bordered input-sm w-full font-mono" placeholder="sk-..." />
+            </div>
+            <div class="form-control mb-6">
+                <label class="label py-1"><span class="label-text text-sm">大模型名称 (Model)</span></label>
+                <input type="text" id="modal-llm-model" class="input input-bordered input-sm w-full font-mono" placeholder="gpt-4o-mini / deepseek-chat 等" />
             </div>
             
             <div class="modal-action">
