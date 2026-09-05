@@ -405,8 +405,9 @@ async function generateAndPlayAudio(text) {
         }
         const audioBlob = await res.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        await audio.play().catch(() => {});
+        stopChatAudio(); // 先停止之前的播放
+        currentChatAudio = new Audio(audioUrl);
+        await currentChatAudio.play().catch(() => {});
     } catch (err) {
         console.error('语音播放失败:', err);
     }
@@ -414,6 +415,14 @@ async function generateAndPlayAudio(text) {
 
 // 添加聊天气泡
 let chatHistory = []; // 对话历史记忆，最多保留20条消息
+let currentChatAudio = null; // 当前正在播放的聊天音频
+
+function stopChatAudio() {
+    if (currentChatAudio) {
+        currentChatAudio.pause();
+        currentChatAudio = null;
+    }
+}
 
 function appendChatMessage(text, type) {
     const container = document.getElementById('chat-messages');
@@ -423,9 +432,46 @@ function appendChatMessage(text, type) {
     bubble.className = `chat-bubble ${type === 'user' ? 'bg-primary text-white' : 'bg-base-200 text-base-content'}`;
     bubble.innerText = text;
     div.appendChild(bubble);
+
+    // AI消息后面加播放按钮
+    if (type === 'ai') {
+        const playBtn = document.createElement('button');
+        playBtn.className = 'btn btn-ghost btn-xs btn-circle ml-2 flex-shrink-0';
+        playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-xs"></i>';
+        playBtn.title = '播放语音';
+        playBtn.onclick = () => playChatMessage(text);
+        div.appendChild(playBtn);
+    }
+
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
     return bubble;
+}
+
+// 播放指定文本的语音（聊天消息用）
+async function playChatMessage(text) {
+    stopChatAudio();
+    const engine = document.getElementById('tts-engine').value;
+    const voiceId = document.getElementById('voice-id').value.trim();
+    const apiKey = document.getElementById('main-api-key').value.trim();
+    const format = document.getElementById('tts-format').value;
+    const speed = parseFloat(document.getElementById('tts-speed').value);
+
+    if (!apiKey) {
+        alert('请先配置 Fish API 密钥');
+        return;
+    }
+
+    try {
+        const res = await callTTS(text, engine, voiceId, apiKey, format, speed);
+        if (!res.ok) throw new Error('TTS请求失败');
+        const audioBlob = await res.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        currentChatAudio = new Audio(audioUrl);
+        currentChatAudio.play().catch(() => {});
+    } catch (err) {
+        console.error('播放失败:', err);
+    }
 }
 
 // 发送聊天消息
@@ -458,6 +504,9 @@ async function sendChatMessage() {
 
     appendChatMessage(text, 'user');
     input.value = '';
+
+    // 发送新消息时，停止上一条AI回复的朗读
+    stopChatAudio();
 
     // 把用户消息加入历史记忆
     chatHistory.push({ role: 'user', content: text });
