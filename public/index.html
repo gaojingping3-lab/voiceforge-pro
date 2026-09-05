@@ -9,20 +9,20 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .glass-panel {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.25);
         }
         [data-theme="dark"] .glass-panel {
-            background: rgba(30, 30, 30, 0.7);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(30, 30, 30, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
         body { transition: background-color 0.3s ease; }
     </style>
 </head>
-<body class="min-h-screen bg-base-200 bg-[url('bg.jpg')] bg-cover bg-center bg-fixed">
-    <div class="navbar bg-base-100/80 backdrop-blur sticky top-0 z-50 shadow-sm">
+<body class="min-h-screen bg-base-200 bg-[url('bg.jpg')] bg-cover bg-center bg-fixed text-base-content">
+    <div class="navbar bg-base-100/90 backdrop-blur sticky top-0 z-50 shadow-sm border-b border-base-content/10">
         <div class="flex-1">
             <a class="btn btn-ghost normal-case text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
                 <i class="fa-solid fa-microphone-lines text-primary"></i> VoiceForge Pro
@@ -38,76 +38,83 @@
         </div>
     </div>
 
-    <main class="container mx-auto max-w-4xl p-4 mt-6">
-        <div class="tabs tabs-boxed mb-6 bg-base-100/60 backdrop-blur p-1 rounded-xl shadow-sm">
+    <main class="container mx-auto max-w-3xl p-4 mt-4">
+        <div class="tabs tabs-boxed mb-4 bg-base-100/80 backdrop-blur p-1 rounded-xl shadow-sm">
             <a class="tab tab-active text-base font-medium h-12 flex-1 rounded-lg" id="tab-tts" onclick="switchTab('tts')"><i class="fa-solid fa-keyboard mr-2"></i>文本转语音</a>
             <a class="tab text-base font-medium h-12 flex-1 rounded-lg" id="tab-clone" onclick="switchTab('clone')"><i class="fa-solid fa-dna mr-2"></i>声音克隆</a>
-            <a class="tab text-base font-medium h-12 flex-1 rounded-lg" id="tab-history" onclick="switchTab('history')"><i class="fa-solid fa-clock-rotate-left mr-2"></i>生成历史</a>
+            <a class="tab text-base font-medium h-12 flex-1 rounded-lg" id="tab-history" onclick="switchTab('history')"><i class="fa-solid fa-clock-rotate-left mr-2"></i>历史记录</a>
         </div>
 
         <!-- TTS Section -->
         <div id="tts-section" class="card glass-panel shadow-xl">
-            <div class="card-body">
-                <h2 class="card-title text-2xl mb-4"><i class="fa-solid fa-wand-magic-sparkles text-accent"></i> 创作你的声音</h2>
-                
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div class="card-body p-6">
+                <!-- API Key Bar directly on top -->
+                <div class="p-3 bg-primary/10 border border-primary/20 rounded-xl mb-4 flex flex-col sm:flex-row items-center gap-3">
+                    <div class="flex items-center gap-2 text-primary font-bold whitespace-nowrap">
+                        <i class="fa-solid fa-key"></i> <span id="api-key-label">Fish API 密钥:</span>
+                    </div>
+                    <input type="password" id="main-api-key" placeholder="在此直接粘贴 API Key (自动保存)" class="input input-bordered input-sm w-full font-mono text-sm" />
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                     <div class="form-control w-full">
-                        <label class="label"><span class="label-text font-bold">引擎选择</span></label>
-                        <select class="select select-bordered w-full" id="tts-engine">
+                        <label class="label py-1"><span class="label-text font-bold">引擎选择</span></label>
+                        <select class="select select-bordered select-sm w-full" id="tts-engine" onchange="onEngineChange()">
                             <option value="fish">Fish TTS (推荐)</option>
+                            <option value="siliconflow">SiliconFlow (硅基流动)</option>
                             <option value="aliyun">阿里云语音合成</option>
-                            <option value="siliconflow">SiliconFlow</option>
                         </select>
                     </div>
                     <div class="form-control w-full">
-                        <label class="label"><span class="label-text font-bold">音色模型 (Voice ID)</span></label>
-                        <input type="text" id="voice-id" placeholder="输入模型ID (可选)" class="input input-bordered w-full" />
+                        <label class="label py-1"><span class="label-text font-bold">模型 ID (Voice/Ref ID)</span></label>
+                        <input type="text" id="voice-id" placeholder="留空为默认音色" class="input input-bordered input-sm w-full font-mono text-sm" />
                     </div>
                     <div class="form-control w-full">
-                        <label class="label"><span class="label-text font-bold">情感预设</span></label>
-                        <select class="select select-bordered w-full" id="tts-emotion">
-                            <option value="default">默认 (Default)</option>
-                            <option value="happy">开心 (Happy)</option>
-                            <option value="sad">悲伤 (Sad)</option>
-                            <option value="angry">愤怒 (Angry)</option>
-                            <option value="calm">平静 (Calm)</option>
-                            <option value="emphasis">强调 (Emphasis)</option>
+                        <label class="label py-1"><span class="label-text font-bold">格式</span></label>
+                        <select class="select select-bordered select-sm w-full" id="tts-format">
+                            <option value="mp3">MP3</option>
+                            <option value="wav">WAV</option>
+                            <option value="opus">Opus</option>
                         </select>
                     </div>
                 </div>
 
-                <div class="form-control w-full mb-4">
-                    <label class="label">
+                <div class="form-control w-full mb-3">
+                    <label class="label py-1">
                         <span class="label-text font-bold">文本内容</span>
-                        <span class="label-text-alt text-gray-500">支持 SSML / 长文本</span>
+                        <span id="char-count" class="label-text-alt text-gray-500">0 字</span>
                     </label>
-                    <textarea id="tts-text" class="textarea textarea-bordered h-40 text-base leading-relaxed resize-none" placeholder="在这里输入想要合成的文本...&#10;&#10;例如：&#10;在这个充满规训与惩罚的现代社会中，我们常常渴望能以另一种声音，讲述来自地下室的独白。凝视深渊过久，深渊将回以凝视。"></textarea>
+                    <textarea id="tts-text" class="textarea textarea-bordered h-36 text-base leading-relaxed resize-none font-sans" placeholder="输入要合成的文字内容..."></textarea>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="grid grid-cols-2 gap-4 mb-4">
                     <div>
-                        <label class="label"><span class="label-text">语速 (Speed)</span></label>
-                        <input type="range" min="0.5" max="2" value="1" step="0.1" class="range range-primary range-sm" />
+                        <label class="label py-0"><span class="label-text text-xs">语速: <span id="val-speed" class="font-bold">1.0</span></span></label>
+                        <input type="range" id="tts-speed" min="0.5" max="2.0" value="1.0" step="0.1" class="range range-primary range-xs" oninput="document.getElementById('val-speed').innerText = this.value" />
                     </div>
                     <div>
-                        <label class="label"><span class="label-text">音调 (Pitch)</span></label>
-                        <input type="range" min="-10" max="10" value="0" step="1" class="range range-secondary range-sm" />
+                        <label class="label py-0"><span class="label-text text-xs">情感参考 (Prompt)</span></label>
+                        <input type="text" id="tts-prompt" placeholder="例如：温柔、愤怒地大喊" class="input input-bordered input-xs w-full" />
                     </div>
                 </div>
 
                 <div class="card-actions justify-end mt-2">
-                    <button id="btn-generate" class="btn btn-primary w-full sm:w-auto px-8 rounded-full shadow-lg hover:shadow-primary/50 transition-all">
-                        <i class="fa-solid fa-play mr-2"></i> 开始生成
+                    <button id="btn-generate" class="btn btn-primary w-full sm:w-auto px-10 rounded-full shadow-lg hover:shadow-primary/40 transition-all">
+                        <i class="fa-solid fa-circle-play mr-2"></i> 开始合成音频
                     </button>
                 </div>
 
-                <!-- Result Player (Hidden by default) -->
-                <div id="result-player" class="mt-6 p-4 bg-base-200/50 rounded-xl hidden flex-col items-center gap-4">
-                    <h3 class="text-lg font-bold self-start">生成结果</h3>
-                    <audio id="audio-playback" controls class="w-full h-12 rounded-full"></audio>
-                    <div class="flex gap-2 self-end">
-                        <button class="btn btn-sm btn-outline"><i class="fa-solid fa-share-nodes"></i> 分享</button>
-                        <a id="btn-download" class="btn btn-sm btn-success text-white"><i class="fa-solid fa-download"></i> 下载音频</a>
+                <!-- Result Player -->
+                <div id="result-player" class="mt-5 p-4 bg-base-100/90 rounded-2xl border border-base-content/10 hidden flex-col items-center gap-3">
+                    <div class="w-full flex justify-between items-center">
+                        <h3 class="font-bold text-sm text-primary"><i class="fa-solid fa-waveform-lines"></i> 播放合成结果</h3>
+                        <span id="audio-duration" class="text-xs opacity-60"></span>
+                    </div>
+                    <audio id="audio-playback" controls class="w-full h-10 rounded-lg"></audio>
+                    <div class="flex gap-2 self-end mt-1">
+                        <a id="btn-download" class="btn btn-sm btn-success text-white px-5 rounded-full" download="voiceforge_output.mp3">
+                            <i class="fa-solid fa-download mr-1"></i> 下载音频
+                        </a>
                     </div>
                 </div>
             </div>
@@ -115,44 +122,31 @@
 
         <!-- Clone Section -->
         <div id="clone-section" class="card glass-panel shadow-xl hidden">
-            <div class="card-body">
-                <h2 class="card-title text-2xl mb-4"><i class="fa-solid fa-fingerprint text-secondary"></i> AI 声音克隆 (Voice Cloning)</h2>
-                <div class="alert alert-info shadow-sm mb-6">
-                    <i class="fa-solid fa-circle-info"></i>
-                    <span>上传一段 5-15 秒的清晰录音，系统将提取特征并建立专属声音模型。请勿用于非法用途。</span>
+            <div class="card-body p-6">
+                <h2 class="card-title text-xl mb-2"><i class="fa-solid fa-dna text-secondary"></i> 声音克隆 (Zero-Shot)</h2>
+                <div class="alert alert-info py-2 px-3 text-xs mb-4">
+                    <i class="fa-solid fa-info-circle"></i>
+                    <span>上传 5~15 秒无杂音的人声干音文件，系统将直接提取声音特征。</span>
+                </div>
+
+                <div class="form-control w-full mb-3">
+                    <label class="label py-1"><span class="label-text font-bold">模型名称</span></label>
+                    <input type="text" id="clone-name" placeholder="例如：定制角色音色" class="input input-bordered input-sm w-full" />
                 </div>
 
                 <div class="form-control w-full mb-4">
-                    <label class="label"><span class="label-text font-bold">目标引擎</span></label>
-                    <select class="select select-bordered w-full md:w-1/2">
-                        <option value="fish">Fish TTS Clone API</option>
-                        <option value="aliyun">阿里云 个性化人声</option>
-                        <option value="siliconflow">SiliconFlow Clone</option>
-                    </select>
-                </div>
-
-                <div class="form-control w-full mb-4">
-                    <label class="label"><span class="label-text font-bold">模型名称 (Model Name)</span></label>
-                    <input type="text" placeholder="例如：我的原声、角色A..." class="input input-bordered w-full md:w-1/2" />
+                    <label class="label py-1"><span class="label-text font-bold">参考音频文本 (Prompt Text)</span></label>
+                    <input type="text" id="clone-ref-text" placeholder="音频里说的原话（准确填写克隆相似度大幅提升）" class="input input-bordered input-sm w-full" />
                 </div>
 
                 <div class="form-control w-full mb-6">
-                    <label class="label"><span class="label-text font-bold">上传参考音频 (.wav, .mp3)</span></label>
-                    <div class="flex items-center justify-center w-full">
-                        <label for="dropzone-file" class="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl cursor-pointer bg-base-200/50 border-base-content/20 hover:bg-base-200/80 hover:border-primary transition-colors">
-                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                                <i class="fa-solid fa-cloud-arrow-up text-4xl mb-3 text-base-content/50"></i>
-                                <p class="mb-2 text-sm"><span class="font-semibold">点击上传</span> 或拖拽文件至此</p>
-                                <p class="text-xs text-base-content/50">支持 WAV, MP3 (最大 10MB)</p>
-                            </div>
-                            <input id="dropzone-file" type="file" class="hidden" accept="audio/*" />
-                        </label>
-                    </div>
+                    <label class="label py-1"><span class="label-text font-bold">选择参考音频 (.wav / .mp3)</span></label>
+                    <input type="file" id="clone-file" class="file-input file-input-bordered file-input-sm w-full" accept="audio/*" />
                 </div>
 
                 <div class="card-actions justify-end">
-                    <button class="btn btn-secondary w-full sm:w-auto px-8 rounded-full shadow-lg hover:shadow-secondary/50">
-                        <i class="fa-solid fa-microchip mr-2"></i> 开始训练模型
+                    <button id="btn-clone" class="btn btn-secondary px-8 rounded-full">
+                        <i class="fa-solid fa-microchip mr-2"></i> 上传并创建模型
                     </button>
                 </div>
             </div>
@@ -160,21 +154,22 @@
 
         <!-- History Section -->
         <div id="history-section" class="card glass-panel shadow-xl hidden">
-            <div class="card-body">
-                <h2 class="card-title text-2xl mb-4"><i class="fa-solid fa-box-archive text-primary"></i> 历史记录</h2>
+            <div class="card-body p-6">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="card-title text-xl"><i class="fa-solid fa-clock-rotate-left text-accent"></i> 生成历史</h2>
+                    <button class="btn btn-ghost btn-xs text-error" onclick="clearHistory()"><i class="fa-solid fa-trash"></i> 清空</button>
+                </div>
                 <div class="overflow-x-auto">
-                    <table class="table w-full">
+                    <table class="table table-sm w-full">
                         <thead>
                             <tr>
                                 <th>时间</th>
                                 <th>引擎</th>
-                                <th>文本摘要</th>
+                                <th>文本</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
                         <tbody id="history-list">
-                            <!-- JS will populate this -->
-                            <tr><td colspan="4" class="text-center text-gray-500 py-8">暂无生成记录</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -185,27 +180,24 @@
     <!-- Settings Modal -->
     <dialog id="settings_modal" class="modal modal-bottom sm:modal-middle">
         <div class="modal-box glass-panel">
-            <h3 class="font-bold text-lg border-b border-base-content/10 pb-2 mb-4"><i class="fa-solid fa-key"></i> API 密钥设置</h3>
-            <p class="text-sm text-base-content/70 mb-4">如果您在本地或未配置环境变量的云端运行，请在此填入您的 API 密钥。数据仅保存在浏览器本地。</p>
+            <h3 class="font-bold text-lg border-b border-base-content/10 pb-2 mb-4"><i class="fa-solid fa-sliders"></i> 全局 API 凭证管理</h3>
+            <p class="text-xs text-base-content/70 mb-4">保存后将持久化储存在本地浏览器（LocalStorage）。在前端即可直接调用真实服务。</p>
             
             <div class="form-control mb-3">
-                <label class="label"><span class="label-text">Fish TTS API Key</span></label>
-                <input type="password" id="key-fish" class="input input-bordered input-sm w-full" placeholder="sk-..." />
+                <label class="label py-1"><span class="label-text text-sm">Fish TTS API Key</span></label>
+                <input type="password" id="modal-key-fish" class="input input-bordered input-sm w-full font-mono" placeholder="从 fish.audio 获取的 API Key" />
             </div>
             <div class="form-control mb-3">
-                <label class="label"><span class="label-text">阿里云 API Key / AppKey</span></label>
-                <input type="password" id="key-aliyun" class="input input-bordered input-sm w-full" placeholder="输入阿里云凭证" />
+                <label class="label py-1"><span class="label-text text-sm">SiliconFlow (硅基流动) API Key</span></label>
+                <input type="password" id="modal-key-sili" class="input input-bordered input-sm w-full font-mono" placeholder="sk-..." />
             </div>
             <div class="form-control mb-6">
-                <label class="label"><span class="label-text">SiliconFlow API Key</span></label>
-                <input type="password" id="key-sili" class="input input-bordered input-sm w-full" placeholder="sk-..." />
+                <label class="label py-1"><span class="label-text text-sm">阿里云 AppKey / Token</span></label>
+                <input type="password" id="modal-key-aliyun" class="input input-bordered input-sm w-full font-mono" placeholder="阿里云鉴权凭证" />
             </div>
             
             <div class="modal-action">
-                <form method="dialog">
-                    <button class="btn btn-outline mr-2" onclick="loadKeys()">取消</button>
-                    <button class="btn btn-primary" onclick="saveKeys()">保存并关闭</button>
-                </form>
+                <button class="btn btn-primary btn-sm px-6 rounded-full" onclick="saveModalKeys()">保存设置</button>
             </div>
         </div>
         <form method="dialog" class="modal-backdrop">
