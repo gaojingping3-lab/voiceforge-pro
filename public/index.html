@@ -49,7 +49,7 @@
         <div class="tabs tabs-boxed mb-4 bg-base-100/80 backdrop-blur p-1 rounded-xl shadow-sm">
             <a class="tab tab-active text-base font-medium h-12 flex-1 rounded-lg" id="tab-tts" onclick="switchTab('tts')"><i class="fa-solid fa-keyboard mr-2"></i>文本转语音</a>
             <a class="tab text-base font-medium h-12 flex-1 rounded-lg" id="tab-chat" onclick="switchTab('chat')"><i class="fa-solid fa-comments mr-2"></i>AI语音对话</a>
-            <a class="tab text-base font-medium h-12 flex-1 rounded-lg" id="tab-clone" onclick="switchTab('clone')"><i class="fa-solid fa-dna mr-2"></i>声音克隆</a>
+            <a class="tab text-base font-medium h-12 flex-1 rounded-lg" id="tab-clone" onclick="switchTab('clone')"><i class="fa-solid fa-dna mr-2"></i>声音ID生成</a>
             <a class="tab text-base font-medium h-12 flex-1 rounded-lg" id="tab-history" onclick="switchTab('history')"><i class="fa-solid fa-clock-rotate-left mr-2"></i>历史记录</a>
         </div>
 
@@ -188,7 +188,7 @@
         <!-- Clone Section -->
         <div id="clone-section" class="card glass-panel shadow-xl hidden">
             <div class="card-body p-6">
-                <h2 class="card-title text-xl mb-2"><i class="fa-solid fa-dna text-secondary"></i> 声音克隆</h2>
+                <h2 class="card-title text-xl mb-2"><i class="fa-solid fa-dna text-secondary"></i> 声音ID生成</h2>
                 <div class="alert alert-info py-2 px-3 text-xs mb-4">
                     <i class="fa-solid fa-info-circle"></i>
                     <span>上传 5~30 秒清晰无杂音的人声音频，支持 MP3 / WAV / M4A / OGG 格式。</span>
@@ -341,9 +341,9 @@
                     </ul>
                 </div>
 
-                <!-- 声音克隆 -->
+                <!-- 声音ID生成 -->
                 <div class="bg-base-200/50 rounded-lg p-4">
-                    <h4 class="font-bold text-base mb-2 text-primary"><i class="fa-solid fa-dna mr-2"></i>声音克隆</h4>
+                    <h4 class="font-bold text-base mb-2 text-primary"><i class="fa-solid fa-dna mr-2"></i>声音ID生成</h4>
                     <ul class="list-disc list-inside space-y-1">
                         <li>上传 10~30 秒清晰的人声音频</li>
                         <li>填写参考文本（音频里说的话）</li>
