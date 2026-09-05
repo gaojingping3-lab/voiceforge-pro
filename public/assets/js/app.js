@@ -77,14 +77,19 @@ function saveModalKeys() {
 onEngineChange();
 syncModalInputs();
 
-// 配置自动迁移：检测到旧的OpenAI默认地址时自动重置为DeepSeek
+// 配置自动迁移：检测到旧的无效地址时自动重置为DeepSeek
 (function migrateConfig() {
-    const oldUrls = ['https://api.openai.com/v1', 'https://api.openai.com', 'https://api.groq.com/openai/v1'];
+    const oldUrls = [
+        'https://api.openai.com/v1',
+        'https://api.openai.com',
+        'https://api.groq.com/openai/v1',
+        'https://openrouter.ai/api/v1'
+    ];
     const currentUrl = localStorage.getItem('LLM_URL');
-    if (currentUrl && oldUrls.includes(currentUrl.trim())) {
+    // 重置条件：是旧地址，或者不是有效的http URL
+    if (currentUrl && (oldUrls.includes(currentUrl.trim()) || !currentUrl.trim().startsWith('http'))) {
         localStorage.removeItem('LLM_URL');
         localStorage.removeItem('LLM_MODEL');
-        // 保留用户的Key，只重置地址和模型
         console.log('已自动迁移大模型配置为DeepSeek默认值');
     }
 })();
@@ -286,9 +291,17 @@ async function sendChatMessage() {
     const text = input.value.trim();
     if (!text) return;
 
-    const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+    let llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
     const llmKey = localStorage.getItem('LLM_KEY') || '';
-    const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+    let llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+
+    // 健壮性校验：如果地址不是有效的http URL，自动重置为DeepSeek默认值
+    if (!llmUrl.startsWith('http')) {
+        llmUrl = 'https://api.deepseek.com';
+        llmModel = 'deepseek-v4-flash';
+        localStorage.setItem('LLM_URL', llmUrl);
+        localStorage.setItem('LLM_MODEL', llmModel);
+    }
 
     if (!llmKey) {
         alert('请先点击右上角齿轮 ⚙️ 设置大模型 API Key！');
