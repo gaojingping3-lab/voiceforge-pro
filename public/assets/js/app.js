@@ -45,12 +45,57 @@ function onEngineChange() {
     };
     keyLabel.innerText = nameMap[engine] || 'API 密钥:';
     mainKeyInput.value = localStorage.getItem(`${engine.toUpperCase()}_KEY`) || '';
+
+    // 切换到Fish引擎且有Key时自动查询余额
+    const balanceBox = document.getElementById('fish-balance-box');
+    if (engine === 'fish' && mainKeyInput.value.trim()) {
+        balanceBox.classList.remove('hidden');
+        fetchFishBalance();
+    } else {
+        balanceBox.classList.add('hidden');
+    }
+}
+
+// 查询 Fish Audio 余额
+async function fetchFishBalance() {
+    const apiKey = mainKeyInput.value.trim();
+    const balanceText = document.getElementById('fish-balance-text');
+    if (!apiKey) {
+        balanceText.innerText = '请先填 API Key';
+        return;
+    }
+    balanceText.innerText = '查询中...';
+    try {
+        const res = await fetch('/api/fish/wallet/self/api-credit', {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${apiKey}` }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        // Fish Audio 余额字段可能是 credit 或 amount
+        const credit = data.credit !== undefined ? data.credit : (data.amount !== undefined ? data.amount : JSON.stringify(data));
+        balanceText.innerText = typeof credit === 'number' ? credit.toLocaleString() : credit;
+    } catch (err) {
+        balanceText.innerText = '查询失败';
+        console.error('Fish余额查询失败:', err);
+    }
 }
 
 mainKeyInput.addEventListener('input', () => {
     const engine = engineSelect.value;
     localStorage.setItem(`${engine.toUpperCase()}_KEY`, mainKeyInput.value.trim());
     syncModalInputs();
+    // Fish引擎下输入Key后自动查询余额（防抖500ms）
+    if (engine === 'fish') {
+        const balanceBox = document.getElementById('fish-balance-box');
+        if (mainKeyInput.value.trim()) {
+            balanceBox.classList.remove('hidden');
+            clearTimeout(window._balanceTimer);
+            window._balanceTimer = setTimeout(fetchFishBalance, 500);
+        } else {
+            balanceBox.classList.add('hidden');
+        }
+    }
 });
 
 function syncModalInputs() {

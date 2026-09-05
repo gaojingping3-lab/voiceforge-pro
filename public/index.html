@@ -60,6 +60,18 @@
                     <input type="password" id="main-api-key" placeholder="在此直接粘贴 API Key (自动保存)" class="input input-bordered input-sm w-full font-mono text-sm" />
                 </div>
 
+                <!-- Fish Audio 余额显示 -->
+                <div id="fish-balance-box" class="hidden mb-4 p-3 bg-success/10 border border-success/20 rounded-xl flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-success">
+                        <i class="fa-solid fa-wallet"></i>
+                        <span class="font-bold text-sm">Fish 余额：</span>
+                        <span id="fish-balance-text" class="font-mono text-sm">--</span>
+                    </div>
+                    <button class="btn btn-ghost btn-xs text-success" onclick="fetchFishBalance()" title="刷新余额">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
+
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                     <div class="form-control w-full">
                         <label class="label py-1"><span class="label-text font-bold">引擎选择</span></label>
