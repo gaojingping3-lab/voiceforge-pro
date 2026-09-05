@@ -66,9 +66,9 @@ function saveModalKeys() {
     localStorage.setItem('FISH_KEY', document.getElementById('modal-key-fish').value.trim());
     localStorage.setItem('SILICONFLOW_KEY', document.getElementById('modal-key-sili').value.trim());
     localStorage.setItem('ALIYUN_KEY', document.getElementById('modal-key-aliyun').value.trim());
-    localStorage.setItem('LLM_URL', document.getElementById('modal-llm-url').value.trim() || 'https://api.openai.com/v1');
+    localStorage.setItem('LLM_URL', document.getElementById('modal-llm-url').value.trim() || 'https://openrouter.ai/api/v1');
     localStorage.setItem('LLM_KEY', document.getElementById('modal-llm-key').value.trim());
-    localStorage.setItem('LLM_MODEL', document.getElementById('modal-llm-model').value.trim() || 'gpt-4o-mini');
+    localStorage.setItem('LLM_MODEL', document.getElementById('modal-llm-model').value.trim() || 'deepseek/deepseek-chat');
     onEngineChange();
     settings_modal.close();
 }
