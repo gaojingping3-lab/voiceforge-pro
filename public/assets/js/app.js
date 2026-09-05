@@ -60,6 +60,7 @@ function syncModalInputs() {
     document.getElementById('modal-llm-url').value = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
     document.getElementById('modal-llm-key').value = localStorage.getItem('LLM_KEY') || '';
     document.getElementById('modal-llm-model').value = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+    document.getElementById('modal-llm-system').value = localStorage.getItem('LLM_SYSTEM') || '';
 }
 
 function saveModalKeys() {
@@ -69,6 +70,7 @@ function saveModalKeys() {
     localStorage.setItem('LLM_URL', document.getElementById('modal-llm-url').value.trim() || 'https://api.deepseek.com');
     localStorage.setItem('LLM_KEY', document.getElementById('modal-llm-key').value.trim());
     localStorage.setItem('LLM_MODEL', document.getElementById('modal-llm-model').value.trim() || 'deepseek-v4-flash');
+    localStorage.setItem('LLM_SYSTEM', document.getElementById('modal-llm-system').value.trim());
     onEngineChange();
     settings_modal.close();
 }
@@ -303,6 +305,10 @@ async function sendChatMessage() {
         localStorage.setItem('LLM_MODEL', llmModel);
     }
 
+    // 用户自定义AI角色设定，留空使用默认设定
+    const defaultSystem = '你是安。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。';
+    const systemPrompt = localStorage.getItem('LLM_SYSTEM') || defaultSystem;
+
     if (!llmKey) {
         alert('请先点击右上角齿轮 ⚙️ 设置大模型 API Key！');
         settings_modal.showModal();
@@ -326,7 +332,7 @@ async function sendChatMessage() {
                 baseUrl: llmUrl,
                 model: llmModel,
                 messages: [
-                    { role: 'system', content: '你是安。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。' },
+                    { role: 'system', content: systemPrompt },
                     { role: 'user', content: text }
                 ],
                 temperature: 0.8
