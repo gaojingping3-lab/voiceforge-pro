@@ -84,6 +84,45 @@ ttsText.addEventListener('input', () => {
     charCount.innerText = `${ttsText.value.length} 字`;
 });
 
+// 统一 TTS 调用函数（Fish引擎使用参考版本参数，声音更真实）
+async function callTTS(text, engine, voiceId, apiKey, format, speed) {
+    if (engine === 'fish') {
+        // Fish Audio - 使用通配路由 + 真实克隆参数
+        const res = await fetch('/api/fish/v1/tts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                text: text,
+                reference_id: voiceId || null,
+                model: 'fish-speech-1.4',
+                format: format || 'mp3',
+                normalize_loudness: true
+            })
+        });
+        return res;
+    } else {
+        // 其他引擎保持原调用方式
+        const res = await fetch(`/api/${engine}/tts`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Local-Api-Key': apiKey
+            },
+            body: JSON.stringify({
+                text,
+                voiceId,
+                format,
+                speed,
+                prompt: ''
+            })
+        });
+        return res;
+    }
+}
+
 // Real TTS Request Handler
 document.getElementById('btn-generate').addEventListener('click', async () => {
     const btn = document.getElementById('btn-generate');
@@ -94,8 +133,6 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
     const apiKey = mainKeyInput.value.trim();
     const format = document.getElementById('tts-format').value;
     const speed = parseFloat(document.getElementById('tts-speed').value);
-    // 全部使用默认，不传情感参数，保持克隆声音真实度
-    const prompt = '';
 
     if (!text) {
         alert("请输入要合成的文本内容！");
@@ -113,21 +150,8 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
     try {
         let audioBlob = null;
 
-        // Try direct backend function first, or direct fallback if running locally
-        const res = await fetch(`/api/${engine}/tts`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Local-Api-Key': apiKey
-            },
-            body: JSON.stringify({
-                text,
-                voiceId,
-                format,
-                speed,
-                prompt
-            })
-        });
+        // 使用统一 TTS 调用函数
+        const res = await callTTS(text, engine, voiceId, apiKey, format, speed);
 
         if (!res.ok) {
             const errData = await res.json().catch(() => ({}));
@@ -208,8 +232,6 @@ async function generateAndPlayAudio(text) {
     const apiKey = document.getElementById('main-api-key').value.trim();
     const format = document.getElementById('tts-format').value;
     const speed = parseFloat(document.getElementById('tts-speed').value);
-    // AI对话朗读时不传情感参数，保持纯克隆声音的真实度
-    const prompt = '';
 
     if (!apiKey) {
         console.warn('未配置 TTS API Key，跳过语音播放');
@@ -217,14 +239,8 @@ async function generateAndPlayAudio(text) {
     }
 
     try {
-        const res = await fetch(`/api/${engine}/tts`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Local-Api-Key': apiKey
-            },
-            body: JSON.stringify({ text, voiceId, format, speed, prompt })
-        });
+        // 使用统一 TTS 调用函数（Fish引擎用更真实的参数）
+        const res = await callTTS(text, engine, voiceId, apiKey, format, speed);
         if (!res.ok) {
             const errData = await res.json().catch(() => ({}));
             throw new Error(errData.error || `HTTP ${res.status}`);
