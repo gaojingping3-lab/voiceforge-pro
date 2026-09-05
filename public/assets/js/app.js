@@ -94,7 +94,8 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
     const apiKey = mainKeyInput.value.trim();
     const format = document.getElementById('tts-format').value;
     const speed = parseFloat(document.getElementById('tts-speed').value);
-    const prompt = document.getElementById('tts-prompt').value.trim();
+    // 全部使用默认，不传情感参数，保持克隆声音真实度
+    const prompt = '';
 
     if (!text) {
         alert("请输入要合成的文本内容！");
