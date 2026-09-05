@@ -430,6 +430,8 @@ function stopAllAudio() {
     if (audioPlayer) {
         audioPlayer.pause();
     }
+    // 释放播放锁
+    isChatAudioPlaying = false;
 }
 
 function appendChatMessage(text, type) {
@@ -458,7 +460,13 @@ function appendChatMessage(text, type) {
 }
 
 // 播放指定文本的语音（聊天消息用）
+let isChatAudioPlaying = false; // 播放锁，防止重复点击
+
 async function playChatMessage(text) {
+    // 播放锁：正在播放中，忽略新的点击
+    if (isChatAudioPlaying) return;
+    isChatAudioPlaying = true;
+
     stopAllAudio();
     const engine = document.getElementById('tts-engine').value;
     const voiceId = document.getElementById('voice-id').value.trim();
@@ -468,6 +476,7 @@ async function playChatMessage(text) {
 
     if (!apiKey) {
         alert('请先配置 Fish API 密钥');
+        isChatAudioPlaying = false;
         return;
     }
 
@@ -477,9 +486,13 @@ async function playChatMessage(text) {
         const audioBlob = await res.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
         currentChatAudio = new Audio(audioUrl);
-        currentChatAudio.play().catch(() => {});
+        // 播放结束后释放锁
+        currentChatAudio.onended = () => { isChatAudioPlaying = false; };
+        currentChatAudio.onerror = () => { isChatAudioPlaying = false; };
+        await currentChatAudio.play().catch(() => { isChatAudioPlaying = false; });
     } catch (err) {
         console.error('播放失败:', err);
+        isChatAudioPlaying = false;
     }
 }
 
