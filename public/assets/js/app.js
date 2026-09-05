@@ -57,9 +57,9 @@ function syncModalInputs() {
     document.getElementById('modal-key-fish').value = localStorage.getItem('FISH_KEY') || '';
     document.getElementById('modal-key-sili').value = localStorage.getItem('SILICONFLOW_KEY') || '';
     document.getElementById('modal-key-aliyun').value = localStorage.getItem('ALIYUN_KEY') || '';
-    document.getElementById('modal-llm-url').value = localStorage.getItem('LLM_URL') || 'https://api.openai.com/v1';
+    document.getElementById('modal-llm-url').value = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com/v1';
     document.getElementById('modal-llm-key').value = localStorage.getItem('LLM_KEY') || '';
-    document.getElementById('modal-llm-model').value = localStorage.getItem('LLM_MODEL') || 'gpt-4o-mini';
+    document.getElementById('modal-llm-model').value = localStorage.getItem('LLM_MODEL') || 'deepseek-chat';
 }
 
 function saveModalKeys() {
@@ -256,9 +256,9 @@ async function sendChatMessage() {
     const text = input.value.trim();
     if (!text) return;
 
-    const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.openai.com/v1';
+    const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com/v1';
     const llmKey = localStorage.getItem('LLM_KEY') || '';
-    const llmModel = localStorage.getItem('LLM_MODEL') || 'gpt-4o-mini';
+    const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-chat';
 
     if (!llmKey) {
         alert('请先点击右上角齿轮 ⚙️ 设置大模型 API Key！');
