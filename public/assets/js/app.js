@@ -444,8 +444,8 @@ function appendChatMessage(text, type) {
     // AI消息后面加播放按钮（放在右下角）
     if (type === 'ai') {
         const playBtn = document.createElement('button');
-        playBtn.className = 'absolute bottom-1 right-1 btn btn-ghost btn-xs btn-circle opacity-60 hover:opacity-100';
-        playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-xs"></i>';
+        playBtn.className = 'absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
+        playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
         playBtn.title = '播放语音';
         // 点击时读取bubble当前的实际文本，而不是创建时的文字
         playBtn.onclick = () => playChatMessage(bubble.innerText);
@@ -502,7 +502,7 @@ async function sendChatMessage() {
     }
 
     // 用户自定义AI角色设定，留空使用默认设定
-    const defaultSystem = '你是安。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。';
+    const defaultSystem = '你是乐。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的乐全提醒或免责声明。';
     const systemPrompt = localStorage.getItem('LLM_SYSTEM') || defaultSystem;
 
     if (!llmKey) {
@@ -522,7 +522,7 @@ async function sendChatMessage() {
     // 限制最多保留20条消息（约10轮对话）
     if (chatHistory.length > 20) chatHistory.shift();
 
-    const loadingBubble = appendChatMessage('安正在思考...', 'ai');
+    const loadingBubble = appendChatMessage('乐正在思考...', 'ai');
     sfxStart();
 
     try {
@@ -574,8 +574,8 @@ async function sendChatMessage() {
         chatHistory.push({ role: 'assistant', content: reply });
         if (chatHistory.length > 20) chatHistory.shift();
 
-        // 自动用克隆声音朗读 AI 回复
-        generateAndPlayAudio(reply);
+        // 自动用克隆声音朗读 AI 回复（已关闭，用户可手动点播放按钮）
+        // generateAndPlayAudio(reply);
         sfxSuccess();
 
     } catch (err) {
@@ -588,7 +588,7 @@ async function sendChatMessage() {
 // 清空聊天记录
 function clearChat() {
     const container = document.getElementById('chat-messages');
-    container.innerHTML = '<div class="chat chat-start"><div class="chat-bubble bg-base-200 text-base-content">你好呀，我是安。今天想跟我聊点什么？</div></div>';
+    container.innerHTML = '<div class="chat chat-start"><div class="chat-bubble bg-base-200 text-base-content">你好呀，我是乐。今天想跟我聊点什么？</div></div>';
     chatHistory = []; // 清空记忆
 }
 

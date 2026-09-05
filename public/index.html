@@ -165,20 +165,20 @@
         <div id="chat-section" class="card glass-panel shadow-xl hidden">
             <div class="card-body p-4 sm:p-6">
                 <div class="flex items-center justify-between mb-3">
-                    <h2 class="card-title text-lg"><i class="fa-solid fa-comments text-primary"></i> 与安 语音对话</h2>
+                    <h2 class="card-title text-lg"><i class="fa-solid fa-comments text-primary"></i> 与乐 语音对话</h2>
                     <button class="btn btn-ghost btn-xs" onclick="clearChat()"><i class="fa-solid fa-trash"></i> 清空</button>
                 </div>
                 <div class="alert alert-info py-2 px-3 text-xs mb-3">
                     <i class="fa-solid fa-info-circle"></i>
-                    <span>AI 回复会自动用你当前选中的克隆声音朗读。需先在「文本转语音」页配置好 API Key 和声音 ID。</span>
+                    <span>点击 AI 消息右下角的 🔊 播放按钮收听克隆声音。需先在「文本转语音」页配置好 API Key 和声音 ID。</span>
                 </div>
                 <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 h-80 sm:h-96 overflow-y-auto flex flex-col gap-3 mb-3">
                     <div class="chat chat-start">
-                        <div class="chat-bubble bg-base-200 text-base-content">你好呀，我是安。今天想跟我聊点什么？</div>
+                        <div class="chat-bubble bg-base-200 text-base-content">你好呀，我是乐。今天想跟我聊点什么？</div>
                     </div>
                 </div>
                 <div class="flex gap-2">
-                    <input type="text" id="chat-input" placeholder="跟安说点什么..." class="input input-bordered input-sm flex-1" onkeypress="if(event.key==='Enter')sendChatMessage()" />
+                    <input type="text" id="chat-input" placeholder="跟乐说点什么..." class="input input-bordered input-sm flex-1" onkeypress="if(event.key==='Enter')sendChatMessage()" />
                     <button id="btn-chat-send" class="btn btn-primary btn-sm px-5 rounded-full" onclick="sendChatMessage()">
                         <i class="fa-solid fa-paper-plane"></i>
                     </button>
@@ -286,7 +286,7 @@
 
             <div class="form-control mb-6">
                 <label class="label py-1"><span class="label-text text-sm">AI 角色设定 (System Prompt)</span></label>
-                <textarea id="modal-llm-system" class="textarea textarea-bordered textarea-sm w-full" rows="4" placeholder="你是安。这是一个纯粹的私人虚构陪伴空间..."></textarea>
+                <textarea id="modal-llm-system" class="textarea textarea-bordered textarea-sm w-full" rows="4" placeholder="你是乐。这是一个纯粹的私人虚构陪伴空间..."></textarea>
                 <label class="label py-0"><span class="label-text text-xs text-gray-500">自定义 AI 的性格、语气、身份等，留空使用默认设定</span></label>
             </div>
 
@@ -334,7 +334,7 @@
                 <div class="bg-base-200/50 rounded-lg p-4">
                     <h4 class="font-bold text-base mb-2 text-primary"><i class="fa-solid fa-comments mr-2"></i>AI 语音对话</h4>
                     <ul class="list-disc list-inside space-y-1">
-                        <li>AI 角色叫"安"，可在设置里自定义角色设定（System Prompt）</li>
+                        <li>AI 角色叫"乐"，可在设置里自定义角色设定（System Prompt）</li>
                         <li>AI 回复后<b>自动用你的克隆声音朗读</b></li>
                         <li>大模型默认 DeepSeek，可在设置里切换其他 OpenAI 兼容接口</li>
                         <li>对话记录不保存，刷新页面即清空</li>
