@@ -427,19 +427,20 @@ function stopChatAudio() {
 function appendChatMessage(text, type) {
     const container = document.getElementById('chat-messages');
     const div = document.createElement('div');
-    div.className = `chat chat-${type === 'user' ? 'end' : 'start'}`;
+    div.className = `chat chat-${type === 'user' ? 'end' : 'start'} relative`;
     const bubble = document.createElement('div');
-    bubble.className = `chat-bubble ${type === 'user' ? 'bg-primary text-white' : 'bg-base-200 text-base-content'}`;
+    bubble.className = `chat-bubble ${type === 'user' ? 'bg-primary text-white' : 'bg-base-200 text-base-content'} relative pr-8`;
     bubble.innerText = text;
     div.appendChild(bubble);
 
-    // AI消息后面加播放按钮
+    // AI消息后面加播放按钮（放在右下角）
     if (type === 'ai') {
         const playBtn = document.createElement('button');
-        playBtn.className = 'btn btn-ghost btn-xs btn-circle ml-2 flex-shrink-0';
+        playBtn.className = 'absolute bottom-1 right-1 btn btn-ghost btn-xs btn-circle opacity-60 hover:opacity-100';
         playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-xs"></i>';
         playBtn.title = '播放语音';
-        playBtn.onclick = () => playChatMessage(text);
+        // 点击时读取bubble当前的实际文本，而不是创建时的文字
+        playBtn.onclick = () => playChatMessage(bubble.innerText);
         div.appendChild(playBtn);
     }
 
