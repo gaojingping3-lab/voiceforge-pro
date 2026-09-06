@@ -728,6 +728,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initRoleCard();
     loadChatHistory(); // 恢复永久记忆
     renderChatHistory(); // 渲染历史消息
+    initVoiceInput(); // 初始化语音输入
 
     // 第一次用户交互时强制恢复 AudioContext（解决移动端音效不生效）
     const unlockAudio = () => {
@@ -811,6 +812,102 @@ function updateEmotionIndicator() {
         indicator.innerText = EMOTION_EMOJIS[emotion] || '';
         indicator.style.opacity = '0.8';
         indicator.title = `检测到情绪：${EMOTION_LABELS[emotion]}`;
+    }
+}
+
+// ============================================
+// 语音输入（Web Speech API）
+// ============================================
+let speechRecognition = null;
+let isListening = false;
+let isVoiceSending = false; // 防重复发送锁
+let voiceFinalResult = '';
+
+function initVoiceInput() {
+    const micBtn = document.getElementById('btn-mic');
+    if (!micBtn) return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        micBtn.style.display = 'none'; // 不支持则隐藏
+        return;
+    }
+
+    speechRecognition = new SpeechRecognition();
+    speechRecognition.lang = 'zh-CN';
+    speechRecognition.interimResults = true; // 实时返回中间结果
+    speechRecognition.continuous = false; // 说完一句自动停止
+
+    speechRecognition.onstart = () => {
+        isListening = true;
+        micBtn.classList.add('recording');
+        const input = document.getElementById('chat-input');
+        if (input) input.placeholder = '正在倾听，请说话...';
+    };
+
+    speechRecognition.onresult = (event) => {
+        let interim = '';
+        voiceFinalResult = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const text = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                voiceFinalResult += text;
+            } else {
+                interim += text;
+            }
+        }
+        const input = document.getElementById('chat-input');
+        if (input) {
+            input.value = voiceFinalResult || interim;
+            autoResizeInput();
+            updateEmotionIndicator();
+        }
+    };
+
+    speechRecognition.onend = () => {
+        isListening = false;
+        micBtn.classList.remove('recording');
+        const input = document.getElementById('chat-input');
+        if (input) input.placeholder = '跟乐说点什么...';
+
+        // 防重复发送锁：有内容且不在发送中才自动发送
+        const text = input ? input.value.trim() : '';
+        if (text.length > 0 && !isVoiceSending) {
+            isVoiceSending = true;
+            setTimeout(() => {
+                sendChatMessage();
+                // 发送完成后解锁（sendChatMessage是async，给个延时确保执行完）
+                setTimeout(() => { isVoiceSending = false; }, 1000);
+            }, 300); // 稍微等一下，避免识别刚结束就发送
+        }
+    };
+
+    speechRecognition.onerror = (event) => {
+        console.warn('语音识别错误:', event.error);
+        isListening = false;
+        micBtn.classList.remove('recording');
+        const input = document.getElementById('chat-input');
+        if (input) input.placeholder = '跟乐说点什么...';
+        if (event.error === 'not-allowed') {
+            alert('麦克风权限被拒绝，请在浏览器设置中允许访问麦克风');
+        }
+    };
+}
+
+function toggleVoiceInput() {
+    if (!speechRecognition) {
+        alert('当前浏览器不支持语音输入');
+        return;
+    }
+    if (isListening) {
+        speechRecognition.stop();
+    } else {
+        voiceFinalResult = '';
+        try {
+            speechRecognition.start();
+        } catch (e) {
+            console.warn('启动语音识别失败:', e);
+        }
     }
 }
 
