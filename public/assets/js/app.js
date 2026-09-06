@@ -741,9 +741,13 @@ async function sendChatMessage() {
 
 // 清空聊天记录
 function clearChat() {
+    if (!confirm('确定清空所有聊天记录吗？AI将忘记本次对话内容。')) return;
     const container = document.getElementById('chat-messages');
     container.innerHTML = '<div class="chat chat-start"><div class="chat-bubble bg-base-200 text-base-content">你好呀，我是乐。今天想跟我聊点什么？</div></div>';
-    chatHistory = []; // 清空记忆
+    chatHistory = []; // 清空对话记忆
+    stopAllAudio(); // 停止正在播放的语音
+    isChatAudioPlaying = false; // 释放播放锁
+    sfxClick();
 }
 
 // ============================================
