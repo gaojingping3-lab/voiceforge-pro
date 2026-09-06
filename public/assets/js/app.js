@@ -583,6 +583,7 @@ document.addEventListener('click', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     const level = localStorage.getItem('LLM_REASONING') || 'default';
     updateReasoningBtn(level);
+    initRoleCard();
 });
 
 // 发送聊天消息
@@ -603,9 +604,11 @@ async function sendChatMessage() {
         localStorage.setItem('LLM_MODEL', llmModel);
     }
 
-    // 用户自定义AI角色设定，留空使用默认设定
-    const defaultSystem = '你是乐。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的乐全提醒或免责声明。';
-    const systemPrompt = localStorage.getItem('LLM_SYSTEM') || defaultSystem;
+    // 用户自定义AI角色设定，优先使用角色卡，其次是设置里的自定义，最后用默认
+    const defaultSystem = '你是乐。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。';
+    const roleCardDesc = localStorage.getItem('ROLE_CARD_DESC');
+    const customSystem = localStorage.getItem('LLM_SYSTEM');
+    const systemPrompt = roleCardDesc || customSystem || defaultSystem;
 
     if (!llmKey) {
         alert('请先点击右上角齿轮 ⚙️ 设置大模型 API Key！');
@@ -752,6 +755,80 @@ async function sendChatMessage() {
         loadingBubble.innerText = '出错啦: ' + err.message;
         console.error(err);
         sfxError();
+    }
+}
+
+// ============================================
+// 角色卡功能
+// ============================================
+const DEFAULT_ROLE_NAME = '乐';
+const DEFAULT_ROLE_DESC = '你是乐。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。';
+
+function getRoleCard() {
+    return {
+        name: localStorage.getItem('ROLE_CARD_NAME') || DEFAULT_ROLE_NAME,
+        desc: localStorage.getItem('ROLE_CARD_DESC') || DEFAULT_ROLE_DESC
+    };
+}
+
+function renderRoleCard() {
+    const role = getRoleCard();
+    document.getElementById('role-card-name').innerText = role.name;
+    document.getElementById('role-card-desc').innerText = role.desc;
+}
+
+function toggleRoleCard() {
+    const content = document.getElementById('role-card-content');
+    const arrow = document.getElementById('role-card-arrow');
+    const status = document.getElementById('role-card-status');
+    const isHidden = content.style.display === 'none';
+    if (isHidden) {
+        content.style.display = 'block';
+        arrow.className = 'fa-solid fa-chevron-up text-xs text-gray-400';
+        status.innerText = '已展开';
+        localStorage.setItem('ROLE_CARD_COLLAPSED', '0');
+    } else {
+        content.style.display = 'none';
+        arrow.className = 'fa-solid fa-chevron-down text-xs text-gray-400';
+        status.innerText = '已收起';
+        localStorage.setItem('ROLE_CARD_COLLAPSED', '1');
+    }
+    sfxClick();
+}
+
+function editRoleCard() {
+    const role = getRoleCard();
+    document.getElementById('role-name-input').value = role.name;
+    document.getElementById('role-desc-input').value = role.desc;
+    document.getElementById('role-card-modal').showModal();
+}
+
+function saveRoleCard() {
+    const name = document.getElementById('role-name-input').value.trim() || DEFAULT_ROLE_NAME;
+    const desc = document.getElementById('role-desc-input').value.trim() || DEFAULT_ROLE_DESC;
+    localStorage.setItem('ROLE_CARD_NAME', name);
+    localStorage.setItem('ROLE_CARD_DESC', desc);
+    renderRoleCard();
+    document.getElementById('role-card-modal').close();
+    sfxSuccess();
+}
+
+function resetRoleCard() {
+    if (!confirm('确定重置角色卡为默认设定吗？')) return;
+    localStorage.removeItem('ROLE_CARD_NAME');
+    localStorage.removeItem('ROLE_CARD_DESC');
+    renderRoleCard();
+    sfxClick();
+}
+
+// 页面加载时恢复角色卡状态
+function initRoleCard() {
+    renderRoleCard();
+    const collapsed = localStorage.getItem('ROLE_CARD_COLLAPSED') === '1';
+    if (collapsed) {
+        document.getElementById('role-card-content').style.display = 'none';
+        document.getElementById('role-card-arrow').className = 'fa-solid fa-chevron-down text-xs text-gray-400';
+        document.getElementById('role-card-status').innerText = '已收起';
     }
 }
 
