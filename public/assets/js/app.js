@@ -1502,44 +1502,65 @@ function startDualChat() {
         return;
     }
     isDualRunning = true;
-    dualCurrentSpeaker = 'B'; // A发完开场白后，轮到B回复
-    dualRoundCount = 0;
     document.getElementById('dual-start-btn').classList.add('hidden');
     document.getElementById('dual-pause-btn').classList.remove('hidden');
-    updateDualRoundCount();
     sfxSuccess();
 
-    // 角色A先发开场白
-    const container = document.getElementById('chat-messages');
-    const openingDiv = document.createElement('div');
-    openingDiv.className = 'chat chat-start relative msg-enter';
-    const openingBubble = document.createElement('div');
-    openingBubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
-    const openingText = dualRoleA.opening || `你好，我是${dualRoleA.name}。`;
-    openingBubble.innerHTML = `<span class="text-xs font-bold block mb-1" style="color:#fb923c">${escapeHtml(dualRoleA.name)}</span>${formatChatText(openingText)}`;
-    openingDiv.appendChild(openingBubble);
-    // 加播放按钮
-    const playBtn = document.createElement('button');
-    playBtn.className = 'play-voice-btn absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
-    playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
-    playBtn.title = '播放语音';
-    playBtn.onclick = () => playChatMessage(openingBubble);
-    openingDiv.appendChild(playBtn);
-    container.appendChild(openingDiv);
-    container.scrollTop = container.scrollHeight;
-    // 加入对话历史
-    chatHistory.push({ role: 'assistant', content: `[${dualRoleA.name}] ${openingText}` });
-    saveChatHistory();
-    dualRoundCount++;
-    updateDualRoundCount();
-    sfxReceive();
+    // 判断是否是第一次开始（没有对话历史）
+    const isFirstStart = chatHistory.length === 0;
 
-    // 开场白不自动播放语音，省额度（需要听可以手动点播放按钮）
+    if (isFirstStart) {
+        // 第一次开始：角色A先发开场白
+        dualCurrentSpeaker = 'B'; // A发完开场白后，轮到B回复
+        dualRoundCount = 0;
+        updateDualRoundCount();
 
-    // 间隔设置的时间后，角色B开始回复
-    setTimeout(() => {
-        if (isDualRunning) dualChatNext();
-    }, getDualInterval());
+        const container = document.getElementById('chat-messages');
+        const openingDiv = document.createElement('div');
+        openingDiv.className = 'chat chat-start relative msg-enter';
+        const openingBubble = document.createElement('div');
+        openingBubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
+        const openingText = dualRoleA.opening || `你好，我是${dualRoleA.name}。`;
+        openingBubble.innerHTML = `<span class="text-xs font-bold block mb-1" style="color:#fb923c">${escapeHtml(dualRoleA.name)}</span>${formatChatText(openingText)}`;
+        openingDiv.appendChild(openingBubble);
+        // 加播放按钮
+        const playBtn = document.createElement('button');
+        playBtn.className = 'play-voice-btn absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
+        playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
+        playBtn.title = '播放语音';
+        playBtn.onclick = () => playChatMessage(openingBubble);
+        openingDiv.appendChild(playBtn);
+        container.appendChild(openingDiv);
+        container.scrollTop = container.scrollHeight;
+        // 加入对话历史
+        chatHistory.push({ role: 'assistant', content: `[${dualRoleA.name}] ${openingText}` });
+        saveChatHistory();
+        dualRoundCount++;
+        updateDualRoundCount();
+        sfxReceive();
+
+        // 间隔设置的时间后，角色B开始回复
+        setTimeout(() => {
+            if (isDualRunning) dualChatNext();
+        }, getDualInterval());
+    } else {
+        // 暂停后继续：不发开场白，根据最后一条消息判断该谁说话
+        const lastMsg = chatHistory[chatHistory.length - 1];
+        const lastContent = lastMsg?.content || '';
+        // 解析最后一条是谁说的
+        const match = lastContent.match(/^\[([^\]]+)\]/);
+        const lastSpeaker = match ? match[1] : '';
+        // 如果最后一条是A说的，轮到B；如果是B说的，轮到A
+        dualCurrentSpeaker = lastSpeaker === dualRoleA.name ? 'B' : 'A';
+        // 恢复轮数（从历史记录数估算）
+        dualRoundCount = chatHistory.filter(m => m.role === 'assistant').length;
+        updateDualRoundCount();
+
+        // 直接继续对话
+        setTimeout(() => {
+            if (isDualRunning) dualChatNext();
+        }, 1000);
+    }
 }
 
 // 暂停双角色对话
