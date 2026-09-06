@@ -751,7 +751,44 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 100);
         });
     }
+
+    // 输入聚焦时折叠黄色提示栏，腾出空间
+    const chatInput = document.getElementById('chat-input');
+    const modeHint = document.getElementById('mode-hint');
+    if (chatInput && modeHint) {
+        chatInput.addEventListener('focus', () => {
+            modeHint.style.maxHeight = '0';
+            modeHint.style.opacity = '0';
+            modeHint.style.margin = '0';
+            modeHint.style.padding = '0';
+            modeHint.style.overflow = 'hidden';
+            modeHint.style.transition = 'all 0.25s ease';
+        });
+        chatInput.addEventListener('blur', () => {
+            modeHint.style.maxHeight = '';
+            modeHint.style.opacity = '';
+            modeHint.style.margin = '';
+            modeHint.style.padding = '';
+            setTimeout(() => { modeHint.style.overflow = ''; }, 300);
+        });
+    }
 });
+
+// 输入框自动增高
+function autoResizeInput() {
+    const input = document.getElementById('chat-input');
+    if (!input) return;
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+}
+
+// 输入框键盘事件：Enter发送，Shift+Enter换行
+function handleChatKeydown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChatMessage();
+    }
+}
 
 // 情绪指示器：输入时实时检测情绪
 const EMOTION_EMOJIS = {
@@ -811,6 +848,7 @@ async function sendChatMessage() {
 
     appendChatMessage(text, 'user');
     input.value = '';
+    input.style.height = 'auto'; // 重置输入框高度
     sfxSend();
 
     // 发送新消息时，停止上一条AI回复的朗读

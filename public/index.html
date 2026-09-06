@@ -2,7 +2,7 @@
 <html lang="zh-CN" data-theme="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     <title>VoiceForge Pro | 多模态语音合成与克隆</title>
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -25,12 +25,12 @@
         body { transition: background-color 0.3s ease; }
     </style>
 </head>
-<body class="bg-base-200 bg-[url('bg.jpg')] bg-cover bg-center bg-fixed text-base-content" style="overflow: hidden; height: 100vh;">
+<body class="bg-base-200 bg-[url('bg.jpg')] bg-cover bg-center bg-fixed text-base-content" style="overflow: hidden; height: 100dvh;">
 
 <!-- 高级主题切换 UI -->
 <style>
   #premium-bg-layer {
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
     z-index: -1; transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     pointer-events: none;
   }
@@ -156,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <main class="container mx-auto max-w-3xl p-4 mt-2 flex flex-col" style="height: calc(100vh - 80px);">
+    <main class="container mx-auto max-w-3xl p-4 mt-2 flex flex-col" style="height: calc(100dvh - 80px);">
         <div class="tabs tabs-boxed mb-4 bg-base-100/80 backdrop-blur p-1 rounded-xl shadow-sm">
             <a class="tab tab-active text-base font-medium h-12 flex-1 rounded-lg" id="tab-tts" onclick="switchTab('tts')"><i class="fa-solid fa-keyboard mr-2"></i>文本转语音</a>
             <a class="tab text-base font-medium h-12 flex-1 rounded-lg" id="tab-chat" onclick="switchTab('chat')"><i class="fa-solid fa-comments mr-2"></i>AI语音对话</a>
@@ -355,12 +355,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 </dialog>
 
                 <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 mb-3"></div>
-                <div class="flex gap-2 items-center">
-                    <input type="text" id="chat-input" placeholder="跟乐说点什么..." class="input input-bordered input-sm flex-1" onkeypress="if(event.key==='Enter')sendChatMessage()" oninput="updateEmotionIndicator()" />
+                <div class="flex gap-2 items-end">
+                    <textarea id="chat-input" placeholder="跟乐说点什么..." class="textarea textarea-bordered textarea-sm flex-1 resize-none" rows="1" style="max-height: 100px; min-height: 40px;" oninput="autoResizeInput(); updateEmotionIndicator();" onkeydown="handleChatKeydown(event)"></textarea>
                     <!-- 情绪指示器 -->
-                    <span id="emotion-indicator" class="text-lg opacity-0 transition-opacity" title="检测到的情绪">😊</span>
+                    <span id="emotion-indicator" class="text-lg opacity-0 transition-opacity self-center" title="检测到的情绪">😊</span>
                     <!-- 思考程度切换 -->
-                    <div class="relative">
+                    <div class="relative self-center">
                         <button id="btn-reasoning" class="btn btn-ghost btn-sm btn-circle" onclick="toggleReasoningMenu()" title="思考程度">
                             <i class="fa-solid fa-brain text-base"></i>
                         </button>
@@ -373,7 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <button class="w-full text-left px-3 py-2 text-sm hover:bg-base-300 rounded-none reasoning-option" data-level="high" onclick="setReasoning('high')">高</button>
                         </div>
                     </div>
-                    <button id="btn-chat-send" class="btn btn-primary btn-sm px-5 rounded-full" onclick="sendChatMessage()">
+                    <button id="btn-chat-send" class="btn btn-primary btn-sm px-5 rounded-full self-center" onclick="sendChatMessage()">
                         <i class="fa-solid fa-paper-plane"></i>
                     </button>
                 </div>
