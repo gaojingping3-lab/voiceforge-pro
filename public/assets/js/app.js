@@ -992,11 +992,23 @@ function switchRole(id) {
     localStorage.setItem('CURRENT_ROLE_ID', id);
     renderRoleCard();
     document.getElementById('role-list-modal').close();
-    // 自动填入开场白
+    // AI主动发送开场白
     const role = getCurrentRole();
     if (role.opening) {
-        const input = document.getElementById('chat-input');
-        if (input) input.value = role.opening;
+        const container = document.getElementById('chat-messages');
+        if (container) {
+            const aiDiv = document.createElement('div');
+            aiDiv.className = 'chat chat-start';
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble bg-base-200 text-base-content';
+            bubble.innerText = role.opening;
+            aiDiv.appendChild(bubble);
+            container.appendChild(aiDiv);
+            container.scrollTop = container.scrollHeight;
+            // 加入记忆
+            chatHistory.push({ role: 'assistant', content: role.opening });
+            saveChatHistory();
+        }
     }
     sfxSuccess();
 }
