@@ -652,15 +652,12 @@ async function sendChatMessage() {
         localStorage.setItem('LLM_MODEL', llmModel);
     }
 
-    // 设置里的角色设定优先（强制规则），角色卡内容补充（防失忆），两者合并
+    // 设置里的角色设定（强制规则）和角色卡（扮演角色）分成两条system消息，模型更容易区分
     const defaultSystem = '你是乐。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。';
     const customSystem = localStorage.getItem('LLM_SYSTEM');
     const roleCardDesc = localStorage.getItem('ROLE_CARD_DESC');
-    let systemPrompt = customSystem || defaultSystem;
-    // 角色卡有内容且不是默认值时，追加到后面作为补充
-    if (roleCardDesc && roleCardDesc !== DEFAULT_ROLE_DESC) {
-        systemPrompt = systemPrompt + '\n\n【角色补充设定】\n' + roleCardDesc;
-    }
+    const systemRules = customSystem || defaultSystem;
+    const hasRoleCard = roleCardDesc && roleCardDesc !== DEFAULT_ROLE_DESC;
 
     if (!llmKey) {
         alert('请先点击右上角齿轮 ⚙️ 设置大模型 API Key！');
@@ -682,11 +679,14 @@ async function sendChatMessage() {
     sfxStart();
 
     try {
-        // 构建消息：system + 历史对话
+        // 构建消息：两条system（规则+角色） + 历史对话，标准messages数组格式
         const messages = [
-            { role: 'system', content: systemPrompt },
-            ...chatHistory
+            { role: 'system', content: systemRules },
         ];
+        if (hasRoleCard) {
+            messages.push({ role: 'system', content: roleCardDesc });
+        }
+        messages.push(...chatHistory);
 
         // 通过 Cloudflare Pages Functions 同源中转，规避浏览器 CORS 预检挂起问题
         // 带自动重试的请求（失败时重试一次，应对网络波动和临时限流）
