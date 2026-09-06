@@ -233,6 +233,11 @@ function syncModalInputs() {
     document.getElementById('role-constraint-toggle').checked = constraintOn !== '0';
     // 加载音效开关
     document.getElementById('sound-toggle').checked = soundEnabled();
+    // 加载双角色模式开关
+    const dualToggle = document.getElementById('dual-role-toggle');
+    if (dualToggle) {
+        dualToggle.checked = localStorage.getItem('DUAL_ROLE_MODE') === '1';
+    }
 }
 
 function saveModalKeys() {
@@ -253,6 +258,9 @@ function saveModalKeys() {
     // 保存音效开关
     const soundOn = document.getElementById('sound-toggle').checked;
     localStorage.setItem('SOUND_ENABLED', soundOn ? '1' : '0');
+    // 保存双角色模式开关
+    const dualOn = document.getElementById('dual-role-toggle').checked;
+    localStorage.setItem('DUAL_ROLE_MODE', dualOn ? '1' : '0');
     onEngineChange();
     updateModeHint();
     sfxSave();
@@ -740,6 +748,13 @@ document.addEventListener('DOMContentLoaded', () => {
     loadChatHistory(); // 恢复永久记忆
     renderChatHistory(); // 渲染历史消息
     initVoiceInput(); // 初始化语音输入
+
+    // 恢复双角色模式状态
+    if (localStorage.getItem('DUAL_ROLE_MODE') === '1') {
+        const dualToggle = document.getElementById('dual-role-toggle');
+        if (dualToggle) dualToggle.checked = true;
+        toggleDualRoleMode();
+    }
 
     // 第一次用户交互时强制恢复 AudioContext（解决移动端音效不生效）
     const unlockAudio = () => {
@@ -1413,6 +1428,224 @@ function formatMemoPrompt(roleId) {
     const memos = getRoleMemos(roleId);
     if (memos.length === 0) return '';
     return `【用户告诉过你的事】\n${memos.map((m, i) => `${i + 1}. ${m}`).join('\n')}\n聊天时可以自然地提到这些，让用户感受到你记得他说过的话。`;
+}
+
+// ============================================
+// 双角色互聊模式
+// ============================================
+let isDualMode = false;
+let isDualRunning = false;
+let dualRoleA = null;
+let dualRoleB = null;
+let dualCurrentSpeaker = 'A'; // 当前该谁说话
+let dualRoundCount = 0;
+const DUAL_MAX_ROUNDS = 20; // 最大自动轮数，防止无限消耗
+let dualAbortController = null;
+
+// 切换双角色模式
+function toggleDualRoleMode() {
+    const toggle = document.getElementById('dual-role-toggle');
+    const bar = document.getElementById('dual-role-bar');
+    isDualMode = toggle.checked;
+    if (isDualMode) {
+        bar.classList.remove('hidden');
+        fillDualRoleSelects();
+        // 隐藏单角色卡，避免混淆
+        document.getElementById('role-card').classList.add('hidden');
+    } else {
+        bar.classList.add('hidden');
+        stopDualChat();
+        document.getElementById('role-card').classList.remove('hidden');
+    }
+}
+
+// 填充角色选择下拉框
+function fillDualRoleSelects() {
+    const list = getRoleList();
+    const selectA = document.getElementById('dual-role-a');
+    const selectB = document.getElementById('dual-role-b');
+    if (!selectA || !selectB) return;
+    selectA.innerHTML = list.map((r, i) => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
+    selectB.innerHTML = list.map((r, i) => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
+    // 默认选前两个不同角色
+    if (list.length >= 1) selectA.value = list[0].id;
+    if (list.length >= 2) selectB.value = list[1].id;
+    else if (list.length === 1) selectB.value = list[0].id;
+}
+
+// 开始双角色对话
+function startDualChat() {
+    const roleAId = document.getElementById('dual-role-a').value;
+    const roleBId = document.getElementById('dual-role-b').value;
+    if (!roleAId || !roleBId) {
+        alert('请先选择两个角色');
+        return;
+    }
+    if (roleAId === roleBId) {
+        alert('请选择两个不同的角色');
+        return;
+    }
+    dualRoleA = getRoleList().find(r => r.id == roleAId);
+    dualRoleB = getRoleList().find(r => r.id == roleBId);
+    if (!dualRoleA || !dualRoleB) {
+        alert('角色不存在');
+        return;
+    }
+    isDualRunning = true;
+    dualCurrentSpeaker = 'A';
+    dualRoundCount = 0;
+    document.getElementById('dual-start-btn').classList.add('hidden');
+    document.getElementById('dual-pause-btn').classList.remove('hidden');
+    updateDualRoundCount();
+    sfxSuccess();
+    // 开始对话循环，角色A先说
+    dualChatNext();
+}
+
+// 暂停双角色对话
+function pauseDualChat() {
+    isDualRunning = false;
+    document.getElementById('dual-start-btn').classList.remove('hidden');
+    document.getElementById('dual-pause-btn').classList.add('hidden');
+    sfxClick();
+}
+
+// 终止双角色对话
+function stopDualChat() {
+    isDualRunning = false;
+    if (dualAbortController) {
+        dualAbortController.abort();
+        dualAbortController = null;
+    }
+    stopAllAudio();
+    dualRoundCount = 0;
+    dualCurrentSpeaker = 'A';
+    const startBtn = document.getElementById('dual-start-btn');
+    const pauseBtn = document.getElementById('dual-pause-btn');
+    if (startBtn) startBtn.classList.remove('hidden');
+    if (pauseBtn) pauseBtn.classList.add('hidden');
+    updateDualRoundCount();
+}
+
+// 更新轮数显示
+function updateDualRoundCount() {
+    const el = document.getElementById('dual-round-count');
+    if (el) el.innerText = `${dualRoundCount}轮`;
+}
+
+// 双角色对话循环：当前角色发言
+async function dualChatNext() {
+    if (!isDualRunning) return;
+    if (dualRoundCount >= DUAL_MAX_ROUNDS) {
+        isDualRunning = false;
+        alert(`已达到最大轮数 ${DUAL_MAX_ROUNDS}，自动暂停。点击继续可以再聊。`);
+        document.getElementById('dual-start-btn').classList.remove('hidden');
+        document.getElementById('dual-pause-btn').classList.add('hidden');
+        return;
+    }
+
+    const currentRole = dualCurrentSpeaker === 'A' ? dualRoleA : dualRoleB;
+    const otherRole = dualCurrentSpeaker === 'A' ? dualRoleB : dualRoleA;
+
+    // 构建消息：当前角色的人设 + 对话历史
+    const messages = [
+        { role: 'system', content: `你是${currentRole.name}。${currentRole.desc}` },
+        { role: 'system', content: `你正在和${otherRole.name}对话。请用第一人称回复，只说你自己的话，不要替对方说话。回复要简短自然，像真人聊天一样。` },
+    ];
+    // 加入最近的对话历史（最近10条）
+    const recentHistory = chatHistory.slice(-10);
+    messages.push(...recentHistory);
+
+    // 显示思考中
+    const container = document.getElementById('chat-messages');
+    const thinkingDiv = document.createElement('div');
+    thinkingDiv.className = 'chat chat-start relative msg-enter';
+    const thinkingBubble = document.createElement('div');
+    thinkingBubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
+    thinkingBubble.innerHTML = `${currentRole.name}正在思考 <span class="thinking-dots"><span></span><span></span><span></span></span>`;
+    thinkingDiv.appendChild(thinkingBubble);
+    container.appendChild(thinkingDiv);
+    container.scrollTop = container.scrollHeight;
+
+    try {
+        dualAbortController = new AbortController();
+        const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+        const llmKey = localStorage.getItem('LLM_KEY') || '';
+        const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                baseUrl: llmUrl,
+                model: llmModel,
+                messages: messages,
+                temperature: parseFloat(localStorage.getItem('LLM_TEMPERATURE') || '0.8'),
+                top_p: parseFloat(localStorage.getItem('LLM_TOPP') || '0.9'),
+                stream: false,
+            }),
+            signal: dualAbortController.signal,
+        });
+
+        if (!res.ok) throw new Error(`请求失败: ${res.status}`);
+        const data = await res.json();
+        const reply = data.choices?.[0]?.message?.content || '';
+
+        // 移除思考中，显示真实回复
+        thinkingDiv.remove();
+        const replyDiv = document.createElement('div');
+        replyDiv.className = 'chat chat-start relative msg-enter';
+        const replyBubble = document.createElement('div');
+        // 角色A用橙色，角色B用蓝色，区分两个角色
+        const color = dualCurrentSpeaker === 'A' ? '#fb923c' : '#3b82f6';
+        replyBubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
+        replyBubble.innerHTML = `<span class="text-xs font-bold block mb-1" style="color:${color}">${escapeHtml(currentRole.name)}</span>${formatChatText(reply)}`;
+        replyDiv.appendChild(replyBubble);
+
+        // 加播放按钮
+        const playBtn = document.createElement('button');
+        playBtn.className = 'play-voice-btn absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
+        playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
+        playBtn.title = '播放语音';
+        playBtn.onclick = () => playChatMessage(replyBubble);
+        replyDiv.appendChild(playBtn);
+
+        container.appendChild(replyDiv);
+        container.scrollTop = container.scrollHeight;
+
+        // 加入对话历史
+        chatHistory.push({ role: 'assistant', content: `[${currentRole.name}] ${reply}` });
+        saveChatHistory();
+
+        dualRoundCount++;
+        updateDualRoundCount();
+
+        // 自动播放语音（如果配置了Fish API）
+        const apiKey = document.getElementById('main-api-key')?.value?.trim();
+        if (apiKey) {
+            playChatMessage(replyBubble).catch(() => {});
+        }
+
+        sfxReceive();
+
+        // 切换到另一个角色，继续下一轮
+        dualCurrentSpeaker = dualCurrentSpeaker === 'A' ? 'B' : 'A';
+        // 间隔1秒再继续，避免太快
+        setTimeout(() => {
+            if (isDualRunning) dualChatNext();
+        }, 1500);
+
+    } catch (err) {
+        if (err.name === 'AbortError') {
+            thinkingDiv.remove();
+            return;
+        }
+        thinkingBubble.innerText = '出错啦: ' + err.message;
+        sfxError();
+        isDualRunning = false;
+        document.getElementById('dual-start-btn').classList.remove('hidden');
+        document.getElementById('dual-pause-btn').classList.add('hidden');
+    }
 }
 
 // HTML转义，防止XSS
