@@ -849,6 +849,11 @@ function editRoleCard() {
     document.getElementById('role-card-modal').showModal();
 }
 
+function clearRoleDescInput() {
+    document.getElementById('role-desc-input').value = '';
+    sfxClick();
+}
+
 function saveRoleCard() {
     const name = document.getElementById('role-name-input').value.trim() || DEFAULT_ROLE_NAME;
     const desc = document.getElementById('role-desc-input').value.trim() || DEFAULT_ROLE_DESC;
