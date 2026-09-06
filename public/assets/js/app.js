@@ -579,6 +579,10 @@ function stopAllAudio() {
     }
     // 释放播放锁
     isChatAudioPlaying = false;
+    // 恢复AudioContext，防止播放完语音后音效不响
+    if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+    }
 }
 
 function appendChatMessage(text, type) {
@@ -631,8 +635,8 @@ async function playChatMessage(bubble) {
     // 如果有缓存的音频，直接播放，不用再调用API
     if (bubble.cachedAudioUrl) {
         currentChatAudio = new Audio(bubble.cachedAudioUrl);
-        currentChatAudio.onended = () => { isChatAudioPlaying = false; };
-        currentChatAudio.onerror = () => { isChatAudioPlaying = false; };
+        currentChatAudio.onended = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
+        currentChatAudio.onerror = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
         await currentChatAudio.play().catch(() => { isChatAudioPlaying = false; });
         return;
     }
@@ -658,8 +662,8 @@ async function playChatMessage(bubble) {
         bubble.cachedAudioUrl = audioUrl;
         currentChatAudio = new Audio(audioUrl);
         // 播放结束后释放锁
-        currentChatAudio.onended = () => { isChatAudioPlaying = false; };
-        currentChatAudio.onerror = () => { isChatAudioPlaying = false; };
+        currentChatAudio.onended = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
+        currentChatAudio.onerror = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
         await currentChatAudio.play().catch(() => { isChatAudioPlaying = false; });
     } catch (err) {
         console.error('播放失败:', err);
