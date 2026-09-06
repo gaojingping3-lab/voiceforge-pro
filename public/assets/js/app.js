@@ -517,6 +517,73 @@ async function playChatMessage(bubble) {
     }
 }
 
+// ============================================
+// 思考程度切换（DeepSeek Reasoning）
+// ============================================
+const REASONING_LABELS = {
+    'default': '默认',
+    'off': '关闭',
+    'low': '低',
+    'medium': '中',
+    'high': '高'
+};
+
+function toggleReasoningMenu() {
+    const menu = document.getElementById('reasoning-menu');
+    menu.classList.toggle('hidden');
+    sfxClick();
+}
+
+function setReasoning(level) {
+    localStorage.setItem('LLM_REASONING', level);
+    updateReasoningBtn(level);
+    document.getElementById('reasoning-menu').classList.add('hidden');
+    sfxSave();
+}
+
+function updateReasoningBtn(level) {
+    const btn = document.getElementById('btn-reasoning');
+    if (level === 'off') {
+        btn.innerHTML = '<i class="fa-solid fa-brain text-base text-gray-400"></i>';
+        btn.title = '思考程度：关闭（秒回）';
+    } else if (level === 'low') {
+        btn.innerHTML = '<i class="fa-solid fa-brain text-base text-blue-400"></i>';
+        btn.title = '思考程度：低';
+    } else if (level === 'medium') {
+        btn.innerHTML = '<i class="fa-solid fa-brain text-base text-yellow-400"></i>';
+        btn.title = '思考程度：中';
+    } else if (level === 'high') {
+        btn.innerHTML = '<i class="fa-solid fa-brain text-base text-red-400"></i>';
+        btn.title = '思考程度：高';
+    } else {
+        btn.innerHTML = '<i class="fa-solid fa-brain text-base"></i>';
+        btn.title = '思考程度：默认';
+    }
+    // 高亮当前选中的选项
+    document.querySelectorAll('.reasoning-option').forEach(opt => {
+        if (opt.dataset.level === level) {
+            opt.classList.add('bg-primary/20', 'text-primary', 'font-bold');
+        } else {
+            opt.classList.remove('bg-primary/20', 'text-primary', 'font-bold');
+        }
+    });
+}
+
+// 点击页面其他地方关闭菜单
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('reasoning-menu');
+    const btn = document.getElementById('btn-reasoning');
+    if (menu && !menu.classList.contains('hidden') && !e.target.closest('#reasoning-menu') && !e.target.closest('#btn-reasoning')) {
+        menu.classList.add('hidden');
+    }
+});
+
+// 页面加载时恢复思考程度设置
+document.addEventListener('DOMContentLoaded', () => {
+    const level = localStorage.getItem('LLM_REASONING') || 'default';
+    updateReasoningBtn(level);
+});
+
 // 发送聊天消息
 async function sendChatMessage() {
     const input = document.getElementById('chat-input');
@@ -568,6 +635,18 @@ async function sendChatMessage() {
 
         // 通过 Cloudflare Pages Functions 同源中转，规避浏览器 CORS 预检挂起问题
         // 带自动重试的请求（失败时重试一次，应对网络波动和临时限流）
+        const reasoningLevel = localStorage.getItem('LLM_REASONING') || 'default';
+        const requestBody = {
+            baseUrl: llmUrl,
+            model: llmModel,
+            messages: messages,
+            temperature: parseFloat(localStorage.getItem('LLM_TEMPERATURE') || '0.8')
+        };
+        // 低/中/高思考程度时传 reasoning_effort 参数（仅 reasoner 模型生效）
+        const isReasonerModel = llmModel.toLowerCase().includes('reasoner');
+        if (isReasonerModel && (reasoningLevel === 'low' || reasoningLevel === 'medium' || reasoningLevel === 'high')) {
+            requestBody.reasoning_effort = reasoningLevel;
+        }
         let res;
         for (let attempt = 0; attempt < 2; attempt++) {
             try {
@@ -577,12 +656,7 @@ async function sendChatMessage() {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${llmKey}`
                     },
-                    body: JSON.stringify({
-                        baseUrl: llmUrl,
-                        model: llmModel,
-                        messages: messages,
-                        temperature: parseFloat(localStorage.getItem('LLM_TEMPERATURE') || '0.8')
-                    })
+                    body: JSON.stringify(requestBody)
                 });
                 break; // 成功就跳出循环
             } catch (e) {

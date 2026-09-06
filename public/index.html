@@ -177,8 +177,22 @@
                         <div class="chat-bubble bg-base-200 text-base-content">你好呀，我是乐。今天想跟我聊点什么？</div>
                     </div>
                 </div>
-                <div class="flex gap-2">
+                <div class="flex gap-2 items-center">
                     <input type="text" id="chat-input" placeholder="跟乐说点什么..." class="input input-bordered input-sm flex-1" onkeypress="if(event.key==='Enter')sendChatMessage()" />
+                    <!-- 思考程度切换 -->
+                    <div class="relative">
+                        <button id="btn-reasoning" class="btn btn-ghost btn-sm btn-circle" onclick="toggleReasoningMenu()" title="思考程度">
+                            <i class="fa-solid fa-brain text-base"></i>
+                        </button>
+                        <div id="reasoning-menu" class="hidden absolute bottom-full right-0 mb-2 bg-base-200 rounded-xl shadow-xl border border-base-300 py-1 w-36 z-50">
+                            <div class="px-3 py-1 text-xs font-bold text-gray-500 border-b border-base-300 mb-1">思考程度</div>
+                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-base-300 rounded-none reasoning-option" data-level="default" onclick="setReasoning('default')">默认</button>
+                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-base-300 rounded-none reasoning-option" data-level="off" onclick="setReasoning('off')">关闭（秒回）</button>
+                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-base-300 rounded-none reasoning-option" data-level="low" onclick="setReasoning('low')">低</button>
+                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-base-300 rounded-none reasoning-option" data-level="medium" onclick="setReasoning('medium')">中</button>
+                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-base-300 rounded-none reasoning-option" data-level="high" onclick="setReasoning('high')">高</button>
+                        </div>
+                    </div>
                     <button id="btn-chat-send" class="btn btn-primary btn-sm px-5 rounded-full" onclick="sendChatMessage()">
                         <i class="fa-solid fa-paper-plane"></i>
                     </button>
