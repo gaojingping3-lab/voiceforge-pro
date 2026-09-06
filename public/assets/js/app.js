@@ -1575,10 +1575,12 @@ async function dualChatNext() {
 
         const res = await fetch('/api/chat', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${llmKey}`
+            },
             body: JSON.stringify({
                 baseUrl: llmUrl,
-                apiKey: llmKey,
                 model: llmModel,
                 messages: messages,
                 temperature: parseFloat(localStorage.getItem('LLM_TEMPERATURE') || '0.8'),
