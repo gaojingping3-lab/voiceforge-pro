@@ -46,22 +46,22 @@ function sfxSuccess() { playTone(523, 0.12, 'sine', 0.06); playTone(659, 0.12, '
 function sfxError() { playTone(300, 0.15, 'sawtooth', 0.04); playTone(200, 0.2, 'sawtooth', 0.03, 0.12); }
 function sfxSave() { playTone(600, 0.08, 'triangle', 0.05); playTone(900, 0.1, 'triangle', 0.04, 0.06); }
 
-// Theme toggler
-const themeToggle = document.getElementById('theme-toggle');
+// Theme toggler（已替换为高级主题切换，保留旧代码备用）
+// const themeToggle = document.getElementById('theme-toggle');
 const htmlEl = document.documentElement;
 let isDark = localStorage.getItem('theme') === 'dark';
 
 function applyTheme() {
     htmlEl.setAttribute('data-theme', isDark ? 'dark' : 'light');
-    themeToggle.innerHTML = isDark ? '<i class="fa-solid fa-sun text-lg"></i>' : '<i class="fa-solid fa-moon text-lg"></i>';
+    // if (themeToggle) themeToggle.innerHTML = isDark ? '<i class="fa-solid fa-sun text-lg"></i>' : '<i class="fa-solid fa-moon text-lg"></i>';
 }
 applyTheme();
 
-themeToggle.addEventListener('click', () => {
-    isDark = !isDark;
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    applyTheme();
-});
+// if (themeToggle) themeToggle.addEventListener('click', () => {
+//     isDark = !isDark;
+//     localStorage.setItem('theme', isDark ? 'dark' : 'light');
+//     applyTheme();
+// });
 
 // Engine & Key Sync
 const mainKeyInput = document.getElementById('main-api-key');
