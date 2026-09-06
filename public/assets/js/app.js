@@ -1012,24 +1012,41 @@ async function sendChatMessage() {
     if (dualRoleA && dualRoleB) {
         // 确定回复角色：优先用用户指定的，否则根据最后一条AI消息切换
         const replyTarget = document.getElementById('dual-reply-target')?.value || 'auto';
-        if (replyTarget === 'A' || replyTarget === 'B') {
-            // 用户指定了回复角色
-            dualCurrentSpeaker = replyTarget;
-        } else {
-            // 自动轮流：根据最后一条AI消息是谁说的，切换到另一个角色回复用户
-            const lastAiMsg = [...chatHistory].reverse().find(m => m.role === 'assistant');
-            if (lastAiMsg) {
-                const match = lastAiMsg.content.match(/^\[([^\]]+)\]/);
-                const lastSpeaker = match ? match[1] : '';
-                dualCurrentSpeaker = lastSpeaker === dualRoleA.name ? 'B' : 'A';
-            }
-        }
         isDualRunning = true;
         // 隐藏开始按钮，显示暂停按钮
         document.getElementById('dual-start-btn').classList.add('hidden');
         document.getElementById('dual-pause-btn').classList.remove('hidden');
-        // 调用双角色回复逻辑（用户插话模式，回复完暂停）
-        dualChatNext(true);
+
+        if (replyTarget === 'both') {
+            // A+B一起回复：先A回复，再B回复
+            dualCurrentSpeaker = 'A';
+            await dualChatNext(true);
+            // 等A回复完，再让B回复
+            if (dualRoleA && dualRoleB) {
+                dualCurrentSpeaker = 'B';
+                isDualRunning = true;
+                await dualChatNext(true);
+            }
+            // 两个都回复完后暂停
+            isDualRunning = false;
+            document.getElementById('dual-start-btn').classList.remove('hidden');
+            document.getElementById('dual-pause-btn').classList.add('hidden');
+        } else {
+            // 单个角色回复
+            if (replyTarget === 'A' || replyTarget === 'B') {
+                dualCurrentSpeaker = replyTarget;
+            } else {
+                // 自动轮流：根据最后一条AI消息是谁说的，切换到另一个角色回复用户
+                const lastAiMsg = [...chatHistory].reverse().find(m => m.role === 'assistant');
+                if (lastAiMsg) {
+                    const match = lastAiMsg.content.match(/^\[([^\]]+)\]/);
+                    const lastSpeaker = match ? match[1] : '';
+                    dualCurrentSpeaker = lastSpeaker === dualRoleA.name ? 'B' : 'A';
+                }
+            }
+            // 调用双角色回复逻辑（用户插话模式，回复完暂停）
+            dualChatNext(true);
+        }
         return;
     }
 
@@ -1677,39 +1694,33 @@ async function dualChatNext(isUserInterruption = false) {
 
     const messages = [
         { role: 'system', content: systemRules },
-        // 明确三方身份定义（放在最前面，强化记忆）
-        { role: 'system', content: `【重要！场景身份说明，必须严格遵守】
-这个对话场景中有且只有三个人：
+        // 明确双方身份定义（自动对话时不强调用户，让两个角色自然交流）
+        { role: 'system', content: `【场景身份说明】
+这个对话场景中有两个人：
 1. 角色A = ${dualRoleA.name}
-2. 角色B = ${dualRoleB.name}  
-3. 角色C = 用户（真实人类，也就是正在和你说话的人）
+2. 角色B = ${dualRoleB.name}
 
 你现在扮演的是【${currentRole.name}】（角色${dualCurrentSpeaker}）。
-⚠️ 绝对禁止：你不能扮演角色C（用户），不能替用户说话，不能假装是用户。
-⚠️ 当你看到以【角色C（用户）说】开头的消息时，那就是真实用户在对你说话，你必须直接回应用户。` },
-        // 用户设定单独一条，强化
-        { role: 'system', content: `【角色C（用户）的设定，回复用户时必须严格参考】
-${userRoleDesc || '用户没有填写特别设定，请把用户当作这个场景的主人/观察者。'}
+你只能以${currentRole.name}的身份说话，和${otherRole.name}自然交流。
+${isUserInterruption ? '⚠️ 现在有用户（角色C）在插话，请直接回应用户。' : ''}` },
+    ];
+
+    // 用户插话时，才加入用户设定和身份强调
+    if (isUserInterruption) {
+        messages.push({ role: 'system', content: `【角色C（用户）的设定，回复用户时必须严格参考】
+${userRoleDesc || '用户没有填写特别设定，请把用户当作这个场景的观察者。'}
 
 ⚠️ 重要规则：
 - 用户就是角色C，是独立的第三个人，不是角色A也不是角色B
 - 当用户问"我是谁"、"你知道我是谁吗"这类问题时，必须根据上面的用户设定来回答
 - 回复用户时，要符合你扮演的角色身份，同时参考用户设定
-- 绝对不能把用户当成角色A或角色B，也不能假装不知道用户是谁` },
-        // 当前角色人设
-        { role: 'system', content: `你扮演的角色人设：
-${currentRole.desc}
-请严格按照这个人设说话，保持角色的性格、语气和说话风格。` },
-    ];
-
-    // 用户插话时，特别强调现在是用户在说话
-    if (isUserInterruption) {
-        messages.push({ role: 'system', content: `【当前状态：用户正在和你说话，请直接回复】
-现在是角色C（用户）在主动和你（${currentRole.name}）对话。
-请你直接回应用户的问题或话语，不要继续和${otherRole.name}对话。
-如果用户问关于自己的问题（如"我是谁"），请根据上面的用户设定来回答。
-回复时要符合${currentRole.name}的身份和性格。` });
+- 绝对不能把用户当成角色A或角色B，也不能假装不知道用户是谁` });
     }
+
+    // 当前角色人设
+    messages.push({ role: 'system', content: `你扮演的角色人设：
+${currentRole.desc}
+请严格按照这个人设说话，保持角色的性格、语气和说话风格。` });
 
     // 加入当前角色的记忆便签
     const memoPrompt = formatMemoPrompt(currentRole.id);
@@ -1727,7 +1738,11 @@ ${currentRole.desc}
     }
 
     // 对话规则
-    messages.push({ role: 'system', content: `你正在和${otherRole.name}对话，角色C（用户）也在场景中。请用第一人称回复，只说你自己（${currentRole.name}）的话，不要替对方或用户说话。回复要简短自然，像真人聊天一样，不要太长。` });
+    if (isUserInterruption) {
+        messages.push({ role: 'system', content: `你正在回应用户（角色C），同时${otherRole.name}也在场景中。请用第一人称回复，只说你自己（${currentRole.name}）的话，不要替对方或用户说话。回复要简短自然，像真人聊天一样，不要太长。` });
+    } else {
+        messages.push({ role: 'system', content: `你正在和${otherRole.name}对话。请用第一人称回复，只说你自己（${currentRole.name}）的话，不要替对方说话。回复要简短自然，像真人聊天一样，不要太长。` });
+    }
 
     // 格式化对话历史：每条消息都标明发言人，让AI清楚区分三方，增加到20条上下文
     const formattedHistory = [];
