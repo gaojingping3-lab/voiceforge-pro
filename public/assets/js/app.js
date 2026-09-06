@@ -587,7 +587,8 @@ function appendChatMessage(text, type) {
     div.className = `chat chat-${type === 'user' ? 'end' : 'start'} relative msg-enter`;
     const bubble = document.createElement('div');
     bubble.className = `chat-bubble ${type === 'user' ? 'bg-primary text-white' : 'bg-base-200 text-base-content'} relative pr-8`;
-    bubble.innerText = text;
+    // AI消息台词上色，用户消息保持原样
+    bubble.innerHTML = type === 'ai' ? formatChatText(text) : escapeHtml(text);
     div.appendChild(bubble);
 
     // AI消息后面加播放按钮（放在右下角）
@@ -612,8 +613,14 @@ let isChatAudioPlaying = false; // 播放锁，防止重复点击
 async function playChatMessage(bubble) {
     // 读取文字时过滤掉底部的token显示，避免朗读数字
     const text = bubble.innerText.replace(/\n?\d+\s*tokens\s*$/, '').trim();
-    // 朗读时去掉括号里的内容（中英文括号都处理），显示不变
-    const speakText = text.replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '').trim();
+    // 朗读时去掉括号里的内容（中英文括号、方括号、星号都处理），显示不变
+    const speakText = text
+        .replace(/【[^】]*】/g, '')
+        .replace(/\[[^\]]*\]/g, '')
+        .replace(/（[^）]*）/g, '')
+        .replace(/\([^)]*\)/g, '')
+        .replace(/\*[^*]*\*/g, '')
+        .trim();
 
     // 播放锁：正在播放中，忽略新的点击
     if (isChatAudioPlaying) return;
@@ -1083,7 +1090,7 @@ async function sendChatMessage() {
                     const delta = chunk.choices?.[0]?.delta?.content;
                     if (delta) {
                         fullReply += delta;
-                        loadingBubble.innerText = fullReply;
+                        loadingBubble.innerHTML = formatChatText(fullReply);
                         // 自动滚动到底部
                         const chatContainer = document.getElementById('chat-messages');
                         chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -1281,7 +1288,7 @@ function switchRole(id) {
             aiDiv.className = 'chat chat-start msg-enter relative';
             const bubble = document.createElement('div');
             bubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
-            bubble.innerText = role.opening;
+            bubble.innerHTML = formatChatText(role.opening);
             aiDiv.appendChild(bubble);
             // 加播放按钮
             const playBtn = document.createElement('button');
@@ -1409,6 +1416,23 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// 台词上色：【】[]()*包裹的动作/心理描写保持原色，其他台词用橙色
+const DIALOG_COLOR = '#fb923c';
+function formatChatText(text) {
+    if (!text) return '';
+    // 按括号分割，括号内的保持原色，括号外的台词上色
+    const parts = text.split(/(【[^】]*】|\[[^\]]*\]|\([^)]*\)|\*[^*]*\*)/g);
+    return parts.map(part => {
+        if (!part) return '';
+        // 括号包裹的内容（动作/心理描写）保持原色
+        if (/^【.*】$|^\[.*\]$|^\(.*\)$|^\*.*\*$/.test(part)) {
+            return escapeHtml(part);
+        }
+        // 台词部分上色
+        return `<span style="color:${DIALOG_COLOR}">${escapeHtml(part)}</span>`;
+    }).join('');
 }
 
 function editRoleCard() {
