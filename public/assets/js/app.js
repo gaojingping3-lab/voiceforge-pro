@@ -245,6 +245,11 @@ function syncModalInputs() {
         intervalInput.value = dualInterval;
         document.getElementById('dual-interval-value').innerText = dualInterval + '秒';
     }
+    // 加载用户角色设定（角色C）
+    const userRoleDesc = document.getElementById('user-role-desc');
+    if (userRoleDesc) {
+        userRoleDesc.value = localStorage.getItem('USER_ROLE_DESC') || '';
+    }
 }
 
 function saveModalKeys() {
@@ -271,6 +276,9 @@ function saveModalKeys() {
     // 保存双角色对话间隔时间
     const dualInterval = document.getElementById('dual-interval').value;
     localStorage.setItem('DUAL_INTERVAL', dualInterval);
+    // 保存用户角色设定（角色C）
+    const userRoleDesc = document.getElementById('user-role-desc').value.trim();
+    localStorage.setItem('USER_ROLE_DESC', userRoleDesc);
     onEngineChange();
     updateModeHint();
     sfxSave();
@@ -1605,13 +1613,14 @@ function getDualInterval() {
 // 双角色对话循环：当前角色发言
 async function dualChatNext() {
     if (!isDualRunning) return;
-    if (dualRoundCount >= DUAL_MAX_ROUNDS) {
-        isDualRunning = false;
-        alert(`已达到最大轮数 ${DUAL_MAX_ROUNDS}，自动暂停。点击继续可以再聊。`);
-        document.getElementById('dual-start-btn').classList.remove('hidden');
-        document.getElementById('dual-pause-btn').classList.add('hidden');
-        return;
-    }
+    // 无轮数限制，用户可以随时暂停
+    // if (dualRoundCount >= DUAL_MAX_ROUNDS) {
+    //     isDualRunning = false;
+    //     alert(`已达到最大轮数 ${DUAL_MAX_ROUNDS}，自动暂停。点击继续可以再聊。`);
+    //     document.getElementById('dual-start-btn').classList.remove('hidden');
+    //     document.getElementById('dual-pause-btn').classList.add('hidden');
+    //     return;
+    // }
 
     const currentRole = dualCurrentSpeaker === 'A' ? dualRoleA : dualRoleB;
     const otherRole = dualCurrentSpeaker === 'A' ? dualRoleB : dualRoleA;
@@ -1637,8 +1646,14 @@ async function dualChatNext() {
         messages.push({ role: 'system', content: `【严格第一人称，禁止越权代打】严禁描写${otherRole.name}的动作、语言、内心想法，绝对禁止替对方做任何推进或决定。每轮回复只写你自己（${currentRole.name}）的反应，说完/做完动作后必须停下，等待对方交互。\n\n【强制神态与动作描写】输出格式严格统一为"*（具体的神态、微表情、肢体动作或与环境互动）* + 「对话台词」"，严禁干瘪的纯对白输出。\n\n【彻底剥离AI味】严禁出现任何助手腔、客服客套话或旁白式总结，必须完全融入角色的语气、性格缺陷与动机中。` });
     }
 
+    // 加入用户角色设定（角色C）
+    const userRoleDesc = localStorage.getItem('USER_ROLE_DESC') || '';
+    if (userRoleDesc) {
+        messages.push({ role: 'system', content: `用户（角色C）的设定：\n${userRoleDesc}\n\n用户是这个对话场景中的第三个人，请根据用户的设定与用户和${otherRole.name}互动。` });
+    }
+
     // 对话规则
-    messages.push({ role: 'system', content: `你正在和${otherRole.name}对话。请用第一人称回复，只说你自己的话，不要替对方说话。回复要简短自然，像真人聊天一样，不要太长。` });
+    messages.push({ role: 'system', content: `你正在和${otherRole.name}对话${userRoleDesc ? '，还有用户（角色C）也在场景中' : ''}。请用第一人称回复，只说你自己的话，不要替对方说话。回复要简短自然，像真人聊天一样，不要太长。` });
 
     // 格式化对话历史：把[角色名] 内容转换成正确的messages格式
     const formattedHistory = [];
