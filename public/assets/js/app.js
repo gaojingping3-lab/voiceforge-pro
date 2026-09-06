@@ -468,7 +468,8 @@ function appendChatMessage(text, type) {
 let isChatAudioPlaying = false; // 播放锁，防止重复点击
 
 async function playChatMessage(bubble) {
-    const text = bubble.innerText;
+    // 读取文字时过滤掉底部的token显示，避免朗读数字
+    const text = bubble.innerText.replace(/\n?\d+\s*tokens\s*$/, '').trim();
     // 朗读时去掉括号里的内容（中英文括号都处理），显示不变
     const speakText = text.replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '').trim();
 
@@ -731,12 +732,12 @@ async function sendChatMessage() {
             throw new Error('流式响应为空，请重试');
         }
 
-        // 在AI消息底部显示token数量
+        // 在AI消息底部显示token数量（放在气泡内部）
         if (totalTokens > 0) {
             const tokenLabel = document.createElement('div');
-            tokenLabel.className = 'text-xs text-gray-400 mt-1 text-right';
+            tokenLabel.className = 'text-xs text-gray-400 mt-2 text-right token-count';
             tokenLabel.innerText = `${totalTokens} tokens`;
-            loadingBubble.parentElement.appendChild(tokenLabel);
+            loadingBubble.appendChild(tokenLabel);
         }
 
         // 把AI回复加入历史记忆
