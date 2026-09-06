@@ -1008,6 +1008,24 @@ async function sendChatMessage() {
     chatHistory.push({ role: 'user', content: text });
     saveChatHistory(); // 保存到本地，刷新不丢失
 
+    // 双角色模式下：用户发消息后直接走双角色回复逻辑，用当前角色身份回复，三方身份上下文
+    if (dualRoleA && dualRoleB) {
+        // 确定当前回复角色：根据最后一条AI消息是谁说的，切换到另一个角色回复用户
+        const lastAiMsg = [...chatHistory].reverse().find(m => m.role === 'assistant');
+        if (lastAiMsg) {
+            const match = lastAiMsg.content.match(/^\[([^\]]+)\]/);
+            const lastSpeaker = match ? match[1] : '';
+            dualCurrentSpeaker = lastSpeaker === dualRoleA.name ? 'B' : 'A';
+        }
+        isDualRunning = true;
+        // 隐藏开始按钮，显示暂停按钮
+        document.getElementById('dual-start-btn').classList.add('hidden');
+        document.getElementById('dual-pause-btn').classList.remove('hidden');
+        // 调用双角色回复逻辑（用户插话模式，回复完暂停）
+        dualChatNext(true);
+        return;
+    }
+
     // 创建思考中动画（三点跳动）
     const container = document.getElementById('chat-messages');
     const loadingDiv = document.createElement('div');
@@ -1629,8 +1647,9 @@ function getDualInterval() {
 }
 
 // 双角色对话循环：当前角色发言
-async function dualChatNext() {
-    if (!isDualRunning) return;
+// isUserInterruption: true表示是用户插话触发的回复，回复完后暂停，不继续自动对话
+async function dualChatNext(isUserInterruption = false) {
+    if (!isDualRunning && !isUserInterruption) return;
     // 无轮数限制，用户可以随时暂停
     // if (dualRoundCount >= DUAL_MAX_ROUNDS) {
     //     isDualRunning = false;
@@ -1787,10 +1806,17 @@ ${currentRole.desc}
 
         // 切换到另一个角色，继续下一轮
         dualCurrentSpeaker = dualCurrentSpeaker === 'A' ? 'B' : 'A';
-        // 间隔设置的时间再继续，模拟真人对话节奏
-        dualTimeoutId = setTimeout(() => {
-            if (isDualRunning) dualChatNext();
-        }, getDualInterval());
+        if (isUserInterruption) {
+            // 用户插话触发的回复：回复完后暂停自动对话，等用户决定是否继续
+            isDualRunning = false;
+            document.getElementById('dual-start-btn').classList.remove('hidden');
+            document.getElementById('dual-pause-btn').classList.add('hidden');
+        } else {
+            // 自动对话：间隔设置的时间再继续，模拟真人对话节奏
+            dualTimeoutId = setTimeout(() => {
+                if (isDualRunning) dualChatNext();
+            }, getDualInterval());
+        }
 
     } catch (err) {
         if (err.name === 'AbortError') {
