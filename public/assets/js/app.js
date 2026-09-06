@@ -987,6 +987,11 @@ async function sendChatMessage() {
         if (hasRoleCard) {
             messages.push({ role: 'system', content: roleCardDesc });
         }
+        // 角色记忆便签（手动录入的用户信息）
+        const memoPrompt = formatMemoPrompt(getCurrentRoleId());
+        if (memoPrompt) {
+            messages.push({ role: 'system', content: memoPrompt });
+        }
         // 情绪感知：检测用户当前情绪，调整回复语气
         const emotion = detectEmotion(text);
         if (emotion !== 'neutral' && EMOTION_PROMPTS[emotion]) {
@@ -1336,11 +1341,82 @@ function deleteRole(id) {
     sfxClick();
 }
 
+// ============================================
+// 角色记忆便签（手动录入，轻量化）
+// ============================================
+function getRoleMemos(roleId) {
+    const saved = localStorage.getItem(`ROLE_MEMOS_${roleId}`);
+    if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+    }
+    return [];
+}
+
+function saveRoleMemos(roleId, memos) {
+    localStorage.setItem(`ROLE_MEMOS_${roleId}`, JSON.stringify(memos));
+}
+
+function renderMemoList() {
+    const container = document.getElementById('memo-list');
+    if (!container) return;
+    const roleId = getCurrentRoleId();
+    const memos = getRoleMemos(roleId);
+    if (memos.length === 0) {
+        container.innerHTML = '<span class="text-xs text-gray-400">暂无记忆，添加后AI聊天时会参考</span>';
+        return;
+    }
+    container.innerHTML = memos.map((memo, index) => `
+        <div class="flex items-center gap-2 bg-base-200 rounded-lg px-2 py-1">
+            <span class="text-xs flex-1">${escapeHtml(memo)}</span>
+            <button class="btn btn-ghost btn-xs text-error" onclick="deleteMemo(${index})" title="删除">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function addMemo() {
+    const input = document.getElementById('memo-input');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    const roleId = getCurrentRoleId();
+    const memos = getRoleMemos(roleId);
+    memos.push(text);
+    saveRoleMemos(roleId, memos);
+    input.value = '';
+    renderMemoList();
+    sfxSuccess();
+}
+
+function deleteMemo(index) {
+    const roleId = getCurrentRoleId();
+    const memos = getRoleMemos(roleId);
+    memos.splice(index, 1);
+    saveRoleMemos(roleId, memos);
+    renderMemoList();
+    sfxClick();
+}
+
+function formatMemoPrompt(roleId) {
+    const memos = getRoleMemos(roleId);
+    if (memos.length === 0) return '';
+    return `【用户告诉过你的事】\n${memos.map((m, i) => `${i + 1}. ${m}`).join('\n')}\n聊天时可以自然地提到这些，让用户感受到你记得他说过的话。`;
+}
+
+// HTML转义，防止XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 function editRoleCard() {
     const role = getCurrentRole();
     document.getElementById('role-name-input').value = role.name;
     document.getElementById('role-desc-input').value = role.desc;
     document.getElementById('role-opening-input').value = role.opening || '';
+    renderMemoList();
     document.getElementById('role-card-modal').showModal();
 }
 
