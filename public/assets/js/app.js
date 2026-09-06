@@ -1581,14 +1581,53 @@ async function dualChatNext() {
     const currentRole = dualCurrentSpeaker === 'A' ? dualRoleA : dualRoleB;
     const otherRole = dualCurrentSpeaker === 'A' ? dualRoleB : dualRoleA;
 
-    // 构建消息：当前角色的人设 + 对话历史
+    // 构建消息：设置里的角色设定 + 当前角色卡 + 记忆便签 + 对话规则 + 格式化的对话历史
+    const defaultSystem = '你是乐。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。';
+    const customSystem = localStorage.getItem('LLM_SYSTEM');
+    const systemRules = customSystem || defaultSystem;
+
     const messages = [
-        { role: 'system', content: `你是${currentRole.name}。${currentRole.desc}` },
-        { role: 'system', content: `你正在和${otherRole.name}对话。请用第一人称回复，只说你自己的话，不要替对方说话。回复要简短自然，像真人聊天一样。` },
+        { role: 'system', content: systemRules },
+        { role: 'system', content: `你现在扮演的角色是：${currentRole.name}\n\n角色人设：\n${currentRole.desc}\n\n请严格按照这个人设说话，保持角色的性格、语气和说话风格。` },
     ];
-    // 加入最近的对话历史（最近10条）
-    const recentHistory = chatHistory.slice(-10);
-    messages.push(...recentHistory);
+
+    // 加入当前角色的记忆便签
+    const memoPrompt = formatMemoPrompt(currentRole.id);
+    if (memoPrompt) {
+        messages.push({ role: 'system', content: memoPrompt });
+    }
+
+    // 加入角色强约束（如果开启了）
+    if (localStorage.getItem('ROLE_CONSTRAINT') !== '0') {
+        messages.push({ role: 'system', content: `【严格第一人称，禁止越权代打】严禁描写${otherRole.name}的动作、语言、内心想法，绝对禁止替对方做任何推进或决定。每轮回复只写你自己（${currentRole.name}）的反应，说完/做完动作后必须停下，等待对方交互。\n\n【强制神态与动作描写】输出格式严格统一为"*（具体的神态、微表情、肢体动作或与环境互动）* + 「对话台词」"，严禁干瘪的纯对白输出。\n\n【彻底剥离AI味】严禁出现任何助手腔、客服客套话或旁白式总结，必须完全融入角色的语气、性格缺陷与动机中。` });
+    }
+
+    // 对话规则
+    messages.push({ role: 'system', content: `你正在和${otherRole.name}对话。请用第一人称回复，只说你自己的话，不要替对方说话。回复要简短自然，像真人聊天一样，不要太长。` });
+
+    // 格式化对话历史：把[角色名] 内容转换成正确的messages格式
+    const formattedHistory = [];
+    for (const msg of chatHistory.slice(-12)) {
+        if (msg.role === 'user') {
+            formattedHistory.push({ role: 'user', content: msg.content });
+        } else if (msg.role === 'assistant') {
+            // 解析[角色名] 内容的格式
+            const match = msg.content.match(/^\[([^\]]+)\]\s*(.*)$/s);
+            if (match) {
+                const speakerName = match[1];
+                const content = match[2];
+                if (speakerName === currentRole.name) {
+                    formattedHistory.push({ role: 'assistant', content: content });
+                } else {
+                    // 对方说的话，作为user消息传入
+                    formattedHistory.push({ role: 'user', content: `【${speakerName}说】${content}` });
+                }
+            } else {
+                formattedHistory.push({ role: 'assistant', content: msg.content });
+            }
+        }
+    }
+    messages.push(...formattedHistory);
 
     // 显示思考中
     const container = document.getElementById('chat-messages');
