@@ -1578,6 +1578,7 @@ async function dualChatNext() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 baseUrl: llmUrl,
+                apiKey: llmKey,
                 model: llmModel,
                 messages: messages,
                 temperature: parseFloat(localStorage.getItem('LLM_TEMPERATURE') || '0.8'),
