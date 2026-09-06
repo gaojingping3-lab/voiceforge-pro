@@ -732,12 +732,12 @@ async function sendChatMessage() {
             throw new Error('流式响应为空，请重试');
         }
 
-        // 在AI消息底部显示token数量（放在气泡内部）
+        // 在AI消息气泡外面下方显示token数量
         if (totalTokens > 0) {
             const tokenLabel = document.createElement('div');
-            tokenLabel.className = 'text-xs text-gray-400 mt-2 text-right token-count';
+            tokenLabel.className = 'text-xs text-gray-400 mt-1 text-right pr-2 token-count';
             tokenLabel.innerText = `${totalTokens} tokens`;
-            loadingBubble.appendChild(tokenLabel);
+            loadingBubble.parentElement.appendChild(tokenLabel);
         }
 
         // 把AI回复加入历史记忆
