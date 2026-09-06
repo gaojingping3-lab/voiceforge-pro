@@ -732,17 +732,14 @@ async function sendChatMessage() {
             throw new Error('流式响应为空，请重试');
         }
 
-        // 在AI消息气泡外面下方显示token数量（和气泡左对齐）
+        // 在AI消息气泡下面单独显示token（独立元素，不影响气泡）
         if (totalTokens > 0) {
-            // 创建一个占满整行的容器，内部靠左对齐，和气泡对齐
-            const tokenWrapper = document.createElement('div');
-            tokenWrapper.className = 'w-full flex justify-start';
-            const tokenLabel = document.createElement('div');
-            tokenLabel.className = 'text-xs text-gray-400 mt-1 token-count';
-            tokenLabel.innerText = `${totalTokens} tokens`;
-            tokenWrapper.appendChild(tokenLabel);
-            loadingBubble.parentElement.appendChild(tokenWrapper);
-            loadingBubble.parentElement.style.flexWrap = 'wrap';
+            const chatDiv = loadingBubble.parentElement;
+            const tokenRow = document.createElement('div');
+            tokenRow.className = 'text-xs text-gray-400 mt-1 ml-1 token-count';
+            tokenRow.innerText = `${totalTokens} tokens`;
+            // 插到chat div后面，作为独立的一行
+            chatDiv.after(tokenRow);
         }
 
         // 把AI回复加入历史记忆
