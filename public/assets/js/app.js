@@ -734,11 +734,14 @@ async function sendChatMessage() {
 
         // 在AI消息气泡外面下方显示token数量（和气泡左对齐）
         if (totalTokens > 0) {
+            // 创建一个占满整行的容器，内部靠左对齐，和气泡对齐
+            const tokenWrapper = document.createElement('div');
+            tokenWrapper.className = 'w-full flex justify-start';
             const tokenLabel = document.createElement('div');
-            tokenLabel.className = 'text-xs text-gray-400 mt-1 basis-full text-left token-count';
+            tokenLabel.className = 'text-xs text-gray-400 mt-1 token-count';
             tokenLabel.innerText = `${totalTokens} tokens`;
-            loadingBubble.parentElement.appendChild(tokenLabel);
-            // 确保chat容器允许换行
+            tokenWrapper.appendChild(tokenLabel);
+            loadingBubble.parentElement.appendChild(tokenWrapper);
             loadingBubble.parentElement.style.flexWrap = 'wrap';
         }
 
