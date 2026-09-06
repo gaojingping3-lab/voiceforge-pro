@@ -61,55 +61,30 @@
     border: 1px solid rgba(255, 255, 255, 0.5) !important;
     box-shadow: 0 10px 30px rgba(160, 140, 120, 0.08) !important;
   }
-  .premium-theme-wrapper {
-    position: fixed; top: 70px; right: 16px; z-index: 999999;
-    display: flex; gap: 6px; padding: 5px;
-    background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
-    border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 50px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-    transition: all 0.5s ease;
+  /* 导航栏主题切换按钮 */
+  .theme-switch-nav { display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 20px; background: rgba(128,128,128,0.1); }
+  .theme-dot-btn {
+    appearance: none; border: 2px solid transparent; background: transparent;
+    padding: 2px; cursor: pointer; border-radius: 50%;
+    transition: all 0.3s ease; outline: none;
+    display: flex; align-items: center; justify-content: center;
   }
-  body.theme-obsidian .premium-theme-wrapper {
-    background: rgba(40, 44, 52, 0.4); border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  }
-  .premium-theme-btn {
-    appearance: none; border: none; background: transparent;
-    padding: 6px 12px; font-size: 12px; font-weight: 500; color: #666;
-    cursor: pointer; border-radius: 40px;
-    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    display: flex; align-items: center; gap: 5px; outline: none;
-  }
-  body.theme-obsidian .premium-theme-btn { color: #999; }
-  .premium-theme-btn:hover { color: #111; }
-  body.theme-obsidian .premium-theme-btn:hover { color: #fff; }
-  .premium-theme-btn.active {
-    background: linear-gradient(180deg, #ffffff 0%, #f7f7f7 100%); color: #000;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  }
-  body.theme-obsidian .premium-theme-btn.active {
-    background: linear-gradient(180deg, #4b5563 0%, #374151 100%); color: #fff;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
-  }
-  .theme-dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2); }
+  .theme-dot-btn:hover { transform: scale(1.2); }
+  .theme-dot-btn.active { border-color: currentColor; }
+  .theme-dot { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2); }
   .dot-pearl { background: linear-gradient(135deg, #fdfbfb, #ebedee); }
   .dot-obsidian { background: linear-gradient(135deg, #434343, #000000); }
   .dot-amber { background: linear-gradient(135deg, #f6d365, #fda085); }
 </style>
 
 <div id="premium-bg-layer"></div>
-<div class="premium-theme-wrapper">
-  <button class="premium-theme-btn" data-theme-class="theme-pearl" onclick="switchPremiumTheme('theme-pearl')"><div class="theme-dot dot-pearl"></div>雅白</button>
-  <button class="premium-theme-btn" data-theme-class="theme-obsidian" onclick="switchPremiumTheme('theme-obsidian')"><div class="theme-dot dot-obsidian"></div>曜石</button>
-  <button class="premium-theme-btn" data-theme-class="theme-amber" onclick="switchPremiumTheme('theme-amber')"><div class="theme-dot dot-amber"></div>琥珀</button>
-</div>
 
 <script>
 function switchPremiumTheme(themeClass) {
-  document.querySelectorAll('.premium-theme-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.theme-dot-btn').forEach(b => b.classList.remove('active'));
   document.body.classList.remove('theme-pearl', 'theme-obsidian', 'theme-amber');
   document.body.classList.add(themeClass);
-  document.querySelector(`[data-theme-class="${themeClass}"]`).classList.add('active');
+  document.querySelector(`.theme-dot-btn[data-theme-class="${themeClass}"]`).classList.add('active');
   document.documentElement.setAttribute('data-theme', themeClass === 'theme-obsidian' ? 'dark' : 'light');
   localStorage.setItem('PREMIUM_THEME', themeClass);
 }
@@ -125,6 +100,12 @@ document.addEventListener('DOMContentLoaded', () => {
             <a class="btn btn-ghost normal-case text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
                 <i class="fa-solid fa-microphone-lines text-primary"></i> VoiceForge Pro
             </a>
+        </div>
+        <!-- 主题切换（只显示小色点图标） -->
+        <div class="theme-switch-nav flex items-center gap-1 mr-2">
+            <button class="theme-dot-btn" data-theme-class="theme-pearl" onclick="switchPremiumTheme('theme-pearl')" title="雅白"><div class="theme-dot dot-pearl"></div></button>
+            <button class="theme-dot-btn" data-theme-class="theme-obsidian" onclick="switchPremiumTheme('theme-obsidian')" title="曜石"><div class="theme-dot dot-obsidian"></div></button>
+            <button class="theme-dot-btn" data-theme-class="theme-amber" onclick="switchPremiumTheme('theme-amber')" title="琥珀"><div class="theme-dot dot-amber"></div></button>
         </div>
         <div class="flex-none gap-2">
             <button class="btn btn-ghost btn-circle" onclick="help_modal.showModal()" title="使用说明">
