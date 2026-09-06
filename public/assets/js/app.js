@@ -420,8 +420,50 @@ async function generateAndPlayAudio(text) {
 }
 
 // 添加聊天气泡
-let chatHistory = []; // 对话历史记忆，最多保留20条消息
+let chatHistory = []; // 对话历史记忆（永久保存，只有清空才删除）
 let currentChatAudio = null; // 当前正在播放的聊天音频
+
+// 永久记忆：保存聊天历史到localStorage
+function saveChatHistory() {
+    localStorage.setItem('PERM_CHAT_HISTORY', JSON.stringify(chatHistory));
+}
+
+// 永久记忆：从localStorage恢复聊天历史
+function loadChatHistory() {
+    const saved = localStorage.getItem('PERM_CHAT_HISTORY');
+    if (saved) {
+        try {
+            chatHistory = JSON.parse(saved);
+        } catch (e) {
+            chatHistory = [];
+        }
+    }
+}
+
+// 永久记忆：渲染历史消息到聊天区域
+function renderChatHistory() {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+    container.innerHTML = '';
+    if (chatHistory.length === 0) {
+        container.innerHTML = '<div class="chat chat-start"><div class="chat-bubble bg-base-200 text-base-content">你好呀，我是乐。今天想跟我聊点什么？</div></div>';
+        return;
+    }
+    for (const msg of chatHistory) {
+        if (msg.role === 'user') {
+            const div = document.createElement('div');
+            div.className = 'chat chat-end';
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble bg-primary text-primary-content';
+            bubble.innerText = msg.content;
+            div.appendChild(bubble);
+            container.appendChild(div);
+        } else {
+            appendChatMessage(msg.content, 'ai');
+        }
+    }
+    container.scrollTop = container.scrollHeight;
+}
 
 // 停止所有音频播放（聊天音频 + TTS页面播放器）
 function stopAllAudio() {
@@ -584,6 +626,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const level = localStorage.getItem('LLM_REASONING') || 'default';
     updateReasoningBtn(level);
     initRoleCard();
+    loadChatHistory(); // 恢复永久记忆
+    renderChatHistory(); // 渲染历史消息
 });
 
 // 发送聊天消息
@@ -626,10 +670,9 @@ async function sendChatMessage() {
     // 发送新消息时，停止上一条AI回复的朗读
     stopAllAudio();
 
-    // 把用户消息加入历史记忆
+    // 把用户消息加入永久记忆
     chatHistory.push({ role: 'user', content: text });
-    // 限制最多保留20条消息（约10轮对话）
-    if (chatHistory.length > 20) chatHistory.shift();
+    saveChatHistory(); // 保存到本地，刷新不丢失
 
     const loadingBubble = appendChatMessage('乐正在思考...', 'ai');
     sfxStart();
@@ -749,9 +792,9 @@ async function sendChatMessage() {
             chatDiv.after(tokenRow);
         }
 
-        // 把AI回复加入历史记忆
+        // 把AI回复加入永久记忆
         chatHistory.push({ role: 'assistant', content: fullReply });
-        if (chatHistory.length > 20) chatHistory.shift();
+        saveChatHistory(); // 保存到本地，刷新不丢失
 
         sfxSuccess();
 
@@ -836,12 +879,13 @@ function initRoleCard() {
     }
 }
 
-// 清空聊天记录
+// 清空聊天记录（同时清除永久记忆）
 function clearChat() {
-    if (!confirm('确定清空所有聊天记录吗？AI将忘记本次对话内容。')) return;
+    if (!confirm('确定清空所有聊天记录吗？AI将忘记全部对话内容。')) return;
     const container = document.getElementById('chat-messages');
     container.innerHTML = '<div class="chat chat-start"><div class="chat-bubble bg-base-200 text-base-content">你好呀，我是乐。今天想跟我聊点什么？</div></div>';
     chatHistory = []; // 清空对话记忆
+    localStorage.removeItem('PERM_CHAT_HISTORY'); // 清除本地永久记忆
     stopAllAudio(); // 停止正在播放的语音
     isChatAudioPlaying = false; // 释放播放锁
     sfxClick();
