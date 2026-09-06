@@ -647,6 +647,9 @@ async function sendChatMessage() {
         if (isReasonerModel && (reasoningLevel === 'low' || reasoningLevel === 'medium' || reasoningLevel === 'high')) {
             requestBody.reasoning_effort = reasoningLevel;
         }
+        // 开启流式输出
+        requestBody.stream = true;
+
         let res;
         for (let attempt = 0; attempt < 2; attempt++) {
             try {
@@ -673,17 +676,52 @@ async function sendChatMessage() {
             throw new Error(`大模型请求失败: ${res.status} ${errText.substring(0, 100)}`);
         }
 
-        const data = await res.json();
-        const reply = data.choices[0].message.content;
+        // 流式读取 SSE 响应，逐字显示
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let fullReply = '';
+        let buffer = '';
+        loadingBubble.innerText = '';
 
-        loadingBubble.innerText = reply;
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed.startsWith('data:')) continue;
+                const dataStr = trimmed.slice(5).trim();
+                if (dataStr === '[DONE]') continue;
+
+                try {
+                    const chunk = JSON.parse(dataStr);
+                    const delta = chunk.choices?.[0]?.delta?.content;
+                    if (delta) {
+                        fullReply += delta;
+                        loadingBubble.innerText = fullReply;
+                        // 自动滚动到底部
+                        const chatContainer = document.getElementById('chat-messages');
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                    }
+                } catch (e) {
+                    // 忽略解析错误的chunk
+                }
+            }
+        }
+
+        // 如果流式返回为空，尝试用非流式方式兜底
+        if (!fullReply) {
+            throw new Error('流式响应为空，请重试');
+        }
 
         // 把AI回复加入历史记忆
-        chatHistory.push({ role: 'assistant', content: reply });
+        chatHistory.push({ role: 'assistant', content: fullReply });
         if (chatHistory.length > 20) chatHistory.shift();
 
-        // 自动用克隆声音朗读 AI 回复（已关闭，用户可手动点播放按钮）
-        // generateAndPlayAudio(reply);
         sfxSuccess();
 
     } catch (err) {
