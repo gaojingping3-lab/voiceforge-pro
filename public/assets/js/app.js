@@ -944,13 +944,9 @@ function renderRoleList() {
     list.forEach(role => {
         const isActive = role.id === currentId;
         const item = document.createElement('div');
-        item.className = `flex items-center justify-between p-3 rounded-lg border ${isActive ? 'border-primary bg-primary/10' : 'border-base-300'} cursor-pointer`;
-        item.ondblclick = () => {
-            switchRole(role.id);
-            setTimeout(() => editRoleCard(), 100);
-        };
+        item.className = `flex items-center justify-between p-3 rounded-lg border ${isActive ? 'border-primary bg-primary/10' : 'border-base-300'}`;
         item.innerHTML = `
-            <div class="flex-1 font-bold text-sm ${isActive ? 'text-primary' : ''}" onclick="switchRole(${role.id})">
+            <div class="flex-1 cursor-pointer font-bold text-sm ${isActive ? 'text-primary' : ''}" onclick="switchRole(${role.id})">
                 ${role.name} ${isActive ? '✓ 当前' : ''}
             </div>
             <button class="btn btn-ghost btn-xs text-error" onclick="deleteRole(${role.id})" title="删除">
