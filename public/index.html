@@ -240,9 +240,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h2 class="card-title text-lg"><i class="fa-solid fa-comments text-primary"></i> 与乐 语音对话</h2>
                     <button class="btn btn-ghost btn-xs" onclick="clearChat()"><i class="fa-solid fa-trash"></i> 清空</button>
                 </div>
-                <div class="alert alert-info py-2 px-3 text-xs mb-3">
-                    <i class="fa-solid fa-info-circle"></i>
-                    <span>点击 AI 消息右下角的 🔊 播放按钮收听克隆声音。需先在「文本转语音」页配置好 API Key 和声音 ID。</span>
+
+                <!-- 当前模式提示 -->
+                <div id="mode-hint" class="alert alert-warning py-1 px-3 text-xs mb-3">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span id="mode-hint-text">当前模式：滑动窗口</span>
                 </div>
 
                 <!-- 角色卡 -->
@@ -312,12 +314,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
                 </dialog>
-
-                <!-- 滑动窗口模式提示 -->
-                <div id="slide-window-hint" class="hidden alert alert-warning py-1 px-3 text-xs mb-2">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                    <span>当前为滑动窗口模式，AI 仅能看到最近 4 轮对话，更早的记录已保存在本地但不会发给 AI。</span>
-                </div>
 
                 <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 h-80 sm:h-96 overflow-y-auto flex flex-col gap-3 mb-3"></div>
                 <div class="flex gap-2 items-center">

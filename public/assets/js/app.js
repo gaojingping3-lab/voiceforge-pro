@@ -192,7 +192,7 @@ function saveModalKeys() {
     const constraintOn = document.getElementById('role-constraint-toggle').checked;
     localStorage.setItem('ROLE_CONSTRAINT', constraintOn ? '1' : '0');
     onEngineChange();
-    updateSlideWindowHint();
+    updateModeHint();
     sfxSave();
     settings_modal.close();
 }
@@ -1105,15 +1105,22 @@ function initRoleCard() {
         document.getElementById('role-card-arrow').className = 'fa-solid fa-chevron-down text-xs text-gray-400';
         document.getElementById('role-card-status').innerText = '已收起';
     }
-    updateSlideWindowHint();
+    updateModeHint();
 }
 
-// 更新滑动窗口提示
-function updateSlideWindowHint() {
-    const hint = document.getElementById('slide-window-hint');
-    if (!hint) return;
+// 更新当前模式提示
+function updateModeHint() {
+    const hint = document.getElementById('mode-hint');
+    const text = document.getElementById('mode-hint-text');
+    if (!hint || !text) return;
     const isSlide = localStorage.getItem('CTX_MODE') === 'slide';
-    hint.classList.toggle('hidden', !isSlide);
+    if (isSlide) {
+        hint.className = 'alert alert-warning py-1 px-3 text-xs mb-3';
+        text.innerText = '当前模式：滑动窗口（AI仅见最近4轮）';
+    } else {
+        hint.className = 'alert alert-success py-1 px-3 text-xs mb-3';
+        text.innerText = '当前模式：全量历史（AI记住全部对话）';
+    }
 }
 
 // 清空聊天记录（同时清除永久记忆）
