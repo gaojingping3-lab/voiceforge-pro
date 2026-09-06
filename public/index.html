@@ -347,17 +347,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         <textarea id="role-desc-input" class="textarea textarea-bordered textarea-sm w-full h-32" placeholder="描述角色的性格、身份、说话风格等..."></textarea>
                         <label class="label py-1 mt-3"><span class="label-text text-sm">快捷开场白（切换角色后自动填入）</span></label>
                         <input type="text" id="role-opening-input" class="input input-bordered input-sm w-full" placeholder="例如：你来了，我等你很久了..." />
-                        <div class="mt-4">
-                            <div class="flex items-center justify-between mb-2">
-                                <label class="label py-0"><span class="label-text text-sm">🧠 记忆本（AI自动提取，可手动清空）</span></label>
-                                <button class="btn btn-ghost btn-xs text-error" onclick="clearRoleMemory()" title="清空记忆">
-                                    <i class="fa-solid fa-eraser"></i> 清空
-                                </button>
-                            </div>
-                            <div id="role-memory-list" class="text-xs text-gray-500 space-y-1 max-h-32 overflow-y-auto">
-                                <span class="text-gray-400">暂无记忆，聊天时会自动提取</span>
-                            </div>
-                        </div>
                         <div class="modal-action mt-4">
                             <button class="btn btn-ghost btn-sm" onclick="document.getElementById('role-card-modal').close()">取消</button>
                             <button class="btn btn-primary btn-sm" onclick="saveRoleCard()">保存</button>
