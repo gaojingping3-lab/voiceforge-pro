@@ -1662,7 +1662,7 @@ async function dualChatNext(isUserInterruption = false) {
     const currentRole = dualCurrentSpeaker === 'A' ? dualRoleA : dualRoleB;
     const otherRole = dualCurrentSpeaker === 'A' ? dualRoleB : dualRoleA;
 
-    // 构建消息：明确三方身份 + 当前角色卡 + 记忆便签 + 对话规则 + 格式化的对话历史
+    // 构建消息：明确三方身份 + 用户设定 + 当前角色卡 + 记忆便签 + 对话规则 + 格式化的对话历史
     const defaultSystem = '你是乐。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。';
     const customSystem = localStorage.getItem('LLM_SYSTEM');
     const systemRules = customSystem || defaultSystem;
@@ -1670,21 +1670,32 @@ async function dualChatNext(isUserInterruption = false) {
 
     const messages = [
         { role: 'system', content: systemRules },
-        // 明确三方身份定义
-        { role: 'system', content: `【场景身份说明】
-这个对话场景中有三个人：
-- 角色A：${dualRoleA.name}
-- 角色B：${dualRoleB.name}
-- 角色C：用户（真实的人类使用者，在旁观和插话）${userRoleDesc ? '\n用户设定：' + userRoleDesc : ''}
+        // 明确三方身份定义（放在最前面，强化记忆）
+        { role: 'system', content: `【重要！场景身份说明，必须严格遵守】
+这个对话场景中有且只有三个人：
+1. 角色A = ${dualRoleA.name}
+2. 角色B = ${dualRoleB.name}  
+3. 角色C = 用户（真实人类，也就是正在和你说话的人）
 
 你现在扮演的是【${currentRole.name}】（角色${dualCurrentSpeaker}）。
-你只能以${currentRole.name}的身份说话，绝对不能冒充角色C（用户）发言，也不能替用户做决定或说用户的话。
-当你看到【角色C说】的消息时，那是真实用户在插话，请正常回应用户。` },
+⚠️ 绝对禁止：你不能扮演角色C（用户），不能替用户说话，不能假装是用户。
+⚠️ 当你看到以【角色C（用户）说】开头的消息时，那就是真实用户在对你说话，你必须直接回应用户。` },
+        // 用户设定单独一条，强化
+        { role: 'system', content: `【角色C（用户）的设定，回复用户时必须参考】
+${userRoleDesc || '用户没有填写特别设定，请把用户当作这个场景的观察者和参与者。'}
+请根据以上用户设定，用符合${currentRole.name}身份的方式回复用户。` },
         // 当前角色人设
         { role: 'system', content: `你扮演的角色人设：
 ${currentRole.desc}
 请严格按照这个人设说话，保持角色的性格、语气和说话风格。` },
     ];
+
+    // 用户插话时，特别强调现在是用户在说话
+    if (isUserInterruption) {
+        messages.push({ role: 'system', content: `【当前状态：用户正在和你说话】
+现在是角色C（用户）在主动和你（${currentRole.name}）对话，请你直接回复用户，不要继续和${otherRole.name}对话。
+回复时要参考上面的用户设定，按照用户希望的方式回应。` });
+    }
 
     // 加入当前角色的记忆便签
     const memoPrompt = formatMemoPrompt(currentRole.id);
@@ -1702,11 +1713,11 @@ ${currentRole.desc}
     }
 
     // 对话规则
-    messages.push({ role: 'system', content: `你正在和${otherRole.name}对话，角色C（用户）也在场景中可能插话。请用第一人称回复，只说你自己（${currentRole.name}）的话，不要替对方或用户说话。回复要简短自然，像真人聊天一样，不要太长。` });
+    messages.push({ role: 'system', content: `你正在和${otherRole.name}对话，角色C（用户）也在场景中。请用第一人称回复，只说你自己（${currentRole.name}）的话，不要替对方或用户说话。回复要简短自然，像真人聊天一样，不要太长。` });
 
-    // 格式化对话历史：每条消息都标明发言人，让AI清楚区分三方
+    // 格式化对话历史：每条消息都标明发言人，让AI清楚区分三方，增加到20条上下文
     const formattedHistory = [];
-    for (const msg of chatHistory.slice(-15)) {
+    for (const msg of chatHistory.slice(-20)) {
         if (msg.role === 'user') {
             // 用户发的消息，标记为角色C
             formattedHistory.push({ role: 'user', content: `【角色C（用户）说】${msg.content}` });
