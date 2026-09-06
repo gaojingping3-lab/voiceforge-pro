@@ -254,6 +254,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="text-xs text-gray-400" id="role-card-status">已展开</span>
                         </div>
                         <div class="flex items-center gap-1">
+                            <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation(); showRoleList()" title="切换角色">
+                                <i class="fa-solid fa-people-arrows"></i>
+                            </button>
                             <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation(); resetRoleCard()" title="一键重置">
                                 <i class="fa-solid fa-rotate-left"></i>
                             </button>
@@ -267,6 +270,23 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="text-xs text-gray-500 leading-relaxed" id="role-card-desc">点击编辑按钮设置角色人设，AI会始终记住这个设定。</div>
                     </div>
                 </div>
+
+                <!-- 角色卡列表弹窗 -->
+                <dialog id="role-list-modal" class="modal">
+                    <div class="modal-box bg-base-100">
+                        <h3 class="font-bold text-lg mb-4">切换角色卡</h3>
+                        <div id="role-list-container" class="space-y-2 mb-4 max-h-60 overflow-y-auto"></div>
+                        <div class="flex gap-2">
+                            <button class="btn btn-primary btn-sm flex-1" onclick="addNewRole()">
+                                <i class="fa-solid fa-plus"></i> 新建角色
+                            </button>
+                            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('role-list-modal').close()">关闭</button>
+                        </div>
+                    </div>
+                    <form method="dialog" class="modal-backdrop">
+                        <button>close</button>
+                    </form>
+                </dialog>
 
                 <!-- 角色卡编辑弹窗 -->
                 <dialog id="role-card-modal" class="modal">

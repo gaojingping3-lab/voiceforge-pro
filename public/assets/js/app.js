@@ -688,7 +688,8 @@ async function sendChatMessage() {
     // 设置里的角色设定（强制规则）和角色卡（扮演角色）分成两条system消息，模型更容易区分
     const defaultSystem = '你是乐。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。';
     const customSystem = localStorage.getItem('LLM_SYSTEM');
-    const roleCardDesc = localStorage.getItem('ROLE_CARD_DESC');
+    const currentRole = getCurrentRole();
+    const roleCardDesc = currentRole.desc;
     const systemRules = customSystem || defaultSystem;
     const hasRoleCard = roleCardDesc && roleCardDesc !== DEFAULT_ROLE_DESC;
 
@@ -861,20 +862,50 @@ async function sendChatMessage() {
 }
 
 // ============================================
-// 角色卡功能
+// 角色卡功能（支持多角色卡切换）
 // ============================================
 const DEFAULT_ROLE_NAME = '乐';
 const DEFAULT_ROLE_DESC = '你是乐。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。';
 
+// 获取角色列表，没有则初始化默认角色
+function getRoleList() {
+    const saved = localStorage.getItem('ROLE_LIST');
+    if (saved) {
+        try {
+            return JSON.parse(saved);
+        } catch (e) {
+            // 解析失败，迁移旧数据
+        }
+    }
+    // 迁移旧数据或初始化
+    const oldName = localStorage.getItem('ROLE_CARD_NAME') || DEFAULT_ROLE_NAME;
+    const oldDesc = localStorage.getItem('ROLE_CARD_DESC') || DEFAULT_ROLE_DESC;
+    const list = [{ id: Date.now(), name: oldName, desc: oldDesc }];
+    localStorage.setItem('ROLE_LIST', JSON.stringify(list));
+    localStorage.setItem('CURRENT_ROLE_ID', list[0].id);
+    return list;
+}
+
+function saveRoleList(list) {
+    localStorage.setItem('ROLE_LIST', JSON.stringify(list));
+}
+
+function getCurrentRoleId() {
+    return parseInt(localStorage.getItem('CURRENT_ROLE_ID')) || getRoleList()[0].id;
+}
+
+function getCurrentRole() {
+    const list = getRoleList();
+    const id = getCurrentRoleId();
+    return list.find(r => r.id === id) || list[0];
+}
+
 function getRoleCard() {
-    return {
-        name: localStorage.getItem('ROLE_CARD_NAME') || DEFAULT_ROLE_NAME,
-        desc: localStorage.getItem('ROLE_CARD_DESC') || DEFAULT_ROLE_DESC
-    };
+    return getCurrentRole();
 }
 
 function renderRoleCard() {
-    const role = getRoleCard();
+    const role = getCurrentRole();
     document.getElementById('role-card-name').innerText = role.name;
     document.getElementById('role-card-desc').innerText = role.desc;
 }
@@ -898,8 +929,81 @@ function toggleRoleCard() {
     sfxClick();
 }
 
+// 显示角色列表弹窗
+function showRoleList() {
+    renderRoleList();
+    document.getElementById('role-list-modal').showModal();
+}
+
+// 渲染角色列表
+function renderRoleList() {
+    const list = getRoleList();
+    const currentId = getCurrentRoleId();
+    const container = document.getElementById('role-list-container');
+    container.innerHTML = '';
+    list.forEach(role => {
+        const isActive = role.id === currentId;
+        const item = document.createElement('div');
+        item.className = `flex items-center justify-between p-3 rounded-lg border ${isActive ? 'border-primary bg-primary/10' : 'border-base-300'}`;
+        item.innerHTML = `
+            <div class="flex-1 cursor-pointer" onclick="switchRole(${role.id})">
+                <div class="font-bold text-sm ${isActive ? 'text-primary' : ''}">${role.name} ${isActive ? '✓' : ''}</div>
+                <div class="text-xs text-gray-500 truncate">${role.desc.substring(0, 50)}...</div>
+            </div>
+            <button class="btn btn-ghost btn-xs text-error" onclick="deleteRole(${role.id})" title="删除">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        `;
+        container.appendChild(item);
+    });
+}
+
+// 切换角色
+function switchRole(id) {
+    localStorage.setItem('CURRENT_ROLE_ID', id);
+    renderRoleCard();
+    document.getElementById('role-list-modal').close();
+    sfxSuccess();
+}
+
+// 新建角色
+function addNewRole() {
+    const list = getRoleList();
+    const newRole = {
+        id: Date.now(),
+        name: '新角色',
+        desc: '在这里写角色人设...'
+    };
+    list.push(newRole);
+    saveRoleList(list);
+    localStorage.setItem('CURRENT_ROLE_ID', newRole.id);
+    renderRoleList();
+    renderRoleCard();
+    // 自动打开编辑
+    editRoleCard();
+}
+
+// 删除角色
+function deleteRole(id) {
+    const list = getRoleList();
+    if (list.length <= 1) {
+        alert('至少保留一个角色卡');
+        return;
+    }
+    if (!confirm('确定删除这个角色卡吗？')) return;
+    const newList = list.filter(r => r.id !== id);
+    saveRoleList(newList);
+    // 如果删的是当前角色，切换到第一个
+    if (getCurrentRoleId() === id) {
+        localStorage.setItem('CURRENT_ROLE_ID', newList[0].id);
+    }
+    renderRoleList();
+    renderRoleCard();
+    sfxClick();
+}
+
 function editRoleCard() {
-    const role = getRoleCard();
+    const role = getCurrentRole();
     document.getElementById('role-name-input').value = role.name;
     document.getElementById('role-desc-input').value = role.desc;
     document.getElementById('role-card-modal').showModal();
@@ -913,23 +1017,36 @@ function clearRoleDescInput() {
 function saveRoleCard() {
     const name = document.getElementById('role-name-input').value.trim() || DEFAULT_ROLE_NAME;
     const desc = document.getElementById('role-desc-input').value.trim() || DEFAULT_ROLE_DESC;
-    localStorage.setItem('ROLE_CARD_NAME', name);
-    localStorage.setItem('ROLE_CARD_DESC', desc);
+    const list = getRoleList();
+    const currentId = getCurrentRoleId();
+    const role = list.find(r => r.id === currentId);
+    if (role) {
+        role.name = name;
+        role.desc = desc;
+        saveRoleList(list);
+    }
     renderRoleCard();
     document.getElementById('role-card-modal').close();
     sfxSuccess();
 }
 
 function resetRoleCard() {
-    if (!confirm('确定重置角色卡为默认设定吗？')) return;
-    localStorage.removeItem('ROLE_CARD_NAME');
-    localStorage.removeItem('ROLE_CARD_DESC');
+    if (!confirm('确定重置当前角色卡为默认设定吗？')) return;
+    const list = getRoleList();
+    const currentId = getCurrentRoleId();
+    const role = list.find(r => r.id === currentId);
+    if (role) {
+        role.name = DEFAULT_ROLE_NAME;
+        role.desc = DEFAULT_ROLE_DESC;
+        saveRoleList(list);
+    }
     renderRoleCard();
     sfxClick();
 }
 
 // 页面加载时恢复角色卡状态
 function initRoleCard() {
+    getRoleList(); // 初始化/迁移
     renderRoleCard();
     const collapsed = localStorage.getItem('ROLE_CARD_COLLAPSED') === '1';
     if (collapsed) {
