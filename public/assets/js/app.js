@@ -604,11 +604,15 @@ async function sendChatMessage() {
         localStorage.setItem('LLM_MODEL', llmModel);
     }
 
-    // 用户自定义AI角色设定，优先使用角色卡，其次是设置里的自定义，最后用默认
+    // 设置里的角色设定优先（强制规则），角色卡内容补充（防失忆），两者合并
     const defaultSystem = '你是乐。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。';
-    const roleCardDesc = localStorage.getItem('ROLE_CARD_DESC');
     const customSystem = localStorage.getItem('LLM_SYSTEM');
-    const systemPrompt = roleCardDesc || customSystem || defaultSystem;
+    const roleCardDesc = localStorage.getItem('ROLE_CARD_DESC');
+    let systemPrompt = customSystem || defaultSystem;
+    // 角色卡有内容且不是默认值时，追加到后面作为补充
+    if (roleCardDesc && roleCardDesc !== DEFAULT_ROLE_DESC) {
+        systemPrompt = systemPrompt + '\n\n【角色补充设定】\n' + roleCardDesc;
+    }
 
     if (!llmKey) {
         alert('请先点击右上角齿轮 ⚙️ 设置大模型 API Key！');
