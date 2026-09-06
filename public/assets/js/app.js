@@ -642,10 +642,18 @@ async function sendChatMessage() {
             messages: messages,
             temperature: parseFloat(localStorage.getItem('LLM_TEMPERATURE') || '0.8')
         };
-        // 低/中/高思考程度时传 reasoning_effort 参数（仅 reasoner 模型生效）
-        const isReasonerModel = llmModel.toLowerCase().includes('reasoner');
-        if (isReasonerModel && (reasoningLevel === 'low' || reasoningLevel === 'medium' || reasoningLevel === 'high')) {
-            requestBody.reasoning_effort = reasoningLevel;
+        // 思考程度控制（支持 V4 系列和 reasoner 模型）
+        const isV4OrReasoner = llmModel.toLowerCase().includes('v4') || llmModel.toLowerCase().includes('reasoner');
+        if (isV4OrReasoner && reasoningLevel !== 'default') {
+            if (reasoningLevel === 'off') {
+                // 关闭思考：不思考，秒回，省token
+                requestBody.thinking = { type: 'disabled' };
+            } else {
+                // 开启思考：低/中/高
+                const effortMap = { 'low': 'low', 'medium': 'high', 'high': 'max' };
+                requestBody.thinking = { type: 'enabled' };
+                requestBody.reasoning_effort = effortMap[reasoningLevel] || 'low';
+            }
         }
         // 开启流式输出
         requestBody.stream = true;
