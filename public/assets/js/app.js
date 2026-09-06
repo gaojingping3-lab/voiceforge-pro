@@ -961,6 +961,15 @@ async function sendChatMessage() {
     const text = input.value.trim();
     if (!text) return;
 
+    // 双角色模式下用户发消息：清除等待定时器，暂停自动对话，AI直接回复
+    if (isDualRunning && dualTimeoutId) {
+        clearTimeout(dualTimeoutId);
+        dualTimeoutId = null;
+        isDualRunning = false;
+        document.getElementById('dual-start-btn').classList.remove('hidden');
+        document.getElementById('dual-pause-btn').classList.add('hidden');
+    }
+
     let llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
     const llmKey = localStorage.getItem('LLM_KEY') || '';
     let llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
@@ -1459,6 +1468,7 @@ let dualCurrentSpeaker = 'A'; // 当前该谁说话
 let dualRoundCount = 0;
 const DUAL_MAX_ROUNDS = 20; // 最大自动轮数，防止无限消耗
 let dualAbortController = null;
+let dualTimeoutId = null; // 保存双角色对话的setTimeout ID，用户发消息时清除
 
 // 切换双角色模式
 function toggleDualRoleMode() {
@@ -1548,7 +1558,7 @@ function startDualChat() {
         sfxReceive();
 
         // 间隔设置的时间后，角色B开始回复
-        setTimeout(() => {
+        dualTimeoutId = setTimeout(() => {
             if (isDualRunning) dualChatNext();
         }, getDualInterval());
     } else {
@@ -1574,6 +1584,10 @@ function startDualChat() {
 // 暂停双角色对话
 function pauseDualChat() {
     isDualRunning = false;
+    if (dualTimeoutId) {
+        clearTimeout(dualTimeoutId);
+        dualTimeoutId = null;
+    }
     document.getElementById('dual-start-btn').classList.remove('hidden');
     document.getElementById('dual-pause-btn').classList.add('hidden');
     sfxClick();
@@ -1582,6 +1596,10 @@ function pauseDualChat() {
 // 终止双角色对话
 function stopDualChat() {
     isDualRunning = false;
+    if (dualTimeoutId) {
+        clearTimeout(dualTimeoutId);
+        dualTimeoutId = null;
+    }
     if (dualAbortController) {
         dualAbortController.abort();
         dualAbortController = null;
@@ -1753,7 +1771,7 @@ async function dualChatNext() {
         // 切换到另一个角色，继续下一轮
         dualCurrentSpeaker = dualCurrentSpeaker === 'A' ? 'B' : 'A';
         // 间隔设置的时间再继续，模拟真人对话节奏
-        setTimeout(() => {
+        dualTimeoutId = setTimeout(() => {
             if (isDualRunning) dualChatNext();
         }, getDualInterval());
 
