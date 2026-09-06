@@ -130,6 +130,23 @@ mainKeyInput.addEventListener('input', () => {
     }
 });
 
+// 当前上下文模式（全量/滑动窗口）
+let currentCtxMode = 'full';
+
+function setCtxMode(mode) {
+    currentCtxMode = mode;
+    const fullBtn = document.getElementById('ctx-mode-full');
+    const slideBtn = document.getElementById('ctx-mode-slide');
+    if (mode === 'full') {
+        fullBtn.className = 'flex-1 py-2 px-2 rounded-lg border border-primary bg-primary/10 text-primary text-xs';
+        slideBtn.className = 'flex-1 py-2 px-2 rounded-lg border border-base-300 text-xs';
+    } else {
+        slideBtn.className = 'flex-1 py-2 px-2 rounded-lg border border-primary bg-primary/10 text-primary text-xs';
+        fullBtn.className = 'flex-1 py-2 px-2 rounded-lg border border-base-300 text-xs';
+    }
+    sfxClick();
+}
+
 function syncModalInputs() {
     document.getElementById('modal-key-fish').value = localStorage.getItem('FISH_KEY') || '';
     document.getElementById('modal-key-sili').value = localStorage.getItem('SILICONFLOW_KEY') || '';
@@ -148,8 +165,7 @@ function syncModalInputs() {
     document.getElementById('topp-value').innerText = topp;
     // 加载上下文模式
     const ctxMode = localStorage.getItem('CTX_MODE') || 'full';
-    const ctxRadio = document.querySelector(`input[name="ctx-mode"][value="${ctxMode}"]`);
-    if (ctxRadio) ctxRadio.checked = true;
+    setCtxMode(ctxMode);
 }
 
 function saveModalKeys() {
@@ -163,8 +179,7 @@ function saveModalKeys() {
     localStorage.setItem('LLM_TEMPERATURE', document.getElementById('modal-llm-temperature').value);
     localStorage.setItem('LLM_TOPP', document.getElementById('modal-llm-topp').value);
     // 保存上下文模式
-    const ctxMode = document.querySelector('input[name="ctx-mode"]:checked')?.value || 'full';
-    localStorage.setItem('CTX_MODE', ctxMode);
+    localStorage.setItem('CTX_MODE', currentCtxMode);
     onEngineChange();
     sfxSave();
     settings_modal.close();

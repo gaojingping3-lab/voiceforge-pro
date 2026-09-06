@@ -437,18 +437,12 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="form-control mb-6">
                 <label class="label py-1"><span class="label-text text-sm">上下文模式</span></label>
                 <div class="flex gap-2">
-                    <label class="flex-1 cursor-pointer">
-                        <input type="radio" name="ctx-mode" value="full" class="peer hidden" checked />
-                        <div class="text-center py-2 px-2 rounded-lg border border-base-300 text-xs peer-checked:border-primary peer-checked:bg-primary/10 peer-checked:text-primary">
-                            全量历史<br /><span class="text-[10px] opacity-70">记住全部对话</span>
-                        </div>
-                    </label>
-                    <label class="flex-1 cursor-pointer">
-                        <input type="radio" name="ctx-mode" value="slide" class="peer hidden" />
-                        <div class="text-center py-2 px-2 rounded-lg border border-base-300 text-xs peer-checked:border-primary peer-checked:bg-primary/10 peer-checked:text-primary">
-                            滑动窗口<br /><span class="text-[10px] opacity-70">仅最近4轮，防降智</span>
-                        </div>
-                    </label>
+                    <button type="button" id="ctx-mode-full" class="flex-1 py-2 px-2 rounded-lg border border-primary bg-primary/10 text-primary text-xs" onclick="setCtxMode('full')">
+                        全量历史<br /><span class="text-[10px] opacity-70">记住全部对话</span>
+                    </button>
+                    <button type="button" id="ctx-mode-slide" class="flex-1 py-2 px-2 rounded-lg border border-base-300 text-xs" onclick="setCtxMode('slide')">
+                        滑动窗口<br /><span class="text-[10px] opacity-70">仅最近4轮，防降智</span>
+                    </button>
                 </div>
             </div>
 
