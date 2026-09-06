@@ -37,16 +37,27 @@ export async function onRequest(context) {
       body: JSON.stringify(body),
     });
 
-    // 4. 流式响应：直接透传 body，确保不缓冲
+    // 4. 流式响应：用 TransformStream 强制逐块转发，防止缓冲
     const isStream = body.stream === true;
     const headers = new Headers(response.headers);
     headers.set("Access-Control-Allow-Origin", "*");
+
     if (isStream) {
-      // 强制流式响应头，防止缓冲
-      headers.set("Content-Type", "text/event-stream");
-      headers.set("Cache-Control", "no-cache");
+      // 强制流式响应头
+      headers.set("Content-Type", "text/event-stream; charset=utf-8");
+      headers.set("Cache-Control", "no-cache, no-transform");
       headers.set("Connection", "keep-alive");
+      headers.set("X-Accel-Buffering", "no");
       headers.delete("Content-Length");
+
+      // 用 TransformStream 强制逐块转发
+      const { readable, writable } = new TransformStream();
+      response.body.pipeTo(writable);
+      return new Response(readable, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: headers,
+      });
     }
 
     return new Response(response.body, {
