@@ -40,11 +40,14 @@ function playTone(freq, duration, type, volume, delay = 0) {
         osc.stop(ctx.currentTime + delay + duration);
     } catch (e) { /* 忽略音效错误 */ }
 }
-function sfxClick() { playTone(700, 0.06, 'sine', 0.04); playTone(400, 0.05, 'sine', 0.03, 0.01); }
-function sfxStart() { playTone(400, 0.1, 'sine', 0.05); playTone(600, 0.1, 'sine', 0.04, 0.08); playTone(800, 0.12, 'sine', 0.03, 0.16); }
-function sfxSuccess() { playTone(523, 0.12, 'sine', 0.06); playTone(659, 0.12, 'sine', 0.05, 0.1); playTone(784, 0.18, 'sine', 0.04, 0.2); }
-function sfxError() { playTone(300, 0.15, 'sawtooth', 0.04); playTone(200, 0.2, 'sawtooth', 0.03, 0.12); }
-function sfxSave() { playTone(600, 0.08, 'triangle', 0.05); playTone(900, 0.1, 'triangle', 0.04, 0.06); }
+function sfxClick() { if (!soundEnabled()) return; playTone(700, 0.06, 'sine', 0.04); playTone(400, 0.05, 'sine', 0.03, 0.01); }
+function sfxStart() { if (!soundEnabled()) return; playTone(400, 0.1, 'sine', 0.05); playTone(600, 0.1, 'sine', 0.04, 0.08); playTone(800, 0.12, 'sine', 0.03, 0.16); }
+function sfxSuccess() { if (!soundEnabled()) return; playTone(523, 0.12, 'sine', 0.06); playTone(659, 0.12, 'sine', 0.05, 0.1); playTone(784, 0.18, 'sine', 0.04, 0.2); }
+function sfxError() { if (!soundEnabled()) return; playTone(300, 0.15, 'sawtooth', 0.04); playTone(200, 0.2, 'sawtooth', 0.03, 0.12); }
+function sfxSave() { if (!soundEnabled()) return; playTone(600, 0.08, 'triangle', 0.05); playTone(900, 0.1, 'triangle', 0.04, 0.06); }
+function sfxSend() { if (!soundEnabled()) return; playTone(800, 0.08, 'sine', 0.04); playTone(1000, 0.06, 'sine', 0.03, 0.05); }
+function sfxReceive() { if (!soundEnabled()) return; playTone(880, 0.1, 'sine', 0.05); playTone(1100, 0.15, 'sine', 0.04, 0.08); }
+function soundEnabled() { return localStorage.getItem('SOUND_ENABLED') !== '0'; }
 
 // Theme toggler（已替换为高级主题切换，保留旧代码备用）
 // const themeToggle = document.getElementById('theme-toggle');
@@ -174,6 +177,8 @@ function syncModalInputs() {
     // 加载角色强约束开关
     const constraintOn = localStorage.getItem('ROLE_CONSTRAINT');
     document.getElementById('role-constraint-toggle').checked = constraintOn !== '0';
+    // 加载音效开关
+    document.getElementById('sound-toggle').checked = soundEnabled();
 }
 
 function saveModalKeys() {
@@ -191,6 +196,9 @@ function saveModalKeys() {
     // 保存角色强约束开关
     const constraintOn = document.getElementById('role-constraint-toggle').checked;
     localStorage.setItem('ROLE_CONSTRAINT', constraintOn ? '1' : '0');
+    // 保存音效开关
+    const soundOn = document.getElementById('sound-toggle').checked;
+    localStorage.setItem('SOUND_ENABLED', soundOn ? '1' : '0');
     onEngineChange();
     updateModeHint();
     sfxSave();
@@ -522,7 +530,7 @@ function stopAllAudio() {
 function appendChatMessage(text, type) {
     const container = document.getElementById('chat-messages');
     const div = document.createElement('div');
-    div.className = `chat chat-${type === 'user' ? 'end' : 'start'} relative`;
+    div.className = `chat chat-${type === 'user' ? 'end' : 'start'} relative msg-enter`;
     const bubble = document.createElement('div');
     bubble.className = `chat-bubble ${type === 'user' ? 'bg-primary text-white' : 'bg-base-200 text-base-content'} relative pr-8`;
     bubble.innerText = text;
@@ -666,6 +674,19 @@ document.addEventListener('DOMContentLoaded', () => {
     initRoleCard();
     loadChatHistory(); // 恢复永久记忆
     renderChatHistory(); // 渲染历史消息
+
+    // 键盘弹出时自动调整，防止输入框被遮挡
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => {
+            const vh = window.visualViewport.height;
+            document.body.style.height = vh + 'px';
+            // 滚动聊天区域到底部
+            setTimeout(() => {
+                const chat = document.getElementById('chat-messages');
+                if (chat) chat.scrollTop = chat.scrollHeight;
+            }, 100);
+        });
+    }
 });
 
 // 发送聊天消息
@@ -702,6 +723,7 @@ async function sendChatMessage() {
 
     appendChatMessage(text, 'user');
     input.value = '';
+    sfxSend();
 
     // 发送新消息时，停止上一条AI回复的朗读
     stopAllAudio();
@@ -710,7 +732,16 @@ async function sendChatMessage() {
     chatHistory.push({ role: 'user', content: text });
     saveChatHistory(); // 保存到本地，刷新不丢失
 
-    const loadingBubble = appendChatMessage('乐正在思考...', 'ai');
+    // 创建思考中动画（三点跳动）
+    const container = document.getElementById('chat-messages');
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'chat chat-start relative msg-enter';
+    const loadingBubble = document.createElement('div');
+    loadingBubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
+    loadingBubble.innerHTML = '乐正在思考 <span class="thinking-dots"><span></span><span></span><span></span></span>';
+    loadingDiv.appendChild(loadingBubble);
+    container.appendChild(loadingDiv);
+    container.scrollTop = container.scrollHeight;
     sfxStart();
 
     try {
@@ -853,7 +884,7 @@ async function sendChatMessage() {
         chatHistory.push({ role: 'assistant', content: fullReply });
         saveChatHistory(); // 保存到本地，刷新不丢失
 
-        sfxSuccess();
+        sfxReceive();
 
     } catch (err) {
         loadingBubble.innerText = '出错啦: ' + err.message;
@@ -973,44 +1004,54 @@ function editRoleById(id) {
 
 // 切换角色
 function switchRole(id) {
-    // 如果有聊天记录，询问是否清空
-    if (chatHistory.length > 0) {
-        if (!confirm('切换角色后是否清空当前聊天记录？\n\n确定：清空记忆，用新角色重新开始\n取消：保留聊天记录（可能导致人设混乱）')) {
-            // 用户选择取消，只切换角色不清空
-            localStorage.setItem('CURRENT_ROLE_ID', id);
-            renderRoleCard();
-            document.getElementById('role-list-modal').close();
-            sfxSuccess();
-            return;
-        }
-        // 用户选择清空
-        chatHistory = [];
-        localStorage.removeItem('PERM_CHAT_HISTORY');
-        const container = document.getElementById('chat-messages');
-        if (container) container.innerHTML = '';
+    const chatContainer = document.getElementById('chat-messages');
+    // 淡出效果
+    if (chatContainer) {
+        chatContainer.style.opacity = '0';
+        chatContainer.style.transition = 'opacity 0.2s ease';
     }
-    localStorage.setItem('CURRENT_ROLE_ID', id);
-    renderRoleCard();
-    document.getElementById('role-list-modal').close();
-    // AI主动发送开场白
-    const role = getCurrentRole();
-    if (role.opening) {
-        const container = document.getElementById('chat-messages');
-        if (container) {
+
+    setTimeout(() => {
+        // 如果有聊天记录，询问是否清空
+        if (chatHistory.length > 0) {
+            if (!confirm('切换角色后是否清空当前聊天记录？\n\n确定：清空记忆，用新角色重新开始\n取消：保留聊天记录（可能导致人设混乱）')) {
+                // 用户选择取消，只切换角色不清空
+                localStorage.setItem('CURRENT_ROLE_ID', id);
+                renderRoleCard();
+                document.getElementById('role-list-modal').close();
+                sfxSuccess();
+                if (chatContainer) chatContainer.style.opacity = '1';
+                return;
+            }
+            // 用户选择清空
+            chatHistory = [];
+            localStorage.removeItem('PERM_CHAT_HISTORY');
+            if (chatContainer) chatContainer.innerHTML = '';
+        }
+        localStorage.setItem('CURRENT_ROLE_ID', id);
+        renderRoleCard();
+        document.getElementById('role-list-modal').close();
+        // AI主动发送开场白
+        const role = getCurrentRole();
+        if (role.opening && chatContainer) {
             const aiDiv = document.createElement('div');
-            aiDiv.className = 'chat chat-start';
+            aiDiv.className = 'chat chat-start msg-enter';
             const bubble = document.createElement('div');
             bubble.className = 'chat-bubble bg-base-200 text-base-content';
             bubble.innerText = role.opening;
             aiDiv.appendChild(bubble);
-            container.appendChild(aiDiv);
-            container.scrollTop = container.scrollHeight;
+            chatContainer.appendChild(aiDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
             // 加入记忆
             chatHistory.push({ role: 'assistant', content: role.opening });
             saveChatHistory();
         }
-    }
-    sfxSuccess();
+        sfxSuccess();
+        // 淡入效果
+        if (chatContainer) {
+            chatContainer.style.opacity = '1';
+        }
+    }, 200);
 }
 
 // 新建角色
