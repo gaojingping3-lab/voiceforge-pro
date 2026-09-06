@@ -1524,11 +1524,7 @@ function startDualChat() {
     updateDualRoundCount();
     sfxReceive();
 
-    // 自动播放开场白语音
-    const apiKey = document.getElementById('main-api-key')?.value?.trim();
-    if (apiKey) {
-        playChatMessage(openingBubble).catch(() => {});
-    }
+    // 开场白不自动播放语音，省额度（需要听可以手动点播放按钮）
 
     // 间隔5-8秒后，角色B开始回复
     setTimeout(() => {
@@ -1696,11 +1692,7 @@ async function dualChatNext() {
         dualRoundCount++;
         updateDualRoundCount();
 
-        // 自动播放语音（如果配置了Fish API）
-        const apiKey = document.getElementById('main-api-key')?.value?.trim();
-        if (apiKey) {
-            playChatMessage(replyBubble).catch(() => {});
-        }
+        // 双角色模式不自动播放语音，省额度（需要听可以手动点播放按钮）
 
         sfxReceive();
 
