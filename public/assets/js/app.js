@@ -949,12 +949,25 @@ function renderRoleList() {
             <div class="flex-1 cursor-pointer font-bold text-sm ${isActive ? 'text-primary' : ''}" onclick="switchRole(${role.id})">
                 ${role.name} ${isActive ? '✓ 当前' : ''}
             </div>
-            <button class="btn btn-ghost btn-xs text-error" onclick="deleteRole(${role.id})" title="删除">
-                <i class="fa-solid fa-trash"></i> 删除
-            </button>
+            <div class="flex gap-1">
+                <button class="btn btn-ghost btn-xs" onclick="editRoleById(${role.id})" title="编辑">
+                    <i class="fa-solid fa-pen"></i> 编辑
+                </button>
+                <button class="btn btn-ghost btn-xs text-error" onclick="deleteRole(${role.id})" title="删除">
+                    <i class="fa-solid fa-trash"></i> 删除
+                </button>
+            </div>
         `;
         container.appendChild(item);
     });
+}
+
+// 编辑指定角色
+function editRoleById(id) {
+    localStorage.setItem('CURRENT_ROLE_ID', id);
+    renderRoleCard();
+    document.getElementById('role-list-modal').close();
+    setTimeout(() => editRoleCard(), 100);
 }
 
 // 切换角色
