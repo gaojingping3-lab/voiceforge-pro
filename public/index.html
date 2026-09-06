@@ -306,6 +306,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="text-xs font-bold">角色B</span>
                         <select id="dual-role-b" class="select select-bordered select-xs flex-1"></select>
                     </div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-xs font-bold">指定回复</span>
+                        <select id="dual-reply-target" class="select select-bordered select-xs flex-1">
+                            <option value="auto">自动轮流</option>
+                            <option value="A">角色A回复</option>
+                            <option value="B">角色B回复</option>
+                        </select>
+                    </div>
                     <div class="flex items-center gap-2">
                         <button id="dual-start-btn" class="btn btn-primary btn-xs flex-1" onclick="startDualChat()">
                             <i class="fa-solid fa-play"></i> 开始

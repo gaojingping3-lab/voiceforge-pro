@@ -1010,12 +1010,19 @@ async function sendChatMessage() {
 
     // 双角色模式下：用户发消息后直接走双角色回复逻辑，用当前角色身份回复，三方身份上下文
     if (dualRoleA && dualRoleB) {
-        // 确定当前回复角色：根据最后一条AI消息是谁说的，切换到另一个角色回复用户
-        const lastAiMsg = [...chatHistory].reverse().find(m => m.role === 'assistant');
-        if (lastAiMsg) {
-            const match = lastAiMsg.content.match(/^\[([^\]]+)\]/);
-            const lastSpeaker = match ? match[1] : '';
-            dualCurrentSpeaker = lastSpeaker === dualRoleA.name ? 'B' : 'A';
+        // 确定回复角色：优先用用户指定的，否则根据最后一条AI消息切换
+        const replyTarget = document.getElementById('dual-reply-target')?.value || 'auto';
+        if (replyTarget === 'A' || replyTarget === 'B') {
+            // 用户指定了回复角色
+            dualCurrentSpeaker = replyTarget;
+        } else {
+            // 自动轮流：根据最后一条AI消息是谁说的，切换到另一个角色回复用户
+            const lastAiMsg = [...chatHistory].reverse().find(m => m.role === 'assistant');
+            if (lastAiMsg) {
+                const match = lastAiMsg.content.match(/^\[([^\]]+)\]/);
+                const lastSpeaker = match ? match[1] : '';
+                dualCurrentSpeaker = lastSpeaker === dualRoleA.name ? 'B' : 'A';
+            }
         }
         isDualRunning = true;
         // 隐藏开始按钮，显示暂停按钮
@@ -1681,9 +1688,14 @@ async function dualChatNext(isUserInterruption = false) {
 ⚠️ 绝对禁止：你不能扮演角色C（用户），不能替用户说话，不能假装是用户。
 ⚠️ 当你看到以【角色C（用户）说】开头的消息时，那就是真实用户在对你说话，你必须直接回应用户。` },
         // 用户设定单独一条，强化
-        { role: 'system', content: `【角色C（用户）的设定，回复用户时必须参考】
-${userRoleDesc || '用户没有填写特别设定，请把用户当作这个场景的观察者和参与者。'}
-请根据以上用户设定，用符合${currentRole.name}身份的方式回复用户。` },
+        { role: 'system', content: `【角色C（用户）的设定，回复用户时必须严格参考】
+${userRoleDesc || '用户没有填写特别设定，请把用户当作这个场景的主人/观察者。'}
+
+⚠️ 重要规则：
+- 用户就是角色C，是独立的第三个人，不是角色A也不是角色B
+- 当用户问"我是谁"、"你知道我是谁吗"这类问题时，必须根据上面的用户设定来回答
+- 回复用户时，要符合你扮演的角色身份，同时参考用户设定
+- 绝对不能把用户当成角色A或角色B，也不能假装不知道用户是谁` },
         // 当前角色人设
         { role: 'system', content: `你扮演的角色人设：
 ${currentRole.desc}
@@ -1692,9 +1704,11 @@ ${currentRole.desc}
 
     // 用户插话时，特别强调现在是用户在说话
     if (isUserInterruption) {
-        messages.push({ role: 'system', content: `【当前状态：用户正在和你说话】
-现在是角色C（用户）在主动和你（${currentRole.name}）对话，请你直接回复用户，不要继续和${otherRole.name}对话。
-回复时要参考上面的用户设定，按照用户希望的方式回应。` });
+        messages.push({ role: 'system', content: `【当前状态：用户正在和你说话，请直接回复】
+现在是角色C（用户）在主动和你（${currentRole.name}）对话。
+请你直接回应用户的问题或话语，不要继续和${otherRole.name}对话。
+如果用户问关于自己的问题（如"我是谁"），请根据上面的用户设定来回答。
+回复时要符合${currentRole.name}的身份和性格。` });
     }
 
     // 加入当前角色的记忆便签
