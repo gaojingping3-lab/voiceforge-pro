@@ -133,6 +133,11 @@ mainKeyInput.addEventListener('input', () => {
 // 当前上下文模式（全量/滑动窗口）
 let currentCtxMode = 'full';
 
+function toggleRoleConstraint() {
+    // 只是切换UI，保存时才存localStorage
+    sfxClick();
+}
+
 function setCtxMode(mode) {
     currentCtxMode = mode;
     const fullBtn = document.getElementById('ctx-mode-full');
@@ -166,6 +171,9 @@ function syncModalInputs() {
     // 加载上下文模式
     const ctxMode = localStorage.getItem('CTX_MODE') || 'full';
     setCtxMode(ctxMode);
+    // 加载角色强约束开关
+    const constraintOn = localStorage.getItem('ROLE_CONSTRAINT');
+    document.getElementById('role-constraint-toggle').checked = constraintOn !== '0';
 }
 
 function saveModalKeys() {
@@ -180,6 +188,9 @@ function saveModalKeys() {
     localStorage.setItem('LLM_TOPP', document.getElementById('modal-llm-topp').value);
     // 保存上下文模式
     localStorage.setItem('CTX_MODE', currentCtxMode);
+    // 保存角色强约束开关
+    const constraintOn = document.getElementById('role-constraint-toggle').checked;
+    localStorage.setItem('ROLE_CONSTRAINT', constraintOn ? '1' : '0');
     onEngineChange();
     sfxSave();
     settings_modal.close();
@@ -701,7 +712,7 @@ async function sendChatMessage() {
     sfxStart();
 
     try {
-        // 构建消息：两条system（规则+角色） + 角色强约束 + 历史对话，标准messages数组格式
+        // 构建消息：两条system（规则+角色） + 角色强约束（可选） + 历史对话，标准messages数组格式
         const roleConstraints = `【严格第一人称，禁止越权代打】
 严禁描写用户的动作、语言、内心想法，绝对禁止替用户做任何剧情推进、决定或者行动。你的回复只能写角色本身的反应，完成角色动作与台词后立刻停止，等待用户继续交互。
 
@@ -713,13 +724,16 @@ async function sendChatMessage() {
 
 【格式范例参考，严格模仿输出风格】
 *(指尖轻轻攥了攥衣角，目光微微垂落，声音放得很轻)*「你怎么现在才过来。」`;
+        const useConstraint = localStorage.getItem('ROLE_CONSTRAINT') !== '0';
         const messages = [
             { role: 'system', content: systemRules },
         ];
         if (hasRoleCard) {
             messages.push({ role: 'system', content: roleCardDesc });
         }
-        messages.push({ role: 'system', content: roleConstraints });
+        if (useConstraint) {
+            messages.push({ role: 'system', content: roleConstraints });
+        }
         messages.push(...chatHistory);
 
         // 通过 Cloudflare Pages Functions 同源中转，规避浏览器 CORS 预检挂起问题

@@ -447,6 +447,14 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
 
             <div class="form-control mb-6">
+                <label class="label py-1 cursor-pointer" onclick="toggleRoleConstraint()">
+                    <span class="label-text text-sm">角色扮演强约束</span>
+                    <input type="checkbox" id="role-constraint-toggle" class="toggle toggle-primary toggle-sm" checked />
+                </label>
+                <label class="label py-0"><span class="label-text text-xs text-gray-500">开启后强制动作描写、禁止代打、去AI味；普通问答可关闭</span></label>
+            </div>
+
+            <div class="form-control mb-6">
                 <label class="label py-1"><span class="label-text text-sm">AI 角色设定 (System Prompt)</span></label>
                 <textarea id="modal-llm-system" class="textarea textarea-bordered textarea-sm w-full" rows="4" placeholder="你是乐。这是一个纯粹的私人虚构陪伴空间..."></textarea>
                 <label class="label py-0"><span class="label-text text-xs text-gray-500">自定义 AI 的性格、语气、身份等，留空使用默认设定</span></label>
