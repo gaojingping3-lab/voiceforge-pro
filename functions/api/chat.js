@@ -1,4 +1,4 @@
-// functions/api/chat.js - 大模型 API 同源中转（支持动态 Base URL，可切换任意 OpenAI 兼容接口）
+// functions/api/chat.js - 大模型 API 同源中转（支持动态 Base URL + 流式输出）
 export async function onRequest(context) {
   const { request } = context;
 
@@ -37,10 +37,23 @@ export async function onRequest(context) {
       body: JSON.stringify(body),
     });
 
-    // 4. 返回响应并追加 CORS 允许头
-    const newResponse = new Response(response.body, response);
-    newResponse.headers.set("Access-Control-Allow-Origin", "*");
-    return newResponse;
+    // 4. 流式响应：直接透传 body，确保不缓冲
+    const isStream = body.stream === true;
+    const headers = new Headers(response.headers);
+    headers.set("Access-Control-Allow-Origin", "*");
+    if (isStream) {
+      // 强制流式响应头，防止缓冲
+      headers.set("Content-Type", "text/event-stream");
+      headers.set("Cache-Control", "no-cache");
+      headers.set("Connection", "keep-alive");
+      headers.delete("Content-Length");
+    }
+
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: headers,
+    });
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
