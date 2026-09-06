@@ -23,11 +23,19 @@ function getAudioCtx() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
+    // 浏览器自动播放策略：如果被暂停，尝试恢复
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+    }
     return audioCtx;
 }
 function playTone(freq, duration, type, volume, delay = 0) {
     try {
         const ctx = getAudioCtx();
+        // 再次确认状态
+        if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+        }
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = type || 'sine';
@@ -675,6 +683,16 @@ document.addEventListener('DOMContentLoaded', () => {
     loadChatHistory(); // 恢复永久记忆
     renderChatHistory(); // 渲染历史消息
 
+    // 第一次用户交互时强制恢复 AudioContext（解决移动端音效不生效）
+    const unlockAudio = () => {
+        const ctx = getAudioCtx();
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        document.removeEventListener('click', unlockAudio);
+        document.removeEventListener('touchstart', unlockAudio);
+    };
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('touchstart', unlockAudio);
+
     // 键盘弹出时自动调整，防止输入框被遮挡
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => {
@@ -1173,7 +1191,7 @@ function clearChat() {
     localStorage.removeItem('PERM_CHAT_HISTORY'); // 清除本地永久记忆
     stopAllAudio(); // 停止正在播放的语音
     isChatAudioPlaying = false; // 释放播放锁
-    sfxClick();
+    sfxSuccess();
 }
 
 // ============================================
