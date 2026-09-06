@@ -25,7 +25,7 @@
         body { transition: background-color 0.3s ease; }
     </style>
 </head>
-<body class="min-h-screen bg-base-200 bg-[url('bg.jpg')] bg-cover bg-center bg-fixed text-base-content">
+<body class="bg-base-200 bg-[url('bg.jpg')] bg-cover bg-center bg-fixed text-base-content" style="overflow: hidden; height: 100vh;">
 
 <!-- 高级主题切换 UI -->
 <style>
@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <main class="container mx-auto max-w-3xl p-4 mt-4">
+    <main class="container mx-auto max-w-3xl p-4 mt-2 flex flex-col" style="height: calc(100vh - 80px);">
         <div class="tabs tabs-boxed mb-4 bg-base-100/80 backdrop-blur p-1 rounded-xl shadow-sm">
             <a class="tab tab-active text-base font-medium h-12 flex-1 rounded-lg" id="tab-tts" onclick="switchTab('tts')"><i class="fa-solid fa-keyboard mr-2"></i>文本转语音</a>
             <a class="tab text-base font-medium h-12 flex-1 rounded-lg" id="tab-chat" onclick="switchTab('chat')"><i class="fa-solid fa-comments mr-2"></i>AI语音对话</a>
@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
 
         <!-- TTS Section -->
-        <div id="tts-section" class="card glass-panel shadow-xl">
+        <div id="tts-section" class="card glass-panel shadow-xl flex-1 min-h-0 overflow-y-auto">
             <div class="card-body p-6">
                 <!-- API Key Bar directly on top -->
                 <div class="p-3 bg-primary/10 border border-primary/20 rounded-xl mb-4 flex flex-col sm:flex-row items-center gap-3">
@@ -234,8 +234,8 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
 
         <!-- AI Chat Section -->
-        <div id="chat-section" class="card glass-panel shadow-xl hidden">
-            <div class="card-body p-4 sm:p-6 flex flex-col" style="height: calc(100vh - 200px); min-height: 500px;">
+        <div id="chat-section" class="card glass-panel shadow-xl hidden flex-1 min-h-0">
+            <div class="card-body p-4 sm:p-6 flex flex-col h-full">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="card-title text-lg"><i class="fa-solid fa-comments text-primary"></i> 与乐 语音对话</h2>
                     <button class="btn btn-ghost btn-xs" onclick="clearChat()"><i class="fa-solid fa-trash"></i> 清空</button>
@@ -339,7 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         </div>
         <!-- Clone Section -->
-        <div id="clone-section" class="card glass-panel shadow-xl hidden">
+        <div id="clone-section" class="card glass-panel shadow-xl hidden flex-1 min-h-0 overflow-y-auto">
             <div class="card-body p-6">
                 <h2 class="card-title text-xl mb-2"><i class="fa-solid fa-dna text-secondary"></i> 声音ID生成</h2>
                 <div class="alert alert-info py-2 px-3 text-xs mb-4">
@@ -381,7 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
 
         <!-- History Section -->
-        <div id="history-section" class="card glass-panel shadow-xl hidden">
+        <div id="history-section" class="card glass-panel shadow-xl hidden flex-1 min-h-0 overflow-y-auto">
             <div class="card-body p-6">
                 <div class="flex justify-between items-center mb-3">
                     <h2 class="card-title text-xl"><i class="fa-solid fa-clock-rotate-left text-accent"></i> 生成历史</h2>
