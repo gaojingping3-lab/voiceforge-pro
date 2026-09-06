@@ -549,6 +549,15 @@ async function generateAndPlayAudio(text) {
 // 添加聊天气泡
 let chatHistory = []; // 对话历史记忆（永久保存，只有清空才删除）
 let currentChatAudio = null; // 当前正在播放的聊天音频
+let totalTokensUsed = 0; // 总消耗tokens量
+
+// 更新总tokens显示
+function updateTotalTokensDisplay() {
+    const el = document.getElementById('total-tokens-display');
+    if (el) {
+        el.innerText = `${totalTokensUsed} tokens`;
+    }
+}
 
 // 永久记忆：保存聊天历史到localStorage
 function saveChatHistory() {
@@ -565,6 +574,12 @@ function loadChatHistory() {
             chatHistory = [];
         }
     }
+    // 恢复总tokens
+    const savedTokens = localStorage.getItem('TOTAL_TOKENS_USED');
+    if (savedTokens) {
+        totalTokensUsed = parseInt(savedTokens, 10) || 0;
+    }
+    updateTotalTokensDisplay();
 }
 
 // 永久记忆：渲染历史消息到聊天区域
@@ -1206,6 +1221,10 @@ async function sendChatMessage() {
             tokenRow.innerText = `${totalTokens} tokens`;
             // 插到chat div后面，作为独立的一行
             chatDiv.after(tokenRow);
+            // 累加总tokens
+            totalTokensUsed += totalTokens;
+            localStorage.setItem('TOTAL_TOKENS_USED', totalTokensUsed.toString());
+            updateTotalTokensDisplay();
         }
 
         // 给流式输出的AI消息补上播放按钮（修复：有时候不显示播放图标）
@@ -1837,6 +1856,14 @@ ${currentRole.desc}
         chatHistory.push({ role: 'assistant', content: `[${currentRole.name}] ${reply}` });
         saveChatHistory();
 
+        // 累加总tokens
+        const dualTokens = data.usage?.total_tokens || 0;
+        if (dualTokens > 0) {
+            totalTokensUsed += dualTokens;
+            localStorage.setItem('TOTAL_TOKENS_USED', totalTokensUsed.toString());
+            updateTotalTokensDisplay();
+        }
+
         dualRoundCount++;
         updateDualRoundCount();
 
@@ -1977,6 +2004,10 @@ function clearChat() {
     container.innerHTML = ''; // 清空，不显示默认欢迎消息
     chatHistory = []; // 清空对话记忆
     localStorage.removeItem('PERM_CHAT_HISTORY'); // 清除本地永久记忆
+    // 重置总tokens
+    totalTokensUsed = 0;
+    localStorage.removeItem('TOTAL_TOKENS_USED');
+    updateTotalTokensDisplay();
     stopAllAudio(); // 停止正在播放的语音
     isChatAudioPlaying = false; // 释放播放锁
     sfxSuccess();
