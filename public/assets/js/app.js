@@ -1492,14 +1492,48 @@ function startDualChat() {
         return;
     }
     isDualRunning = true;
-    dualCurrentSpeaker = 'A';
+    dualCurrentSpeaker = 'B'; // A发完开场白后，轮到B回复
     dualRoundCount = 0;
     document.getElementById('dual-start-btn').classList.add('hidden');
     document.getElementById('dual-pause-btn').classList.remove('hidden');
     updateDualRoundCount();
     sfxSuccess();
-    // 开始对话循环，角色A先说
-    dualChatNext();
+
+    // 角色A先发开场白
+    const container = document.getElementById('chat-messages');
+    const openingDiv = document.createElement('div');
+    openingDiv.className = 'chat chat-start relative msg-enter';
+    const openingBubble = document.createElement('div');
+    openingBubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
+    const openingText = dualRoleA.opening || `你好，我是${dualRoleA.name}。`;
+    openingBubble.innerHTML = `<span class="text-xs font-bold block mb-1" style="color:#fb923c">${escapeHtml(dualRoleA.name)}</span>${formatChatText(openingText)}`;
+    openingDiv.appendChild(openingBubble);
+    // 加播放按钮
+    const playBtn = document.createElement('button');
+    playBtn.className = 'play-voice-btn absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
+    playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
+    playBtn.title = '播放语音';
+    playBtn.onclick = () => playChatMessage(openingBubble);
+    openingDiv.appendChild(playBtn);
+    container.appendChild(openingDiv);
+    container.scrollTop = container.scrollHeight;
+    // 加入对话历史
+    chatHistory.push({ role: 'assistant', content: `[${dualRoleA.name}] ${openingText}` });
+    saveChatHistory();
+    dualRoundCount++;
+    updateDualRoundCount();
+    sfxReceive();
+
+    // 自动播放开场白语音
+    const apiKey = document.getElementById('main-api-key')?.value?.trim();
+    if (apiKey) {
+        playChatMessage(openingBubble).catch(() => {});
+    }
+
+    // 间隔5-8秒后，角色B开始回复
+    setTimeout(() => {
+        if (isDualRunning) dualChatNext();
+    }, 5000 + Math.random() * 3000);
 }
 
 // 暂停双角色对话
@@ -1633,10 +1667,10 @@ async function dualChatNext() {
 
         // 切换到另一个角色，继续下一轮
         dualCurrentSpeaker = dualCurrentSpeaker === 'A' ? 'B' : 'A';
-        // 间隔1秒再继续，避免太快
+        // 间隔5-8秒再继续，模拟真人对话节奏
         setTimeout(() => {
             if (isDualRunning) dualChatNext();
-        }, 1500);
+        }, 5000 + Math.random() * 3000);
 
     } catch (err) {
         if (err.name === 'AbortError') {
