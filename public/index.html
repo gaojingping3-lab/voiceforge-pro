@@ -283,11 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </dialog>
 
-                <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 h-80 sm:h-96 overflow-y-auto flex flex-col gap-3 mb-3">
-                    <div class="chat chat-start">
-                        <div class="chat-bubble bg-base-200 text-base-content">你好呀，我是乐。今天想跟我聊点什么？</div>
-                    </div>
-                </div>
+                <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 h-80 sm:h-96 overflow-y-auto flex flex-col gap-3 mb-3"></div>
                 <div class="flex gap-2 items-center">
                     <input type="text" id="chat-input" placeholder="跟乐说点什么..." class="input input-bordered input-sm flex-1" onkeypress="if(event.key==='Enter')sendChatMessage()" />
                     <!-- 思考程度切换 -->

@@ -446,8 +446,7 @@ function renderChatHistory() {
     if (!container) return;
     container.innerHTML = '';
     if (chatHistory.length === 0) {
-        container.innerHTML = '<div class="chat chat-start"><div class="chat-bubble bg-base-200 text-base-content">你好呀，我是乐。今天想跟我聊点什么？</div></div>';
-        return;
+        return; // 空聊天，不显示默认欢迎消息
     }
     for (const msg of chatHistory) {
         if (msg.role === 'user') {
@@ -883,7 +882,7 @@ function initRoleCard() {
 function clearChat() {
     if (!confirm('确定清空所有聊天记录吗？AI将忘记全部对话内容。')) return;
     const container = document.getElementById('chat-messages');
-    container.innerHTML = '<div class="chat chat-start"><div class="chat-bubble bg-base-200 text-base-content">你好呀，我是乐。今天想跟我聊点什么？</div></div>';
+    container.innerHTML = ''; // 清空，不显示默认欢迎消息
     chatHistory = []; // 清空对话记忆
     localStorage.removeItem('PERM_CHAT_HISTORY'); // 清除本地永久记忆
     stopAllAudio(); // 停止正在播放的语音
