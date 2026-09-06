@@ -1643,14 +1643,28 @@ async function dualChatNext() {
     const currentRole = dualCurrentSpeaker === 'A' ? dualRoleA : dualRoleB;
     const otherRole = dualCurrentSpeaker === 'A' ? dualRoleB : dualRoleA;
 
-    // 构建消息：设置里的角色设定 + 当前角色卡 + 记忆便签 + 对话规则 + 格式化的对话历史
+    // 构建消息：明确三方身份 + 当前角色卡 + 记忆便签 + 对话规则 + 格式化的对话历史
     const defaultSystem = '你是乐。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。';
     const customSystem = localStorage.getItem('LLM_SYSTEM');
     const systemRules = customSystem || defaultSystem;
+    const userRoleDesc = localStorage.getItem('USER_ROLE_DESC') || '';
 
     const messages = [
         { role: 'system', content: systemRules },
-        { role: 'system', content: `你现在扮演的角色是：${currentRole.name}\n\n角色人设：\n${currentRole.desc}\n\n请严格按照这个人设说话，保持角色的性格、语气和说话风格。` },
+        // 明确三方身份定义
+        { role: 'system', content: `【场景身份说明】
+这个对话场景中有三个人：
+- 角色A：${dualRoleA.name}
+- 角色B：${dualRoleB.name}
+- 角色C：用户（真实的人类使用者，在旁观和插话）${userRoleDesc ? '\n用户设定：' + userRoleDesc : ''}
+
+你现在扮演的是【${currentRole.name}】（角色${dualCurrentSpeaker}）。
+你只能以${currentRole.name}的身份说话，绝对不能冒充角色C（用户）发言，也不能替用户做决定或说用户的话。
+当你看到【角色C说】的消息时，那是真实用户在插话，请正常回应用户。` },
+        // 当前角色人设
+        { role: 'system', content: `你扮演的角色人设：
+${currentRole.desc}
+请严格按照这个人设说话，保持角色的性格、语气和说话风格。` },
     ];
 
     // 加入当前角色的记忆便签
@@ -1661,23 +1675,22 @@ async function dualChatNext() {
 
     // 加入角色强约束（如果开启了）
     if (localStorage.getItem('ROLE_CONSTRAINT') !== '0') {
-        messages.push({ role: 'system', content: `【严格第一人称，禁止越权代打】严禁描写${otherRole.name}的动作、语言、内心想法，绝对禁止替对方做任何推进或决定。每轮回复只写你自己（${currentRole.name}）的反应，说完/做完动作后必须停下，等待对方交互。\n\n【强制神态与动作描写】输出格式严格统一为"*（具体的神态、微表情、肢体动作或与环境互动）* + 「对话台词」"，严禁干瘪的纯对白输出。\n\n【彻底剥离AI味】严禁出现任何助手腔、客服客套话或旁白式总结，必须完全融入角色的语气、性格缺陷与动机中。` });
-    }
+        messages.push({ role: 'system', content: `【严格第一人称，禁止越权代打】严禁描写${otherRole.name}和角色C（用户）的动作、语言、内心想法，绝对禁止替对方或用户做任何推进或决定。每轮回复只写你自己（${currentRole.name}）的反应，说完/做完动作后必须停下，等待对方或用户交互。
 
-    // 加入用户角色设定（角色C）
-    const userRoleDesc = localStorage.getItem('USER_ROLE_DESC') || '';
-    if (userRoleDesc) {
-        messages.push({ role: 'system', content: `用户（角色C）的设定：\n${userRoleDesc}\n\n用户是这个对话场景中的第三个人，请根据用户的设定与用户和${otherRole.name}互动。` });
+【强制神态与动作描写】输出格式严格统一为"*（具体的神态、微表情、肢体动作或与环境互动）* + 「对话台词」"，严禁干瘪的纯对白输出。
+
+【彻底剥离AI味】严禁出现任何助手腔、客服客套话或旁白式总结，必须完全融入角色的语气、性格缺陷与动机中。` });
     }
 
     // 对话规则
-    messages.push({ role: 'system', content: `你正在和${otherRole.name}对话${userRoleDesc ? '，还有用户（角色C）也在场景中' : ''}。请用第一人称回复，只说你自己的话，不要替对方说话。回复要简短自然，像真人聊天一样，不要太长。` });
+    messages.push({ role: 'system', content: `你正在和${otherRole.name}对话，角色C（用户）也在场景中可能插话。请用第一人称回复，只说你自己（${currentRole.name}）的话，不要替对方或用户说话。回复要简短自然，像真人聊天一样，不要太长。` });
 
-    // 格式化对话历史：把[角色名] 内容转换成正确的messages格式
+    // 格式化对话历史：每条消息都标明发言人，让AI清楚区分三方
     const formattedHistory = [];
-    for (const msg of chatHistory.slice(-12)) {
+    for (const msg of chatHistory.slice(-15)) {
         if (msg.role === 'user') {
-            formattedHistory.push({ role: 'user', content: msg.content });
+            // 用户发的消息，标记为角色C
+            formattedHistory.push({ role: 'user', content: `【角色C（用户）说】${msg.content}` });
         } else if (msg.role === 'assistant') {
             // 解析[角色名] 内容的格式
             const match = msg.content.match(/^\[([^\]]+)\]\s*(.*)$/s);
@@ -1685,9 +1698,13 @@ async function dualChatNext() {
                 const speakerName = match[1];
                 const content = match[2];
                 if (speakerName === currentRole.name) {
+                    // 当前角色自己说的话，作为assistant
                     formattedHistory.push({ role: 'assistant', content: content });
+                } else if (speakerName === otherRole.name) {
+                    // 对方角色说的话，作为user消息传入，标记清楚
+                    formattedHistory.push({ role: 'user', content: `【角色${dualCurrentSpeaker === 'A' ? 'B' : 'A'}（${speakerName}）说】${content}` });
                 } else {
-                    // 对方说的话，作为user消息传入
+                    // 其他情况，也标记清楚
                     formattedHistory.push({ role: 'user', content: `【${speakerName}说】${content}` });
                 }
             } else {
