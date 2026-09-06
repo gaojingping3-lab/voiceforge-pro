@@ -146,6 +146,10 @@ function syncModalInputs() {
     const topp = localStorage.getItem('LLM_TOPP') || '0.9';
     document.getElementById('modal-llm-topp').value = topp;
     document.getElementById('topp-value').innerText = topp;
+    // 加载上下文模式
+    const ctxMode = localStorage.getItem('CTX_MODE') || 'full';
+    const ctxRadio = document.querySelector(`input[name="ctx-mode"][value="${ctxMode}"]`);
+    if (ctxRadio) ctxRadio.checked = true;
 }
 
 function saveModalKeys() {
@@ -158,6 +162,9 @@ function saveModalKeys() {
     localStorage.setItem('LLM_SYSTEM', document.getElementById('modal-llm-system').value.trim());
     localStorage.setItem('LLM_TEMPERATURE', document.getElementById('modal-llm-temperature').value);
     localStorage.setItem('LLM_TOPP', document.getElementById('modal-llm-topp').value);
+    // 保存上下文模式
+    const ctxMode = document.querySelector('input[name="ctx-mode"]:checked')?.value || 'full';
+    localStorage.setItem('CTX_MODE', ctxMode);
     onEngineChange();
     sfxSave();
     settings_modal.close();
@@ -679,24 +686,38 @@ async function sendChatMessage() {
     sfxStart();
 
     try {
-        // 构建消息：两条system（规则+角色） + 历史对话，标准messages数组格式
+        // 构建消息：两条system（规则+角色） + 角色强约束 + 历史对话，标准messages数组格式
+        const roleConstraints = `【严格第一人称，禁止越权代打】
+严禁描写用户的动作、语言、内心想法，绝对禁止替用户做任何剧情推进、决定或者行动。你的回复只能写角色本身的反应，完成角色动作与台词后立刻停止，等待用户继续交互。
+
+【强制神态与动作描写】
+输出格式严格固定：*(具体微表情、神态、肢体动作、环境互动细节)*「角色对话台词」。禁止纯文字对白，不能缺少动作描写。
+
+【彻底剥离AI助手腔】
+不允许出现客服话术、客套问候、总结旁白、解释性文字。完全代入角色本身，保留角色性格、小缺点、个人习惯，语言风格贴合人设。
+
+【格式范例参考，严格模仿输出风格】
+*(指尖轻轻攥了攥衣角，目光微微垂落，声音放得很轻)*「你怎么现在才过来。」`;
         const messages = [
             { role: 'system', content: systemRules },
         ];
         if (hasRoleCard) {
             messages.push({ role: 'system', content: roleCardDesc });
         }
+        messages.push({ role: 'system', content: roleConstraints });
         messages.push(...chatHistory);
 
         // 通过 Cloudflare Pages Functions 同源中转，规避浏览器 CORS 预检挂起问题
         // 带自动重试的请求（失败时重试一次，应对网络波动和临时限流）
         const reasoningLevel = localStorage.getItem('LLM_REASONING') || 'default';
+        const useSlideWindow = localStorage.getItem('CTX_MODE') === 'slide';
         const requestBody = {
             baseUrl: llmUrl,
             model: llmModel,
             messages: messages,
             temperature: parseFloat(localStorage.getItem('LLM_TEMPERATURE') || '0.8'),
-            top_p: parseFloat(localStorage.getItem('LLM_TOPP') || '0.9')
+            top_p: parseFloat(localStorage.getItem('LLM_TOPP') || '0.9'),
+            useSlideWindow: useSlideWindow
         };
         // 思考程度控制（支持 V4 系列和 reasoner 模型）
         const isV4OrReasoner = llmModel.toLowerCase().includes('v4') || llmModel.toLowerCase().includes('reasoner');

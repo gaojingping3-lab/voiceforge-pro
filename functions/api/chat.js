@@ -27,6 +27,16 @@ export async function onRequest(context) {
     // 移除 baseUrl 字段，不转发给目标 API
     delete body.baseUrl;
 
+    // 2.5 滑动窗口截断：system人设永久保留，聊天历史只保留最近8条（4轮对话）
+    if (body.useSlideWindow === true && Array.isArray(body.messages)) {
+      const systemMsgs = body.messages.filter(m => m.role === "system");
+      const chatMsgs = body.messages.filter(m => m.role !== "system");
+      const maxKeep = 8;
+      const trimmedChat = chatMsgs.length > maxKeep ? chatMsgs.slice(-maxKeep) : chatMsgs;
+      body.messages = [...systemMsgs, ...trimmedChat];
+    }
+    delete body.useSlideWindow; // 不转发给目标API
+
     // 3. 由 Cloudflare 边缘节点向目标 API 发起请求
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
