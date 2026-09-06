@@ -138,6 +138,10 @@ function syncModalInputs() {
     document.getElementById('modal-llm-key').value = localStorage.getItem('LLM_KEY') || '';
     document.getElementById('modal-llm-model').value = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
     document.getElementById('modal-llm-system').value = localStorage.getItem('LLM_SYSTEM') || '';
+    // 加载思考程度temperature
+    const temp = localStorage.getItem('LLM_TEMPERATURE') || '0.8';
+    document.getElementById('modal-llm-temperature').value = temp;
+    document.getElementById('temp-value').innerText = temp;
 }
 
 function saveModalKeys() {
@@ -148,6 +152,7 @@ function saveModalKeys() {
     localStorage.setItem('LLM_KEY', document.getElementById('modal-llm-key').value.trim());
     localStorage.setItem('LLM_MODEL', document.getElementById('modal-llm-model').value.trim() || 'deepseek-v4-flash');
     localStorage.setItem('LLM_SYSTEM', document.getElementById('modal-llm-system').value.trim());
+    localStorage.setItem('LLM_TEMPERATURE', document.getElementById('modal-llm-temperature').value);
     onEngineChange();
     sfxSave();
     settings_modal.close();
@@ -576,7 +581,7 @@ async function sendChatMessage() {
                         baseUrl: llmUrl,
                         model: llmModel,
                         messages: messages,
-                        temperature: 0.8
+                        temperature: parseFloat(localStorage.getItem('LLM_TEMPERATURE') || '0.8')
                     })
                 });
                 break; // 成功就跳出循环

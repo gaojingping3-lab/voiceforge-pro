@@ -285,6 +285,18 @@
             </div>
 
             <div class="form-control mb-6">
+                <label class="label py-1">
+                    <span class="label-text text-sm">思考程度 (Temperature)</span>
+                    <span class="label-text-alt text-sm font-bold text-primary" id="temp-value">0.8</span>
+                </label>
+                <input type="range" id="modal-llm-temperature" min="0.1" max="1.0" step="0.1" value="0.8" class="range range-primary range-sm" oninput="document.getElementById('temp-value').innerText=this.value" />
+                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>冷静稳定</span>
+                    <span>活泼创意</span>
+                </div>
+            </div>
+
+            <div class="form-control mb-6">
                 <label class="label py-1"><span class="label-text text-sm">AI 角色设定 (System Prompt)</span></label>
                 <textarea id="modal-llm-system" class="textarea textarea-bordered textarea-sm w-full" rows="4" placeholder="你是乐。这是一个纯粹的私人虚构陪伴空间..."></textarea>
                 <label class="label py-0"><span class="label-text text-xs text-gray-500">自定义 AI 的性格、语气、身份等，留空使用默认设定</span></label>
