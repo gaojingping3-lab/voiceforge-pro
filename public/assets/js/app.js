@@ -1099,13 +1099,23 @@ async function sendChatMessage() {
         }
 
         // 在AI消息气泡下面单独显示token（独立元素，不影响气泡）
+        const chatDiv = loadingBubble.parentElement;
         if (totalTokens > 0) {
-            const chatDiv = loadingBubble.parentElement;
             const tokenRow = document.createElement('div');
             tokenRow.className = 'text-xs text-gray-400 mt-1 ml-1 token-count';
             tokenRow.innerText = `${totalTokens} tokens`;
             // 插到chat div后面，作为独立的一行
             chatDiv.after(tokenRow);
+        }
+
+        // 给流式输出的AI消息补上播放按钮（修复：有时候不显示播放图标）
+        if (chatDiv && !chatDiv.querySelector('.play-voice-btn')) {
+            const playBtn = document.createElement('button');
+            playBtn.className = 'play-voice-btn absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
+            playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
+            playBtn.title = '播放语音';
+            playBtn.onclick = () => playChatMessage(loadingBubble);
+            chatDiv.appendChild(playBtn);
         }
 
         // 把AI回复加入永久记忆
@@ -1263,11 +1273,18 @@ function switchRole(id) {
         const role = getCurrentRole();
         if (role.opening && chatContainer) {
             const aiDiv = document.createElement('div');
-            aiDiv.className = 'chat chat-start msg-enter';
+            aiDiv.className = 'chat chat-start msg-enter relative';
             const bubble = document.createElement('div');
-            bubble.className = 'chat-bubble bg-base-200 text-base-content';
+            bubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
             bubble.innerText = role.opening;
             aiDiv.appendChild(bubble);
+            // 加播放按钮
+            const playBtn = document.createElement('button');
+            playBtn.className = 'play-voice-btn absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
+            playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
+            playBtn.title = '播放语音';
+            playBtn.onclick = () => playChatMessage(bubble);
+            aiDiv.appendChild(playBtn);
             chatContainer.appendChild(aiDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
             // 加入记忆
