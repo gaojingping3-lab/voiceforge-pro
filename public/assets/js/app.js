@@ -689,6 +689,7 @@ async function sendChatMessage() {
         const decoder = new TextDecoder();
         let fullReply = '';
         let buffer = '';
+        let totalTokens = 0;
         loadingBubble.innerText = '';
 
         while (true) {
@@ -715,6 +716,10 @@ async function sendChatMessage() {
                         const chatContainer = document.getElementById('chat-messages');
                         chatContainer.scrollTop = chatContainer.scrollHeight;
                     }
+                    // 捕获token使用量
+                    if (chunk.usage?.total_tokens) {
+                        totalTokens = chunk.usage.total_tokens;
+                    }
                 } catch (e) {
                     // 忽略解析错误的chunk
                 }
@@ -724,6 +729,14 @@ async function sendChatMessage() {
         // 如果流式返回为空，尝试用非流式方式兜底
         if (!fullReply) {
             throw new Error('流式响应为空，请重试');
+        }
+
+        // 在AI消息底部显示token数量
+        if (totalTokens > 0) {
+            const tokenLabel = document.createElement('div');
+            tokenLabel.className = 'text-xs text-gray-400 mt-1 text-right';
+            tokenLabel.innerText = `${totalTokens} tokens`;
+            loadingBubble.parentElement.appendChild(tokenLabel);
         }
 
         // 把AI回复加入历史记忆
