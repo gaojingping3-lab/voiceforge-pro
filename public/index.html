@@ -595,6 +595,15 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
 
             <div class="form-control mb-6">
+                <label class="label py-1">
+                    <span class="label-text text-sm">双角色对话间隔</span>
+                    <span class="label-text text-sm" id="dual-interval-value">6秒</span>
+                </label>
+                <input type="range" id="dual-interval" min="2" max="15" value="6" class="range range-primary range-sm" oninput="document.getElementById('dual-interval-value').innerText = this.value + '秒'" />
+                <label class="label py-0"><span class="label-text text-xs text-gray-500">两个角色每次对话之间的等待时间（2-15秒）</span></label>
+            </div>
+
+            <div class="form-control mb-6">
                 <label class="label py-1"><span class="label-text text-sm">AI 角色设定 (System Prompt)</span></label>
                 <textarea id="modal-llm-system" class="textarea textarea-bordered textarea-sm w-full" rows="4" placeholder="你是乐。这是一个纯粹的私人虚构陪伴空间..."></textarea>
                 <label class="label py-0"><span class="label-text text-xs text-gray-500">自定义 AI 的性格、语气、身份等，留空使用默认设定</span></label>

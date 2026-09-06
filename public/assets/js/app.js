@@ -238,6 +238,13 @@ function syncModalInputs() {
     if (dualToggle) {
         dualToggle.checked = localStorage.getItem('DUAL_ROLE_MODE') === '1';
     }
+    // 加载双角色对话间隔时间
+    const dualInterval = localStorage.getItem('DUAL_INTERVAL') || '6';
+    const intervalInput = document.getElementById('dual-interval');
+    if (intervalInput) {
+        intervalInput.value = dualInterval;
+        document.getElementById('dual-interval-value').innerText = dualInterval + '秒';
+    }
 }
 
 function saveModalKeys() {
@@ -261,6 +268,9 @@ function saveModalKeys() {
     // 保存双角色模式开关
     const dualOn = document.getElementById('dual-role-toggle').checked;
     localStorage.setItem('DUAL_ROLE_MODE', dualOn ? '1' : '0');
+    // 保存双角色对话间隔时间
+    const dualInterval = document.getElementById('dual-interval').value;
+    localStorage.setItem('DUAL_INTERVAL', dualInterval);
     onEngineChange();
     updateModeHint();
     sfxSave();
@@ -1526,10 +1536,10 @@ function startDualChat() {
 
     // 开场白不自动播放语音，省额度（需要听可以手动点播放按钮）
 
-    // 间隔5-8秒后，角色B开始回复
+    // 间隔设置的时间后，角色B开始回复
     setTimeout(() => {
         if (isDualRunning) dualChatNext();
-    }, 5000 + Math.random() * 3000);
+    }, getDualInterval());
 }
 
 // 暂停双角色对话
@@ -1561,6 +1571,14 @@ function stopDualChat() {
 function updateDualRoundCount() {
     const el = document.getElementById('dual-round-count');
     if (el) el.innerText = `${dualRoundCount}轮`;
+}
+
+// 获取双角色对话间隔时间（秒），返回毫秒数，带±2秒随机
+function getDualInterval() {
+    const base = parseInt(localStorage.getItem('DUAL_INTERVAL') || '6', 10);
+    // 基础时间 ±2秒随机，避免太机械
+    const random = (Math.random() * 4 - 2) * 1000;
+    return Math.max(1000, base * 1000 + random);
 }
 
 // 双角色对话循环：当前角色发言
@@ -1698,10 +1716,10 @@ async function dualChatNext() {
 
         // 切换到另一个角色，继续下一轮
         dualCurrentSpeaker = dualCurrentSpeaker === 'A' ? 'B' : 'A';
-        // 间隔5-8秒再继续，模拟真人对话节奏
+        // 间隔设置的时间再继续，模拟真人对话节奏
         setTimeout(() => {
             if (isDualRunning) dualChatNext();
-        }, 5000 + Math.random() * 3000);
+        }, getDualInterval());
 
     } catch (err) {
         if (err.name === 'AbortError') {
