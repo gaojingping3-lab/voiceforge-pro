@@ -192,6 +192,7 @@ function saveModalKeys() {
     const constraintOn = document.getElementById('role-constraint-toggle').checked;
     localStorage.setItem('ROLE_CONSTRAINT', constraintOn ? '1' : '0');
     onEngineChange();
+    updateSlideWindowHint();
     sfxSave();
     settings_modal.close();
 }
@@ -880,7 +881,7 @@ function getRoleList() {
     // 迁移旧数据或初始化
     const oldName = localStorage.getItem('ROLE_CARD_NAME') || DEFAULT_ROLE_NAME;
     const oldDesc = localStorage.getItem('ROLE_CARD_DESC') || DEFAULT_ROLE_DESC;
-    const list = [{ id: Date.now(), name: oldName, desc: oldDesc }];
+    const list = [{ id: Date.now(), name: oldName, desc: oldDesc, opening: '' }];
     localStorage.setItem('ROLE_LIST', JSON.stringify(list));
     localStorage.setItem('CURRENT_ROLE_ID', list[0].id);
     return list;
@@ -972,9 +973,31 @@ function editRoleById(id) {
 
 // 切换角色
 function switchRole(id) {
+    // 如果有聊天记录，询问是否清空
+    if (chatHistory.length > 0) {
+        if (!confirm('切换角色后是否清空当前聊天记录？\n\n确定：清空记忆，用新角色重新开始\n取消：保留聊天记录（可能导致人设混乱）')) {
+            // 用户选择取消，只切换角色不清空
+            localStorage.setItem('CURRENT_ROLE_ID', id);
+            renderRoleCard();
+            document.getElementById('role-list-modal').close();
+            sfxSuccess();
+            return;
+        }
+        // 用户选择清空
+        chatHistory = [];
+        localStorage.removeItem('PERM_CHAT_HISTORY');
+        const container = document.getElementById('chat-messages');
+        if (container) container.innerHTML = '';
+    }
     localStorage.setItem('CURRENT_ROLE_ID', id);
     renderRoleCard();
     document.getElementById('role-list-modal').close();
+    // 自动填入开场白
+    const role = getCurrentRole();
+    if (role.opening) {
+        const input = document.getElementById('chat-input');
+        if (input) input.value = role.opening;
+    }
     sfxSuccess();
 }
 
@@ -984,7 +1007,8 @@ function addNewRole() {
     const newRole = {
         id: Date.now(),
         name: '新角色',
-        desc: '在这里写角色人设...'
+        desc: '在这里写角色人设...',
+        opening: ''
     };
     list.push(newRole);
     saveRoleList(list);
@@ -1018,6 +1042,7 @@ function editRoleCard() {
     const role = getCurrentRole();
     document.getElementById('role-name-input').value = role.name;
     document.getElementById('role-desc-input').value = role.desc;
+    document.getElementById('role-opening-input').value = role.opening || '';
     document.getElementById('role-card-modal').showModal();
 }
 
@@ -1029,12 +1054,14 @@ function clearRoleDescInput() {
 function saveRoleCard() {
     const name = document.getElementById('role-name-input').value.trim() || DEFAULT_ROLE_NAME;
     const desc = document.getElementById('role-desc-input').value.trim() || DEFAULT_ROLE_DESC;
+    const opening = document.getElementById('role-opening-input').value.trim();
     const list = getRoleList();
     const currentId = getCurrentRoleId();
     const role = list.find(r => r.id === currentId);
     if (role) {
         role.name = name;
         role.desc = desc;
+        role.opening = opening;
         saveRoleList(list);
     }
     renderRoleCard();
@@ -1066,6 +1093,15 @@ function initRoleCard() {
         document.getElementById('role-card-arrow').className = 'fa-solid fa-chevron-down text-xs text-gray-400';
         document.getElementById('role-card-status').innerText = '已收起';
     }
+    updateSlideWindowHint();
+}
+
+// 更新滑动窗口提示
+function updateSlideWindowHint() {
+    const hint = document.getElementById('slide-window-hint');
+    if (!hint) return;
+    const isSlide = localStorage.getItem('CTX_MODE') === 'slide';
+    hint.classList.toggle('hidden', !isSlide);
 }
 
 // 清空聊天记录（同时清除永久记忆）

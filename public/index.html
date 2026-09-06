@@ -304,12 +304,20 @@ document.addEventListener('DOMContentLoaded', () => {
                             </button>
                         </div>
                         <textarea id="role-desc-input" class="textarea textarea-bordered textarea-sm w-full h-32" placeholder="描述角色的性格、身份、说话风格等..."></textarea>
+                        <label class="label py-1 mt-3"><span class="label-text text-sm">快捷开场白（切换角色后自动填入）</span></label>
+                        <input type="text" id="role-opening-input" class="input input-bordered input-sm w-full" placeholder="例如：你来了，我等你很久了..." />
                         <div class="modal-action mt-4">
                             <button class="btn btn-ghost btn-sm" onclick="document.getElementById('role-card-modal').close()">取消</button>
                             <button class="btn btn-primary btn-sm" onclick="saveRoleCard()">保存</button>
                         </div>
                     </div>
                 </dialog>
+
+                <!-- 滑动窗口模式提示 -->
+                <div id="slide-window-hint" class="hidden alert alert-warning py-1 px-3 text-xs mb-2">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>当前为滑动窗口模式，AI 仅能看到最近 4 轮对话，更早的记录已保存在本地但不会发给 AI。</span>
+                </div>
 
                 <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 h-80 sm:h-96 overflow-y-auto flex flex-col gap-3 mb-3"></div>
                 <div class="flex gap-2 items-center">
