@@ -235,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         <!-- AI Chat Section -->
         <div id="chat-section" class="card glass-panel shadow-xl hidden">
-            <div class="card-body p-4 sm:p-6">
+            <div class="card-body p-4 sm:p-6 flex flex-col" style="height: calc(100vh - 200px); min-height: 500px;">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="card-title text-lg"><i class="fa-solid fa-comments text-primary"></i> 与乐 语音对话</h2>
                     <button class="btn btn-ghost btn-xs" onclick="clearChat()"><i class="fa-solid fa-trash"></i> 清空</button>
@@ -315,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </dialog>
 
-                <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 h-80 sm:h-96 overflow-y-auto flex flex-col gap-3 mb-3"></div>
+                <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 mb-3"></div>
                 <div class="flex gap-2 items-center">
                     <input type="text" id="chat-input" placeholder="跟乐说点什么..." class="input input-bordered input-sm flex-1" onkeypress="if(event.key==='Enter')sendChatMessage()" />
                     <!-- 思考程度切换 -->
