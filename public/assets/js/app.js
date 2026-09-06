@@ -1,4 +1,107 @@
 
+// ============================================
+// 情绪感知系统
+// ============================================
+const EMOTION_KEYWORDS = {
+    happy: ['开心', '高兴', '快乐', '哈哈', '嘻嘻', '太棒了', '好耶', '喜欢', '爱你', '么么', '幸福', '满足', '愉快', '笑'],
+    sad: ['难过', '伤心', '想哭', '郁闷', '失落', '沮丧', '心酸', '委屈', '孤独', '寂寞', '痛苦', '悲伤', '哭'],
+    angry: ['生气', '气死', '烦', '讨厌', '可恶', '愤怒', '火大', '抓狂', '崩溃', '妈的', '操', '怒'],
+    tired: ['累', '疲惫', '困', '没力气', '不想动', '好累', '疲乏', '倦', '没精神', '想睡'],
+    anxious: ['焦虑', '紧张', '担心', '害怕', '恐惧', '不安', '慌', '压力', '愁', '纠结'],
+    love: ['想你', '抱抱', '亲亲', '爱', '喜欢', '心动', '甜蜜', '依赖', '舍不得', '陪伴']
+};
+
+function detectEmotion(text) {
+    const scores = {};
+    for (const [emotion, keywords] of Object.entries(EMOTION_KEYWORDS)) {
+        scores[emotion] = 0;
+        for (const kw of keywords) {
+            if (text.includes(kw)) scores[emotion] += kw.length; // 长词权重更高
+        }
+    }
+    let maxEmotion = 'neutral';
+    let maxScore = 0;
+    for (const [emotion, score] of Object.entries(scores)) {
+        if (score > maxScore) {
+            maxScore = score;
+            maxEmotion = emotion;
+        }
+    }
+    return maxScore > 0 ? maxEmotion : 'neutral';
+}
+
+const EMOTION_LABELS = {
+    happy: '开心', sad: '难过', angry: '生气', tired: '疲惫',
+    anxious: '焦虑', love: '亲昵', neutral: '平静'
+};
+
+const EMOTION_PROMPTS = {
+    happy: '用户现在心情很好，很开心。请用轻松愉快的语气回应，跟他一起开心，可以开点玩笑。',
+    sad: '用户现在情绪低落，难过。请先温柔地安慰他，不要讲大道理，不要说教，静静地陪伴他，让他感受到被理解。',
+    angry: '用户现在很生气，烦躁。请先共情他的情绪，不要反驳或说教，帮他发泄情绪，等他平静下来再聊。',
+    tired: '用户现在很累，疲惫。请用温柔舒缓的语气回应，关心他有没有休息好，不要聊太复杂的话题，让他放松。',
+    anxious: '用户现在焦虑，紧张不安。请安抚他的情绪，给他安全感，帮他理清思路，不要增加他的压力。',
+    love: '用户现在在表达亲昵和依赖。请用温暖亲密的语气回应，接受他的感情，让他感受到被爱和被需要。',
+    neutral: ''
+};
+
+// ============================================
+// 记忆关键词提取系统
+// ============================================
+const MEMORY_PATTERNS = [
+    { key: 'birthday', regex: /(?:我生日是|我过生日|我生日在|我的生日)([^。！？\n]{1,30})/g, label: '生日' },
+    { key: 'age', regex: /(?:我今年|我现在|我)(\d{1,2})岁/g, label: '年龄' },
+    { key: 'location', regex: /(?:我在|我住在|我家在|我来自)([^。！？\n]{1,20})/g, label: '所在地' },
+    { key: 'job', regex: /(?:我工作是|我是做|我的职业|我上班)([^。！？\n]{1,20})/g, label: '职业' },
+    { key: 'like', regex: /(?:我喜欢|我超爱|我最爱)([^。！？\n]{1,20})/g, label: '喜欢的事物' },
+    { key: 'dislike', regex: /(?:我讨厌|我不喜欢|我受不了)([^。！？\n]{1,20})/g, label: '讨厌的事物' },
+    { key: 'important', regex: /(?:记住|别忘了|你要记得)([^。！？\n]{1,30})/g, label: '重要的事' }
+];
+
+function getRoleMemory(roleId) {
+    const saved = localStorage.getItem(`ROLE_MEMORY_${roleId}`);
+    if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {};
+}
+
+function saveRoleMemory(roleId, memory) {
+    localStorage.setItem(`ROLE_MEMORY_${roleId}`, JSON.stringify(memory));
+}
+
+function extractMemory(text, roleId) {
+    const memory = getRoleMemory(roleId);
+    let extracted = false;
+    for (const pattern of MEMORY_PATTERNS) {
+        const matches = text.matchAll(pattern.regex);
+        for (const match of matches) {
+            const value = match[1].trim();
+            if (value && value.length > 0 && value.length < 30) {
+                if (!memory[pattern.key]) memory[pattern.key] = [];
+                if (!memory[pattern.key].includes(value)) {
+                    memory[pattern.key].push(value);
+                    extracted = true;
+                }
+            }
+        }
+    }
+    if (extracted) saveRoleMemory(roleId, memory);
+    return extracted;
+}
+
+function formatMemoryPrompt(roleId) {
+    const memory = getRoleMemory(roleId);
+    const entries = [];
+    for (const pattern of MEMORY_PATTERNS) {
+        if (memory[pattern.key] && memory[pattern.key].length > 0) {
+            entries.push(`${pattern.label}：${memory[pattern.key].join('、')}`);
+        }
+    }
+    if (entries.length === 0) return '';
+    return `【关于用户的记忆】\n${entries.join('\n')}\n聊天时可以自然地提到这些信息，让用户感受到你记得他说过的话。`;
+}
+
 // Tab Switching
 function switchTab(tabId) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('tab-active', 'text-primary'));
@@ -707,6 +810,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// 情绪指示器：输入时实时检测情绪
+const EMOTION_EMOJIS = {
+    happy: '😊', sad: '😢', angry: '😠', tired: '😴',
+    anxious: '😰', love: '🥰', neutral: ''
+};
+function updateEmotionIndicator() {
+    const input = document.getElementById('chat-input');
+    const indicator = document.getElementById('emotion-indicator');
+    if (!input || !indicator) return;
+    const text = input.value.trim();
+    if (!text) {
+        indicator.style.opacity = '0';
+        return;
+    }
+    const emotion = detectEmotion(text);
+    if (emotion === 'neutral') {
+        indicator.style.opacity = '0';
+    } else {
+        indicator.innerText = EMOTION_EMOJIS[emotion] || '';
+        indicator.style.opacity = '0.8';
+        indicator.title = `检测到情绪：${EMOTION_LABELS[emotion]}`;
+    }
+}
+
 // 发送聊天消息
 async function sendChatMessage() {
     const input = document.getElementById('chat-input');
@@ -742,6 +869,9 @@ async function sendChatMessage() {
     appendChatMessage(text, 'user');
     input.value = '';
     sfxSend();
+
+    // 从用户消息中提取记忆（生日、喜欢的事物等）
+    extractMemory(text, getCurrentRoleId());
 
     // 发送新消息时，停止上一条AI回复的朗读
     stopAllAudio();
@@ -781,6 +911,17 @@ async function sendChatMessage() {
         ];
         if (hasRoleCard) {
             messages.push({ role: 'system', content: roleCardDesc });
+        }
+        // 加入角色记忆（关于用户的重要信息）
+        const currentRoleId = getCurrentRoleId();
+        const memoryPrompt = formatMemoryPrompt(currentRoleId);
+        if (memoryPrompt) {
+            messages.push({ role: 'system', content: memoryPrompt });
+        }
+        // 情绪感知：检测用户当前情绪，调整回复语气
+        const emotion = detectEmotion(text);
+        if (emotion !== 'neutral' && EMOTION_PROMPTS[emotion]) {
+            messages.push({ role: 'system', content: EMOTION_PROMPTS[emotion] });
         }
         if (useConstraint) {
             messages.push({ role: 'system', content: roleConstraints });
@@ -1114,7 +1255,36 @@ function editRoleCard() {
     document.getElementById('role-name-input').value = role.name;
     document.getElementById('role-desc-input').value = role.desc;
     document.getElementById('role-opening-input').value = role.opening || '';
+    renderRoleMemory();
     document.getElementById('role-card-modal').showModal();
+}
+
+// 渲染角色记忆本
+function renderRoleMemory() {
+    const container = document.getElementById('role-memory-list');
+    if (!container) return;
+    const roleId = getCurrentRoleId();
+    const memory = getRoleMemory(roleId);
+    const entries = [];
+    for (const pattern of MEMORY_PATTERNS) {
+        if (memory[pattern.key] && memory[pattern.key].length > 0) {
+            entries.push(`<div><span class="font-bold">${pattern.label}：</span>${memory[pattern.key].join('、')}</div>`);
+        }
+    }
+    if (entries.length === 0) {
+        container.innerHTML = '<span class="text-gray-400">暂无记忆，聊天时会自动提取</span>';
+    } else {
+        container.innerHTML = entries.join('');
+    }
+}
+
+// 清空角色记忆
+function clearRoleMemory() {
+    if (!confirm('确定清空这个角色的所有记忆吗？')) return;
+    const roleId = getCurrentRoleId();
+    localStorage.removeItem(`ROLE_MEMORY_${roleId}`);
+    renderRoleMemory();
+    sfxSuccess();
 }
 
 function clearRoleDescInput() {
