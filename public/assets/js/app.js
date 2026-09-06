@@ -1767,11 +1767,12 @@ const DIALOG_COLOR = '#fb923c';
 function formatChatText(text) {
     if (!text) return '';
     // 按括号分割，括号内的保持原色，括号外的台词上色
-    const parts = text.split(/(【[^】]*】|\[[^\]]*\]|\([^)]*\)|\*[^*]*\*)/g);
+    // 同时支持中英文括号：【】[]（）()**
+    const parts = text.split(/(【[^】]*】|\[[^\]]*\]|（[^）]*）|\([^)]*\)|\*[^*]*\*)/g);
     return parts.map(part => {
         if (!part) return '';
         // 括号包裹的内容（动作/心理描写）保持原色
-        if (/^【.*】$|^\[.*\]$|^\(.*\)$|^\*.*\*$/.test(part)) {
+        if (/^【.*】$|^\[.*\]$|^（.*）$|^\(.*\)$|^\*.*\*$/.test(part)) {
             return escapeHtml(part);
         }
         // 台词部分上色
