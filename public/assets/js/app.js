@@ -142,6 +142,10 @@ function syncModalInputs() {
     const temp = localStorage.getItem('LLM_TEMPERATURE') || '0.8';
     document.getElementById('modal-llm-temperature').value = temp;
     document.getElementById('temp-value').innerText = temp;
+    // 加载Top-P
+    const topp = localStorage.getItem('LLM_TOPP') || '0.9';
+    document.getElementById('modal-llm-topp').value = topp;
+    document.getElementById('topp-value').innerText = topp;
 }
 
 function saveModalKeys() {
@@ -153,6 +157,7 @@ function saveModalKeys() {
     localStorage.setItem('LLM_MODEL', document.getElementById('modal-llm-model').value.trim() || 'deepseek-v4-flash');
     localStorage.setItem('LLM_SYSTEM', document.getElementById('modal-llm-system').value.trim());
     localStorage.setItem('LLM_TEMPERATURE', document.getElementById('modal-llm-temperature').value);
+    localStorage.setItem('LLM_TOPP', document.getElementById('modal-llm-topp').value);
     onEngineChange();
     sfxSave();
     settings_modal.close();
@@ -690,7 +695,8 @@ async function sendChatMessage() {
             baseUrl: llmUrl,
             model: llmModel,
             messages: messages,
-            temperature: parseFloat(localStorage.getItem('LLM_TEMPERATURE') || '0.8')
+            temperature: parseFloat(localStorage.getItem('LLM_TEMPERATURE') || '0.8'),
+            top_p: parseFloat(localStorage.getItem('LLM_TOPP') || '0.9')
         };
         // 思考程度控制（支持 V4 系列和 reasoner 模型）
         const isV4OrReasoner = llmModel.toLowerCase().includes('v4') || llmModel.toLowerCase().includes('reasoner');
