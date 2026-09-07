@@ -177,6 +177,35 @@ function onEngineChange() {
         if (voiceLabel) voiceLabel.innerText = '选择声音';
         if (zeroshotBox) zeroshotBox.classList.add('hidden');
         if (zeroshotToggle) zeroshotToggle.closest('.form-control')?.classList.add('hidden');
+        // 切换到Kokoro时自动预加载模型
+        if (typeof KokoroWrapper !== 'undefined') {
+            if (KokoroWrapper.isLoaded()) {
+                const span = kokoroHint?.querySelector('span');
+                if (span) span.textContent = '模型已就绪，可以合成';
+            } else if (!window._kokoroPreloading) {
+                window._kokoroPreloading = true;
+                const span = kokoroHint?.querySelector('span');
+                if (span) span.textContent = '正在准备下载模型...';
+                KokoroWrapper.load((stage, pct, msg) => {
+                    if (span) span.textContent = msg || (stage + ' ' + pct + '%');
+                }).then(() => {
+                    if (span) span.textContent = '模型已就绪，可以合成';
+                    window._kokoroPreloading = false;
+                }).catch(err => {
+                    if (span) span.textContent = '下载失败，点此重试';
+                    window._kokoroPreloading = false;
+                    // 点击提示条重试
+                    if (kokoroHint) {
+                        kokoroHint.style.cursor = 'pointer';
+                        kokoroHint.onclick = () => {
+                            kokoroHint.style.cursor = '';
+                            kokoroHint.onclick = null;
+                            onEngineChange();
+                        };
+                    }
+                });
+            }
+        }
     } else {
         if (apiKeyBar) apiKeyBar.classList.remove('hidden');
         if (kokoroHint) kokoroHint.classList.add('hidden');

@@ -56,7 +56,7 @@
     }
 
     /**
-     * 加载模型（只加载一次）
+     * 加载模型（只加载一次，带重试和镜像回退）
      * @param {function} onProgress - (stage, percent, message) => void
      */
     function load(onProgress) {
@@ -83,42 +83,71 @@
                 }
             } catch (e) { /* 回退 WASM */ }
 
-            if (onProgress) onProgress('loading', 3, '正在下载模型（约120MB，仅首次需要）...');
+            // 尝试多个镜像源，每个最多重试2次
+            const mirrors = [
+                { name: 'hf-mirror国内镜像', host: 'https://hf-mirror.com' },
+                { name: 'HuggingFace官方', host: 'https://huggingface.co' }
+            ];
+            const maxRetries = 2;
+            let lastError = null;
 
-            try {
-                ttsInstance = await global.KokoroTTS.from_pretrained(MODEL_ID, {
-                    dtype: 'q8',
-                    device: device,
-                    // 使用国内镜像加速下载
-                    envConfig: {
-                        remoteHost: 'https://hf-mirror.com'
-                    },
-                    progress_callback: (progress) => {
-                        if (!onProgress) return;
-                        const status = progress.status || '';
-                        const pct = extractProgress(progress);
-                        const file = progress.file || '';
+            for (let m = 0; m < mirrors.length; m++) {
+                const mirror = mirrors[m];
+                for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                    try {
+                        if (onProgress) {
+                            onProgress('loading', 3,
+                                '正在下载模型（' + mirror.name + '，第' + attempt + '次尝试）...');
+                        }
 
-                        if (status === 'initiate' || status === 'download') {
-                            onProgress('loading', pct, '开始下载 ' + file);
-                        } else if (status === 'progress') {
-                            // 显示当前文件名和进度
-                            const shortFile = file.split('/').pop() || file;
-                            onProgress('loading', pct, '下载 ' + shortFile + ' ' + pct + '%');
-                        } else if (status === 'done') {
-                            onProgress('loading', pct, '下载完成 ' + file);
+                        ttsInstance = await global.KokoroTTS.from_pretrained(MODEL_ID, {
+                            dtype: 'q8',
+                            device: device,
+                            envConfig: { remoteHost: mirror.host },
+                            progress_callback: (progress) => {
+                                if (!onProgress) return;
+                                const status = progress.status || '';
+                                const pct = extractProgress(progress);
+                                const file = progress.file || '';
+
+                                if (status === 'initiate' || status === 'download') {
+                                    onProgress('loading', pct, '开始下载 ' + file);
+                                } else if (status === 'progress') {
+                                    const shortFile = file.split('/').pop() || file;
+                                    onProgress('loading', pct, '下载 ' + shortFile + ' ' + pct + '%');
+                                } else if (status === 'done') {
+                                    onProgress('loading', pct, '下载完成 ' + file);
+                                }
+                            }
+                        });
+
+                        // 加载成功
+                        if (onProgress) onProgress('loading', 100, '模型加载完成，可以开始合成');
+                        return ttsInstance;
+
+                    } catch (err) {
+                        lastError = err;
+                        const msg = err && err.message ? err.message : String(err);
+                        if (onProgress) {
+                            onProgress('loading', 0, mirror.name + ' 第' + attempt + '次失败：' + msg);
+                        }
+                        // 等待2秒后重试
+                        if (attempt < maxRetries) {
+                            await new Promise(r => setTimeout(r, 2000));
                         }
                     }
-                });
-            } catch (err) {
-                // 下载失败，重置 loadPromise 允许重试
-                loadPromise = null;
-                const msg = err && err.message ? err.message : String(err);
-                throw new Error('模型下载失败：' + msg + '。请检查网络后刷新页面重试。');
+                }
+                // 当前镜像失败，切换到下一个镜像
+                if (m < mirrors.length - 1) {
+                    if (onProgress) onProgress('loading', 0, '切换到' + mirrors[m + 1].name + '...');
+                    await new Promise(r => setTimeout(r, 1000));
+                }
             }
 
-            if (onProgress) onProgress('loading', 100, '模型加载完成，可以开始合成');
-            return ttsInstance;
+            // 所有镜像都失败
+            loadPromise = null;
+            const msg = lastError && lastError.message ? lastError.message : String(lastError);
+            throw new Error('模型下载失败：' + msg + '。请检查网络后重试。');
         })();
 
         return loadPromise;
