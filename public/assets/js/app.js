@@ -141,6 +141,11 @@ function toggleChatFullscreen() {
     if (btn) {
         btn.className = isFull ? 'fa-solid fa-compress' : 'fa-solid fa-expand';
     }
+    // 进入全屏时如果键盘已弹出，立即调整高度
+    if (isFull && window.visualViewport) {
+        const chatSection = document.getElementById('chat-section');
+        if (chatSection) chatSection.style.height = window.visualViewport.height + 'px';
+    }
     // 退出全屏时清除内联高度
     if (!isFull) {
         const chatSection = document.getElementById('chat-section');
