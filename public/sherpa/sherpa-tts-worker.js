@@ -2,7 +2,7 @@
 // 基于官方 sherpa-onnx WASM TTS Worker，模型已打包进 .data 文件
 
 let tts = null;
-const VERSION = '?v=20260908d';
+const VERSION = '?v=20260908e';
 
 self.Module = {
   locateFile: function (path, scriptDirectory) {
@@ -18,19 +18,31 @@ self.Module = {
   onRuntimeInitialized: function () {
     self.postMessage({ type: 'status', message: '正在初始化语音模型...' });
     try {
-      // 显式传入中文模型配置（默认配置缺lexicon且指向espeak-ng-data，不适合中文模型）
+      // 先检查虚拟文件系统里的模型文件
+      let fsInfo = '';
+      try {
+        const files = ['model.onnx', 'lexicon.txt', 'tokens.txt', 'phone.fst', 'date.fst', 'number.fst'];
+        for (const f of files) {
+          const exists = self.Module.FS.analyzePath('/' + f).exists;
+          fsInfo += f + ':' + (exists ? 'OK' : 'MISSING') + ' ';
+        }
+      } catch (fsErr) {
+        fsInfo = 'FS检查失败: ' + getErrorMessage(fsErr);
+      }
+      self.postMessage({ type: 'status', message: '文件检查: ' + fsInfo });
+
       const config = {
         offlineTtsModelConfig: {
           offlineTtsVitsModelConfig: {
-            model: './model.onnx',
-            lexicon: './lexicon.txt',
-            tokens: './tokens.txt',
+            model: '/model.onnx',
+            lexicon: '/lexicon.txt',
+            tokens: '/tokens.txt',
           },
           numThreads: 1,
-          debug: 0,
+          debug: 1,
           provider: 'cpu',
         },
-        ruleFsts: './phone.fst,./date.fst,./number.fst',
+        ruleFsts: '/phone.fst,/date.fst,/number.fst',
         ruleFars: '',
         maxNumSentences: 1,
       };
@@ -41,7 +53,8 @@ self.Module = {
         numSpeakers: tts.numSpeakers,
       });
     } catch (e) {
-      self.postMessage({ type: 'error', message: '模型初始化失败: ' + e.message });
+      const detail = getErrorMessage(e);
+      self.postMessage({ type: 'error', message: '模型初始化失败: ' + detail });
     }
   },
 };
