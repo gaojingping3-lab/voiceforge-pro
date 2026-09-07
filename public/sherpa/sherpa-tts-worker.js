@@ -2,7 +2,7 @@
 // 基于官方 sherpa-onnx WASM TTS Worker，模型已打包进 .data 文件
 
 let tts = null;
-const VERSION = '?v=20260908f';
+const VERSION = '?v=20260908g';
 
 self.Module = {
   locateFile: function (path, scriptDirectory) {
@@ -18,29 +18,59 @@ self.Module = {
   onRuntimeInitialized: function () {
     self.postMessage({ type: 'status', message: '正在初始化语音模型...' });
     try {
+      // 完整配置（包含所有模型字段，避免initConfig访问undefined）
       const config = {
         offlineTtsModelConfig: {
           offlineTtsVitsModelConfig: {
-            model: '/model.onnx',
-            lexicon: '/lexicon.txt',
-            tokens: '/tokens.txt',
+            model: './model.onnx',
+            lexicon: './lexicon.txt',
+            tokens: './tokens.txt',
+            dataDir: '',
+            noiseScale: 0.667,
+            noiseScaleW: 0.8,
+            lengthScale: 1.0,
+          },
+          offlineTtsMatchaModelConfig: {
+            acousticModel: '', vocoder: '', lexicon: '', tokens: '', dataDir: '',
+            noiseScale: 0.667, lengthScale: 1.0,
+          },
+          offlineTtsKokoroModelConfig: {
+            model: '', voices: '', tokens: '', dataDir: '', lengthScale: 1.0, lexicon: '', lang: '',
+          },
+          offlineTtsKittenModelConfig: {
+            model: '', voices: '', tokens: '', dataDir: '', lengthScale: 1.0,
+          },
+          offlineTtsZipVoiceModelConfig: {
+            tokens: '', encoder: '', decoder: '', vocoder: '', dataDir: '', lexicon: '',
+            featScale: 0.1, tShift: 0.5, targetRMS: 0.1, guidanceScale: 1.0,
+          },
+          offlineTtsPocketModelConfig: {
+            lmFlow: '', lmMain: '', encoder: '', decoder: '', textConditioner: '',
+            vocabJson: '', tokenScoresJson: '', voiceEmbeddingCacheCapacity: 50,
           },
           numThreads: 1,
           debug: 1,
           provider: 'cpu',
         },
-        ruleFsts: '/phone.fst,/date.fst,/number.fst',
+        ruleFsts: './phone.fst,./date.fst,./number.fst',
         ruleFars: '',
         maxNumSentences: 1,
       };
-      tts = new OfflineTts(config, self.Module);
+      tts = createOfflineTts(self.Module, config);
       self.postMessage({
         type: 'ready',
         sampleRate: tts.sampleRate,
         numSpeakers: tts.numSpeakers,
       });
     } catch (e) {
-      const detail = getErrorMessage(e);
+      let detail;
+      if (e instanceof Error) {
+        detail = e.message + (e.stack ? '\n' + e.stack : '');
+      } else if (typeof e === 'object' && e !== null) {
+        detail = JSON.stringify(e);
+      } else {
+        detail = String(e);
+      }
       self.postMessage({ type: 'error', message: '模型初始化失败: ' + detail });
     }
   },
