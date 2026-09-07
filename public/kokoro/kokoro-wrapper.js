@@ -29,13 +29,12 @@
         'config.json',
         'tokenizer.json',
         'tokenizer_config.json',
-        'onnx/model_quantized.onnx.partaa',
-        'onnx/model_quantized.onnx.partab',
-        'onnx/model_quantized.onnx.partac',
-        'onnx/model_quantized.onnx.partad',
-        'onnx/model_quantized.onnx.partae',
-        'onnx/model_quantized.onnx.partaf',
-        'onnx/model_quantized.onnx.partag',
+        'onnx/model_quantized.ort.partaa',
+        'onnx/model_quantized.ort.partab',
+        'onnx/model_quantized.ort.partac',
+        'onnx/model_quantized.ort.partad',
+        'onnx/model_quantized.ort.partae',
+        'onnx/model_quantized.ort.partaf',
         'voices/zf_xiaobei.bin',
         'voices/zf_xiaoni.bin',
         'voices/zf_xiaoxiao.bin',
@@ -134,18 +133,17 @@
             if (onProgress) onProgress('loading', pct, '已下载 ' + (i + 1) + '/' + total);
         }
 
-        // 合并模型分片到 IndexedDB（不占内存，用流式合并）
+        // 合并模型分片到 IndexedDB
         if (onProgress) onProgress('loading', 95, '合并模型文件...');
-        if (!(await hasInDB('model_quantized.onnx'))) {
+        if (!(await hasInDB('model_quantized.ort'))) {
             const parts = [];
-            for (let i = 0; i < 7; i++) {
-                const suffix = String.fromCharCode(97 + i); // aa, ab, ac...
-                const part = await getFromDB('onnx/model_quantized.onnx.part' + suffix);
+            for (let i = 0; i < 6; i++) {
+                const suffix = String.fromCharCode(97 + i);
+                const part = await getFromDB('onnx/model_quantized.ort.part' + suffix);
                 parts.push(part);
             }
             const merged = new Blob(parts, { type: 'application/octet-stream' });
-            await saveToDB('model_quantized.onnx', merged);
-            // 释放分片引用
+            await saveToDB('model_quantized.ort', merged);
             parts.length = 0;
         }
 
@@ -166,7 +164,7 @@
             if (urlStr.endsWith('/config.json')) dbKey = 'config.json';
             else if (urlStr.endsWith('/tokenizer.json')) dbKey = 'tokenizer.json';
             else if (urlStr.endsWith('/tokenizer_config.json')) dbKey = 'tokenizer_config.json';
-            else if (urlStr.includes('model_quantized.onnx')) dbKey = 'model_quantized.onnx';
+            else if (urlStr.includes('model_quantized.ort')) dbKey = 'model_quantized.ort';
             else {
                 const voiceMatch = urlStr.match(/voices\/(zf_[a-z]+\.bin)/);
                 if (voiceMatch) dbKey = voiceMatch[1];
@@ -227,6 +225,7 @@
                     const opts = {
                         dtype: 'q8',
                         device: backend === 'webgl' ? 'wasm' : backend,
+                        model_file_name: 'model_quantized.ort',
                         progress_callback: (progress) => {
                             if (!onProgress) return;
                             if (progress.status === 'done') {
