@@ -684,6 +684,7 @@ function renderChatHistory() {
                 const bubble = document.createElement('div');
                 bubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
                 bubble.innerHTML = '<span class="text-xs font-bold block mb-1" style="color:' + color + '">' + escapeHtml(speakerName) + '</span>' + formatChatText(content);
+                div.appendChild(bubble);
                 const playBtn = document.createElement('button');
                 playBtn.className = 'play-voice-btn absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
                 playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
