@@ -1151,7 +1151,7 @@ function updateAutoPlayBtn() {
 // 播放指定文本的语音（聊天消息用）
 let isChatAudioPlaying = false; // 播放锁，防止重复点击
 
-async function playChatMessage(bubble) {
+async function playChatMessage(bubble, force = false) {
     // 读取文字时过滤掉底部的token显示，避免朗读数字
     let text = bubble.innerText.replace(/\n?\d+\s*tokens\s*$/, '').trim();
     // 如果有角色名span（AI消息），去掉第一行的名字，不朗读
@@ -1171,8 +1171,8 @@ async function playChatMessage(bubble) {
         .replace(/\*[^*]*\*/g, '')
         .trim();
 
-    // 播放锁：正在播放中，忽略新的点击
-    if (isChatAudioPlaying) return;
+    // 播放锁：正在播放中，忽略新的点击（force模式除外）
+    if (isChatAudioPlaying && !force) return;
 
     stopAllAudio(); // 先停止之前的音频（会释放锁）
     isChatAudioPlaying = true; // 然后设置新的锁
@@ -1815,7 +1815,7 @@ async function sendChatMessage() {
 
         // 自动朗读
         if (autoPlayTTS) {
-            setTimeout(() => { stopAllAudio(); playChatMessage(loadingBubble); }, 300);
+            setTimeout(() => playChatMessage(loadingBubble, true), 300);
         }
 
     } catch (err) {
@@ -2491,7 +2491,7 @@ ${currentRole.desc}
 
         // 自动朗读（如果开启了自动朗读）
         if (autoPlayTTS) {
-            setTimeout(() => { stopAllAudio(); playChatMessage(replyBubble); }, 300);
+            setTimeout(() => playChatMessage(replyBubble, true), 300);
         }
 
         sfxReceive();
