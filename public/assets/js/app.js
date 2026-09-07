@@ -610,22 +610,41 @@ function saveModalKeys() {
     settings_modal.close();
 }
 
-// 设置弹窗分组折叠/展开（手风琴效果：展开一个时自动收起其他）
+// 设置弹窗分组折叠/展开（手风琴效果 + 动态高度动画）
 function toggleSettingsGroup(groupId) {
     const allGroups = ['tts-group', 'ai-group', 'other-group'];
     const wrapper = document.getElementById(groupId + '-wrapper');
     if (!wrapper) return;
+    const content = document.getElementById(groupId);
     const willExpand = !wrapper.classList.contains('open');
+
     // 先收起所有
     allGroups.forEach(id => {
         const w = document.getElementById(id + '-wrapper');
         const icon = document.getElementById(id + '-icon');
-        if (w) w.classList.remove('open');
+        if (w && w.classList.contains('open')) {
+            // 收起：先固定当前高度，再下一帧设为0
+            const currentHeight = w.scrollHeight;
+            w.style.height = currentHeight + 'px';
+            w.classList.remove('open');
+            requestAnimationFrame(() => {
+                w.style.height = '0px';
+            });
+        }
         if (icon) icon.style.transform = 'rotate(-90deg)';
     });
+
     // 如果点击的是收起状态，则展开它
     if (willExpand) {
         wrapper.classList.add('open');
+        const targetHeight = content.scrollHeight;
+        wrapper.style.height = targetHeight + 'px';
+        // 动画完成后设为auto，防止内容变化
+        setTimeout(() => {
+            if (wrapper.classList.contains('open')) {
+                wrapper.style.height = 'auto';
+            }
+        }, 320);
         const icon = document.getElementById(groupId + '-icon');
         if (icon) icon.style.transform = 'rotate(0deg)';
     }
@@ -634,6 +653,13 @@ function toggleSettingsGroup(groupId) {
 // 打开设置弹窗：取消自动聚焦，防止手机端弹出键盘
 function openSettingsModal() {
     settings_modal.showModal();
+    // 初始化默认展开分组的高度
+    ['tts-group', 'ai-group', 'other-group'].forEach(id => {
+        const w = document.getElementById(id + '-wrapper');
+        if (w && w.classList.contains('open')) {
+            w.style.height = 'auto';
+        }
+    });
     setTimeout(() => {
         if (document.activeElement && typeof document.activeElement.blur === 'function') {
             document.activeElement.blur();

@@ -298,18 +298,14 @@
     opacity: 1 !important;
     pointer-events: auto !important;
   }
-  /* 设置分组折叠动画 - grid方案，精确无空跑 */
+  /* 设置分组折叠动画 - JS动态高度方案 */
   .settings-group-wrapper {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    height: 0;
+    overflow: hidden;
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .settings-group-wrapper.open {
-    grid-template-rows: 1fr;
-  }
-  .settings-group-wrapper > div {
-    overflow: hidden;
-    min-height: 0;
+    /* 展开时高度由JS设置为内容实际高度，动画完成后设为auto */
   }
   /* 白色主题卡片优化：增加背景色、边框、阴影，提升辨识度 */
   body:not(.theme-obsidian):not(.theme-dark) #dual-role-bar {
