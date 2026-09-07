@@ -610,6 +610,21 @@ function saveModalKeys() {
     settings_modal.close();
 }
 
+// 设置弹窗分组折叠/展开
+function toggleSettingsGroup(groupId) {
+    const content = document.getElementById(groupId);
+    const icon = document.getElementById(groupId + '-icon');
+    if (!content) return;
+    content.classList.toggle('hidden');
+    if (icon) {
+        if (content.classList.contains('hidden')) {
+            icon.style.transform = 'rotate(-90deg)';
+        } else {
+            icon.style.transform = 'rotate(0deg)';
+        }
+    }
+}
+
 // 打开设置弹窗：取消自动聚焦，防止手机端弹出键盘
 function openSettingsModal() {
     settings_modal.showModal();
