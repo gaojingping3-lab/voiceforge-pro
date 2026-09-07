@@ -30,6 +30,61 @@ function detectEmotion(text) {
     return maxScore > 0 ? maxEmotion : 'neutral';
 }
 
+// ============================================
+// 智能滚动系统
+// ============================================
+const SCROLL_BOTTOM_THRESHOLD = 150; // 距离底部150px内视为在底部
+let hasUnreadMessages = false; // 用户不在底部时来了新消息
+
+function isAtBottom(container) {
+    if (!container) return false;
+    return container.scrollHeight - container.scrollTop - container.clientHeight < SCROLL_BOTTOM_THRESHOLD;
+}
+
+function smartScroll(container) {
+    if (!container) return;
+    if (isAtBottom(container)) {
+        container.scrollTop = container.scrollHeight;
+        hasUnreadMessages = false;
+        updateScrollToBottomBtn();
+    } else {
+        // 用户在看历史，不自动滚动，标记有新消息
+        hasUnreadMessages = true;
+        updateScrollToBottomBtn();
+    }
+}
+
+function updateScrollToBottomBtn() {
+    const btn = document.getElementById('scroll-to-bottom-btn');
+    if (!btn) return;
+    if (hasUnreadMessages) {
+        btn.classList.add('show');
+    } else {
+        btn.classList.remove('show');
+    }
+}
+
+function scrollToBottom() {
+    const container = document.getElementById('chat-messages');
+    if (container) {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+        hasUnreadMessages = false;
+        updateScrollToBottomBtn();
+    }
+}
+
+// 初始化智能滚动（页面加载后调用）
+function initSmartScroll() {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+    container.addEventListener('scroll', () => {
+        if (isAtBottom(container)) {
+            hasUnreadMessages = false;
+            updateScrollToBottomBtn();
+        }
+    });
+}
+
 const EMOTION_LABELS = {
     happy: '开心', sad: '难过', angry: '生气', tired: '疲惫',
     anxious: '焦虑', love: '亲昵', neutral: '平静'
@@ -692,7 +747,7 @@ function appendChatMessage(text, type) {
     }
 
     container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
+    smartScroll(container);
     return bubble;
 }
 
@@ -825,6 +880,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadChatHistory(); // 恢复永久记忆
     renderChatHistory(); // 渲染历史消息
     initVoiceInput(); // 初始化语音输入
+    initSmartScroll(); // 初始化智能滚动
 
     // 恢复双角色模式状态
     if (localStorage.getItem('DUAL_ROLE_MODE') === '1') {
@@ -1118,7 +1174,7 @@ async function sendChatMessage() {
     loadingBubble.innerHTML = '乐正在思考 <span class="thinking-dots"><span></span><span></span><span></span></span>';
     loadingDiv.appendChild(loadingBubble);
     container.appendChild(loadingDiv);
-    container.scrollTop = container.scrollHeight;
+    smartScroll(container);
     sfxStart();
 
     try {
@@ -1239,9 +1295,9 @@ async function sendChatMessage() {
                     if (delta) {
                         fullReply += delta;
                         loadingBubble.innerHTML = formatChatText(fullReply);
-                        // 自动滚动到底部
+                        // 智能滚动：用户在底部才自动滚
                         const chatContainer = document.getElementById('chat-messages');
-                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                        smartScroll(chatContainer);
                     }
                     // 捕获token使用量
                     if (chunk.usage?.total_tokens) {
@@ -1450,7 +1506,7 @@ function switchRole(id) {
             playBtn.onclick = () => playChatMessage(bubble);
             aiDiv.appendChild(playBtn);
             chatContainer.appendChild(aiDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            smartScroll(chatContainer);
             // 加入记忆
             chatHistory.push({ role: 'assistant', content: role.opening });
             saveChatHistory();
@@ -1673,7 +1729,7 @@ function startDualChat() {
         playBtn.onclick = () => playChatMessage(openingBubble);
         openingDiv.appendChild(playBtn);
         container.appendChild(openingDiv);
-        container.scrollTop = container.scrollHeight;
+        smartScroll(container);
         // 加入对话历史
         chatHistory.push({ role: 'assistant', content: `[${dualRoleA.name}] ${openingText}` });
         saveChatHistory();
@@ -1864,7 +1920,7 @@ ${currentRole.desc}
     thinkingBubble.innerHTML = `${currentRole.name}正在思考 <span class="thinking-dots"><span></span><span></span><span></span></span>`;
     thinkingDiv.appendChild(thinkingBubble);
     container.appendChild(thinkingDiv);
-    container.scrollTop = container.scrollHeight;
+    smartScroll(container);
 
     try {
         dualAbortController = new AbortController();
@@ -1914,7 +1970,7 @@ ${currentRole.desc}
         replyDiv.appendChild(playBtn);
 
         container.appendChild(replyDiv);
-        container.scrollTop = container.scrollHeight;
+        smartScroll(container);
 
         // 加入对话历史
         chatHistory.push({ role: 'assistant', content: `[${currentRole.name}] ${reply}` });
