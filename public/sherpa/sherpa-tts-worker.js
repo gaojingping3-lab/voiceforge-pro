@@ -2,7 +2,7 @@
 // 基于官方 sherpa-onnx WASM TTS Worker，模型已打包进 .data 文件
 
 let tts = null;
-const VERSION = '?v=20260908c';
+const VERSION = '?v=20260908d';
 
 self.Module = {
   locateFile: function (path, scriptDirectory) {
@@ -18,7 +18,23 @@ self.Module = {
   onRuntimeInitialized: function () {
     self.postMessage({ type: 'status', message: '正在初始化语音模型...' });
     try {
-      tts = createOfflineTts(self.Module);
+      // 显式传入中文模型配置（默认配置缺lexicon且指向espeak-ng-data，不适合中文模型）
+      const config = {
+        offlineTtsModelConfig: {
+          offlineTtsVitsModelConfig: {
+            model: './model.onnx',
+            lexicon: './lexicon.txt',
+            tokens: './tokens.txt',
+          },
+          numThreads: 1,
+          debug: 0,
+          provider: 'cpu',
+        },
+        ruleFsts: './phone.fst,./date.fst,./number.fst',
+        ruleFars: '',
+        maxNumSentences: 1,
+      };
+      tts = new OfflineTts(config, self.Module);
       self.postMessage({
         type: 'ready',
         sampleRate: tts.sampleRate,
