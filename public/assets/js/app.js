@@ -144,7 +144,7 @@ function toggleChatFullscreen() {
     // 进入全屏时如果键盘已弹出，立即调整高度
     if (isFull && window.visualViewport) {
         const chatSection = document.getElementById('chat-section');
-        if (chatSection) chatSection.style.height = window.visualViewport.height + 'px';
+        if (chatSection) chatSection.style.setProperty('height', window.visualViewport.height + 'px', 'important');
     }
     // 退出全屏时清除内联高度
     if (!isFull) {
@@ -1156,7 +1156,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (document.body.classList.contains('chat-fullscreen')) {
                 const chatSection = document.getElementById('chat-section');
                 if (chatSection) {
-                    chatSection.style.height = vh + 'px';
+                    chatSection.style.setProperty('height', vh + 'px', 'important');
                 }
             }
             // 滚动聊天区域到底部
