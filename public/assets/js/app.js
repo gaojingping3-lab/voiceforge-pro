@@ -194,17 +194,6 @@ function showMsgContextMenu(msgEl, x, y) {
     const menu = document.createElement('div');
     menu.className = 'msg-context-menu';
 
-    // 复制
-    const copyBtn = document.createElement('button');
-    copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i> 复制文本';
-    copyBtn.onclick = () => {
-        navigator.clipboard.writeText(text).then(() => {
-            sfxSave();
-        }).catch(() => {});
-        menu.remove();
-    };
-    menu.appendChild(copyBtn);
-
     // 重新生成（仅AI消息）
     if (!isUser) {
         const regenBtn = document.createElement('button');
