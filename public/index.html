@@ -549,13 +549,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </dialog>
 
-                <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 mb-3 relative"></div>
+                <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 mb-3 relative">
+                    <button id="exit-fullscreen-btn" onclick="toggleChatFullscreen()" class="sticky top-0 ml-auto z-20 btn btn-circle btn-sm bg-base-200/90 backdrop-blur shadow-lg opacity-0 pointer-events-none transition-all duration-200 hover:scale-110 -mb-8" title="退出全屏">
+                        <i class="fa-solid fa-compress text-sm"></i>
+                    </button>
+                </div>
                 <!-- 回到底部按钮 -->
                 <button id="scroll-to-bottom-btn" onclick="scrollToBottom()" class="absolute bottom-20 right-6 z-20 btn btn-circle btn-sm bg-base-200/90 backdrop-blur shadow-lg opacity-0 pointer-events-none transition-all duration-200 hover:scale-110" title="回到底部">
                     <i class="fa-solid fa-arrow-down text-sm"></i>
-                </button>
-                <button id="exit-fullscreen-btn" onclick="toggleChatFullscreen()" class="absolute top-3 right-3 z-20 btn btn-circle btn-sm bg-base-200/90 backdrop-blur shadow-lg opacity-0 pointer-events-none transition-all duration-200 hover:scale-110" title="退出全屏">
-                    <i class="fa-solid fa-compress text-sm"></i>
                 </button>
                 <div class="flex gap-2 items-end">
                     <textarea id="chat-input" placeholder="跟乐说点什么..." class="textarea textarea-bordered textarea-sm flex-1 resize-none" rows="1" style="max-height: 100px; min-height: 40px;" oninput="autoResizeInput(); updateEmotionIndicator();" onkeydown="handleChatKeydown(event)"></textarea>
