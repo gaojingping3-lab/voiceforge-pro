@@ -43,15 +43,9 @@ function isAtBottom(container) {
 
 function smartScroll(container) {
     if (!container) return;
-    if (isAtBottom(container)) {
-        container.scrollTop = container.scrollHeight;
-        hasUnreadMessages = false;
-        updateScrollToBottomBtn();
-    } else {
-        // 用户在看历史，不自动滚动，标记有新消息
-        hasUnreadMessages = true;
-        updateScrollToBottomBtn();
-    }
+    // 完全不自动滚动，只标记有新消息并显示回到底部按钮
+    hasUnreadMessages = true;
+    updateScrollToBottomBtn();
 }
 
 function updateScrollToBottomBtn() {
