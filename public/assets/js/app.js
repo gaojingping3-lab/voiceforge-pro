@@ -1166,12 +1166,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!document.body.classList.contains('chat-fullscreen')) return;
         const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         const chatSection = document.getElementById('chat-section');
-        // 用requestAnimationFrame批量更新
+        // 立即设置高度
+        document.body.style.setProperty('height', vh + 'px', 'important');
+        if (chatSection) {
+            chatSection.style.setProperty('height', vh + 'px', 'important');
+        }
+        // 强制重排
+        if (chatSection) void chatSection.offsetWidth;
+        // 下一帧再重排一次，并滚动聊天区域
         requestAnimationFrame(() => {
-            document.body.style.setProperty('height', vh + 'px', 'important');
-            if (chatSection) {
-                chatSection.style.setProperty('height', vh + 'px', 'important');
-            }
+            if (chatSection) void chatSection.offsetWidth;
             const chat = document.getElementById('chat-messages');
             if (chat) chat.scrollTop = chat.scrollHeight;
         });
@@ -1179,7 +1183,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => {
             adjustFullscreenHeight();
-            setTimeout(adjustFullscreenHeight, 200);
+            setTimeout(adjustFullscreenHeight, 100);
+            setTimeout(adjustFullscreenHeight, 300);
+        });
+        // 监听visualViewport滚动，iOS键盘弹出时会触发
+        window.visualViewport.addEventListener('scroll', () => {
+            adjustFullscreenHeight();
         });
     }
     // 输入框聚焦时也触发一次（只调一次，避免每次点击都动）
