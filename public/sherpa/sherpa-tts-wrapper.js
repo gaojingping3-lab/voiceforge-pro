@@ -1,5 +1,6 @@
 // sherpa-tts-wrapper.js
 // sherpa-onnx TTS 主线程封装 - 与 Worker 通信，播放音频
+// Worker 加载后自动初始化（模型已打包进 .data）
 
 class SherpaTTS {
   constructor() {
@@ -11,18 +12,19 @@ class SherpaTTS {
     this.onStatus = null;
     this.onReady = null;
     this.onError = null;
+    this._readyPromise = null;
   }
 
-  // 初始化
+  // 初始化（创建 Worker，等待自动初始化完成）
   async init() {
     if (this.isReady) return;
+    if (this._readyPromise) return this._readyPromise;
 
-    return new Promise((resolve, reject) => {
-      // 创建 Worker
-      this.worker = new Worker('/sherpa/sherpa-tts-worker.js');
+    this._readyPromise = new Promise((resolve, reject) => {
+      this.worker = new Worker('/sherpa/sherpa-tts-worker.js?v=20260908c');
 
       this.worker.onmessage = (e) => {
-        const { type, message, sampleRate, numSpeakers, samples } = e.data;
+        const { type, message, sampleRate, numSpeakers } = e.data;
 
         switch (type) {
           case 'status':
@@ -40,14 +42,6 @@ class SherpaTTS {
             if (this.onError) this.onError(message);
             reject(new Error(message));
             break;
-
-          case 'audio':
-            // 存储待播放的音频（由调用方处理）
-            this._pendingAudio = { samples, sampleRate };
-            break;
-
-          case 'destroyed':
-            break;
         }
       };
 
@@ -56,16 +50,9 @@ class SherpaTTS {
         if (this.onError) this.onError(msg);
         reject(new Error(msg));
       };
-
-      // 发送初始化消息
-      this.worker.postMessage({
-        type: 'init',
-        payload: {
-          baseUrl: '/sherpa/',
-          modelBaseUrl: '/models/sherpa/',
-        }
-      });
     });
+
+    return this._readyPromise;
   }
 
   // 合成音频（返回 Float32Array）
@@ -86,10 +73,7 @@ class SherpaTTS {
       };
 
       this.worker.addEventListener('message', handleAudio);
-      this.worker.postMessage({
-        type: 'generate',
-        payload: { text, sid, speed }
-      });
+      this.worker.postMessage({ type: 'generate', text, sid, speed });
     });
   }
 
@@ -127,9 +111,7 @@ class SherpaTTS {
   // 停止播放
   stop() {
     if (this.currentSource) {
-      try {
-        this.currentSource.stop();
-      } catch (e) {}
+      try { this.currentSource.stop(); } catch (e) {}
       this.currentSource = null;
     }
   }
@@ -143,8 +125,8 @@ class SherpaTTS {
       this.worker = null;
     }
     this.isReady = false;
+    this._readyPromise = null;
   }
 }
 
-// 导出
 window.SherpaTTS = SherpaTTS;

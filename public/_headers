@@ -20,6 +20,3 @@
 # Sherpa WASM 运行时和模型缓存1天
 /sherpa/*
   Cache-Control: public, max-age=86400
-
-/models/sherpa/*
-  Cache-Control: public, max-age=86400
