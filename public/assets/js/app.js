@@ -17,6 +17,46 @@
     } catch (e) { console.log('版本检测失败:', e); }
 })();
 
+// Float32Array 转 WAV Blob（用于 sherpa-onnx 离线合成）
+function float32ToWav(samples, sampleRate) {
+    const numChannels = 1;
+    const bytesPerSample = 2;
+    const blockAlign = numChannels * bytesPerSample;
+    const byteRate = sampleRate * blockAlign;
+    const dataSize = samples.length * bytesPerSample;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
+    // RIFF header
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + dataSize, true);
+    writeString(view, 8, 'WAVE');
+    // fmt chunk
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, 16, true); // bits per sample
+    // data chunk
+    writeString(view, 36, 'data');
+    view.setUint32(40, dataSize, true);
+    // 写入 PCM 数据
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        offset += 2;
+    }
+    return new Blob([buffer], { type: 'audio/wav' });
+}
+function writeString(view, offset, string) {
+    for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+    }
+}
+
 // ============================================
 // 情绪感知系统
 // ============================================
@@ -161,9 +201,10 @@ function onEngineChange() {
     } else {
         balanceBox.classList.add('hidden');
     }
-    // Kokoro 本地离线模式：隐藏API Key栏，显示提示，声音用下拉选择
+    // Kokoro/Sherpa 本地离线模式：隐藏API Key栏，显示提示
     const apiKeyBar = document.getElementById('api-key-bar');
     const kokoroHint = document.getElementById('kokoro-hint');
+    const sherpaHint = document.getElementById('sherpa-hint');
     const voiceIdInput = document.getElementById('voice-id');
     const kokoroVoiceSelect = document.getElementById('kokoro-voice');
     const voiceLabel = document.getElementById('voice-label');
@@ -172,6 +213,7 @@ function onEngineChange() {
     if (engine === 'kokoro') {
         if (apiKeyBar) apiKeyBar.classList.add('hidden');
         if (kokoroHint) kokoroHint.classList.remove('hidden');
+        if (sherpaHint) sherpaHint.classList.add('hidden');
         if (voiceIdInput) voiceIdInput.classList.add('hidden');
         if (kokoroVoiceSelect) kokoroVoiceSelect.classList.remove('hidden');
         if (voiceLabel) voiceLabel.innerText = '选择声音';
@@ -207,9 +249,53 @@ function onEngineChange() {
                 });
             }
         }
+    } else if (engine === 'sherpa') {
+        if (apiKeyBar) apiKeyBar.classList.add('hidden');
+        if (kokoroHint) kokoroHint.classList.add('hidden');
+        if (sherpaHint) sherpaHint.classList.remove('hidden');
+        if (voiceIdInput) voiceIdInput.classList.add('hidden');
+        if (kokoroVoiceSelect) kokoroVoiceSelect.classList.add('hidden');
+        if (voiceLabel) voiceLabel.innerText = '中文女声（小雅）';
+        if (zeroshotBox) zeroshotBox.classList.add('hidden');
+        if (zeroshotToggle) zeroshotToggle.closest('.form-control')?.classList.add('hidden');
+        // 切换到Sherpa时自动初始化
+        if (typeof SherpaTTS !== 'undefined') {
+            if (!window._sherpaTts) {
+                window._sherpaTts = new SherpaTTS();
+            }
+            if (!window._sherpaTts.isReady && !window._sherpaLoading) {
+                window._sherpaLoading = true;
+                const span = sherpaHint?.querySelector('span');
+                if (span) span.textContent = '正在加载 WASM 运行时和模型...';
+                window._sherpaTts.onStatus = (msg) => {
+                    if (span) span.textContent = msg;
+                };
+                window._sherpaTts.init().then(() => {
+                    if (span) span.textContent = '模型已就绪，可以合成';
+                    window._sherpaLoading = false;
+                }).catch(err => {
+                    const errMsg = err && err.message ? err.message : String(err);
+                    if (span) span.textContent = '加载失败: ' + errMsg + ' (点此重试)';
+                    window._sherpaLoading = false;
+                    if (sherpaHint) {
+                        sherpaHint.style.cursor = 'pointer';
+                        sherpaHint.onclick = () => {
+                            sherpaHint.style.cursor = '';
+                            sherpaHint.onclick = null;
+                            window._sherpaTts = null;
+                            onEngineChange();
+                        };
+                    }
+                });
+            } else if (window._sherpaTts.isReady) {
+                const span = sherpaHint?.querySelector('span');
+                if (span) span.textContent = '模型已就绪，可以合成';
+            }
+        }
     } else {
         if (apiKeyBar) apiKeyBar.classList.remove('hidden');
         if (kokoroHint) kokoroHint.classList.add('hidden');
+        if (sherpaHint) sherpaHint.classList.add('hidden');
         if (voiceIdInput) voiceIdInput.classList.remove('hidden');
         if (kokoroVoiceSelect) kokoroVoiceSelect.classList.add('hidden');
         if (voiceLabel) voiceLabel.innerText = '模型 ID (Voice/Ref ID)';
@@ -465,6 +551,27 @@ async function callTTS(text, engine, voiceId, apiKey, format, speed) {
                 }
             }
         });
+        return {
+            ok: true,
+            status: 200,
+            blob: async () => audioBlob,
+            json: async () => ({})
+        };
+    } else if (engine === 'sherpa') {
+        // Sherpa 本地离线合成：轻量模型，iOS 推荐
+        if (!window._sherpaTts) {
+            window._sherpaTts = new SherpaTTS();
+        }
+        if (!window._sherpaTts.isReady) {
+            const hint = document.getElementById('sherpa-hint');
+            const span = hint?.querySelector('span');
+            window._sherpaTts.onStatus = (msg) => { if (span) span.textContent = msg; };
+            await window._sherpaTts.init();
+            if (span) span.textContent = '模型已就绪，正在合成...';
+        }
+        const { samples, sampleRate } = await window._sherpaTts.synthesize(text, 0, speed);
+        // 将 Float32Array 转换为 WAV Blob
+        const audioBlob = float32ToWav(samples, sampleRate);
         return {
             ok: true,
             status: 200,

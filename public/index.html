@@ -194,7 +194,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 <!-- Kokoro 离线提示 -->
                 <div id="kokoro-hint" class="hidden p-3 bg-success/10 border border-success/20 rounded-xl mb-4 flex items-center gap-2 text-success text-sm">
                     <i class="fa-solid fa-shield-halved"></i>
-                    <span>Kokoro 本地离线模式：首次需下载约120MB模型，之后完全离线，文字不离开设备</span>
+                    <span>Kokoro 本地离线模式（仅桌面端推荐）：首次需下载约120MB模型，之后完全离线，文字不离开设备</span>
+                </div>
+
+                <!-- Sherpa 离线提示 -->
+                <div id="sherpa-hint" class="hidden p-3 bg-info/10 border border-info/20 rounded-xl mb-4 flex items-center gap-2 text-info text-sm">
+                    <i class="fa-solid fa-mobile-screen"></i>
+                    <span>Sherpa 离线模式（iOS/移动端推荐）：约20MB轻量模型，中文女声，完全离线运行</span>
                 </div>
 
                 <!-- Fish Audio 余额显示 -->
@@ -216,7 +222,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             <option value="fish">Fish TTS (推荐)</option>
                             <option value="siliconflow">SiliconFlow (硅基流动)</option>
                             <option value="aliyun">阿里云语音合成</option>
-                            <option value="kokoro">Kokoro (本地离线·中文女声)</option>
+                            <option value="sherpa">Sherpa (离线·中文女声·iOS推荐)</option>
+                            <option value="kokoro">Kokoro (离线·中文女声·仅桌面端)</option>
                         </select>
                     </div>
                     <div class="form-control w-full">
@@ -757,6 +764,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.KokoroTTS = KokoroTTS;
     </script>
     <script src="kokoro/kokoro-wrapper.js"></script>
+    <script src="sherpa/sherpa-tts-wrapper.js"></script>
     <script src="assets/js/app.js"></script>
 </body>
 </html>
