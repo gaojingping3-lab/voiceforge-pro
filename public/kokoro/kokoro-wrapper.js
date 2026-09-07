@@ -213,19 +213,35 @@
 
             if (onProgress) onProgress('loading', 98, '正在加载模型...');
 
-            // 加载模型（从 IndexedDB 读取，JS 内存里没有模型副本）
-            ttsInstance = await global.KokoroTTS.from_pretrained(MODEL_ID, {
-                dtype: 'q8',
-                device: device,
-                progress_callback: (progress) => {
-                    if (!onProgress) return;
-                    if (progress.status === 'done') {
-                        onProgress('loading', 100, '模型加载完成');
-                    }
+            // 尝试多个后端：webgpu -> webgl -> wasm
+            const backends = device === 'webgpu' ? ['webgpu', 'webgl', 'wasm'] : ['webgl', 'wasm'];
+            let lastErr = null;
+            for (const backend of backends) {
+                try {
+                    if (onProgress) onProgress('loading', 98, '尝试 ' + backend + ' 后端...');
+                    ttsInstance = await global.KokoroTTS.from_pretrained(MODEL_ID, {
+                        dtype: 'q8',
+                        device: backend === 'webgl' ? 'wasm' : backend,
+                        session_options: backend === 'webgl' ? { executionProviders: ['webgl'] } : undefined,
+                        progress_callback: (progress) => {
+                            if (!onProgress) return;
+                            if (progress.status === 'done') {
+                                onProgress('loading', 100, '模型加载完成');
+                            }
+                        }
+                    });
+                    lastErr = null;
+                    if (onProgress) onProgress('loading', 100, '模型已就绪（' + backend + '），可以合成');
+                    break;
+                } catch (err) {
+                    lastErr = err;
+                    console.warn('Kokoro backend', backend, 'failed:', err.message);
                 }
-            });
+            }
+            if (lastErr) {
+                throw new Error('所有后端都失败: ' + lastErr.message);
+            }
 
-            if (onProgress) onProgress('loading', 100, '模型已就绪，可以合成');
             return ttsInstance;
         })();
 
