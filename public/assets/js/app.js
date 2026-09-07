@@ -350,6 +350,16 @@ function saveModalKeys() {
     settings_modal.close();
 }
 
+// 打开设置弹窗：取消自动聚焦，防止手机端弹出键盘
+function openSettingsModal() {
+    settings_modal.showModal();
+    setTimeout(() => {
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
+    }, 0);
+}
+
 // Initial Sync
 onEngineChange();
 syncModalInputs();
@@ -1102,7 +1112,7 @@ async function sendChatMessage() {
 
     if (!llmKey) {
         alert('请先点击右上角齿轮 ⚙️ 设置大模型 API Key！');
-        settings_modal.showModal();
+        openSettingsModal();
         return;
     }
 
