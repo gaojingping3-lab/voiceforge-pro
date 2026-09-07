@@ -137,6 +137,7 @@ function initPullToRefresh() {
 // 聊天全屏模式切换
 function toggleChatFullscreen() {
     const isFull = document.body.classList.toggle('chat-fullscreen');
+    document.documentElement.classList.toggle('chat-fullscreen-html', isFull);
     const btn = document.querySelector('#chat-section .card-body > div:first-child button[onclick="toggleChatFullscreen()"] i');
     if (btn) {
         btn.className = isFull ? 'fa-solid fa-compress' : 'fa-solid fa-expand';
@@ -147,6 +148,7 @@ function toggleChatFullscreen() {
         document.body.style.setProperty('height', vh + 'px', 'important');
         const chatSection = document.getElementById('chat-section');
         if (chatSection) chatSection.style.setProperty('height', vh + 'px', 'important');
+        window.scrollTo(0, 0);
     }
     // 退出全屏时清除内联高度
     if (!isFull) {
@@ -165,15 +167,18 @@ function initFullscreenMode() {
     const isChatVisible = chatSection && !chatSection.classList.contains('hidden');
     if (localStorage.getItem('CHAT_FULLSCREEN') === '1' && isChatVisible) {
         document.body.classList.add('chat-fullscreen');
+        document.documentElement.classList.add('chat-fullscreen-html');
         const btn = document.querySelector('#chat-section .card-body > div:first-child button[onclick="toggleChatFullscreen()"] i');
         if (btn) btn.className = 'fa-solid fa-compress';
         // 设置body和卡片高度
         const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         document.body.style.setProperty('height', vh + 'px', 'important');
         if (chatSection) chatSection.style.setProperty('height', vh + 'px', 'important');
+        window.scrollTo(0, 0);
     } else {
         // 非聊天页面强制退出全屏
         document.body.classList.remove('chat-fullscreen');
+        document.documentElement.classList.remove('chat-fullscreen-html');
         localStorage.setItem('CHAT_FULLSCREEN', '0');
         document.body.style.height = '';
         if (chatSection) chatSection.style.height = '';
@@ -183,6 +188,7 @@ function initFullscreenMode() {
         const chat = document.getElementById('chat-section');
         if (chat && chat.classList.contains('hidden') && document.body.classList.contains('chat-fullscreen')) {
             document.body.classList.remove('chat-fullscreen');
+            document.documentElement.classList.remove('chat-fullscreen-html');
             localStorage.setItem('CHAT_FULLSCREEN', '0');
             document.body.style.height = '';
             if (chat) chat.style.height = '';
@@ -1167,18 +1173,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chatSection) {
             chatSection.style.setProperty('height', vh + 'px', 'important');
         }
+        // 强制页面滚动到顶部，防止iOS自动滚动把控制栏推上去
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
         // 强制重排
         if (chatSection) void chatSection.offsetWidth;
-        // 自动滚动聊天区域，触发浏览器重新计算布局
-        const chat = document.getElementById('chat-messages');
-        if (chat) {
-            const oldScroll = chat.scrollTop;
-            chat.scrollTop = oldScroll + 1;
-            setTimeout(() => { chat.scrollTop = oldScroll; }, 10);
-        }
         // 下一帧再重排一次
         requestAnimationFrame(() => {
+            window.scrollTo(0, 0);
             if (chatSection) void chatSection.offsetWidth;
+            const chat = document.getElementById('chat-messages');
             if (chat) chat.scrollTop = chat.scrollHeight;
         });
     }

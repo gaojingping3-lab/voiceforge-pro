@@ -225,7 +225,13 @@
 
   /* 聊天全屏模式 */
   body.chat-fullscreen {
-    position: relative !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    overflow: hidden !important;
+  }
+  html.chat-fullscreen-html {
     overflow: hidden !important;
   }
   body.chat-fullscreen .navbar,
