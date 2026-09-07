@@ -298,18 +298,18 @@
     opacity: 1 !important;
     pointer-events: auto !important;
   }
-  /* 设置分组折叠动画 */
-  .settings-group-content {
-    max-height: 1200px;
-    overflow: hidden;
-    transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
-    opacity: 1;
+  /* 设置分组折叠动画 - grid方案，精确无空跑 */
+  .settings-group-wrapper {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .settings-group-content.collapsed {
-    max-height: 0;
-    opacity: 0;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
+  .settings-group-wrapper.open {
+    grid-template-rows: 1fr;
+  }
+  .settings-group-wrapper > div {
+    overflow: hidden;
+    min-height: 0;
   }
   /* 白色主题卡片优化：增加背景色、边框、阴影，提升辨识度 */
   body:not(.theme-obsidian):not(.theme-dark) #dual-role-bar {
@@ -744,7 +744,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     </span>
                     <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200" id="tts-group-icon" style="transform: rotate(-90deg);"></i>
                 </h4>
-                <div id="tts-group" class="settings-group-content collapsed px-4 pb-4">
+                <div class="settings-group-wrapper" id="tts-group-wrapper">
+                <div id="tts-group" class="px-4 pb-4">
                 <div class="form-control mb-3">
                     <label class="label py-1"><span class="label-text text-sm">Fish Audio API Key</span></label>
                     <input type="password" id="modal-key-fish" class="input input-bordered input-sm w-full font-mono" placeholder="从 fish.audio 获取的 API Key" />
@@ -761,6 +762,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="text-xs text-base-content/50 mt-1">用于阿里云 CosyVoice 语音合成</span>
                 </div>
                 </div>
+                </div>
             </div>
 
             <!-- 卡片2：AI 对话配置 -->
@@ -771,7 +773,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     </span>
                     <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200" id="ai-group-icon"></i>
                 </h4>
-                <div id="ai-group" class="settings-group-content px-4 pb-4">
+                <div class="settings-group-wrapper open" id="ai-group-wrapper">
+                <div id="ai-group" class="px-4 pb-4">
                 <div class="form-control mb-3">
                     <label class="label py-1"><span class="label-text text-sm">大模型 API 地址 (Base URL)</span></label>
                     <input type="text" id="modal-llm-url" class="input input-bordered input-sm w-full font-mono" placeholder="https://api.deepseek.com" />
@@ -824,6 +827,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="text-xs text-base-content/50 mt-1">全量历史消耗更多 token，滑动窗口更省钱</span>
                 </div>
                 </div>
+                </div>
             </div>
 
             <!-- 卡片3：其他设置 -->
@@ -834,7 +838,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     </span>
                     <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200" id="other-group-icon" style="transform: rotate(-90deg);"></i>
                 </h4>
-                <div id="other-group" class="settings-group-content collapsed px-4 pb-4">
+                <div class="settings-group-wrapper" id="other-group-wrapper">
+                <div id="other-group" class="px-4 pb-4">
                 <div class="form-control mb-4">
                     <label class="label py-1 cursor-pointer" onclick="toggleRoleConstraint()">
                         <span class="label-text text-sm">角色扮演强约束</span>
@@ -873,6 +878,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <label class="label py-1"><span class="label-text text-sm">AI 角色设定 (System Prompt)</span></label>
                     <textarea id="modal-llm-system" class="textarea textarea-bordered textarea-sm w-full" rows="3" placeholder="你是乐。这是一个纯粹的私人虚构陪伴空间..."></textarea>
                     <span class="text-xs text-base-content/50 mt-1">自定义 AI 的性格、语气、身份等，留空使用默认设定</span>
+                </div>
                 </div>
                 </div>
             </div>

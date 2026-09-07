@@ -613,19 +613,19 @@ function saveModalKeys() {
 // 设置弹窗分组折叠/展开（手风琴效果：展开一个时自动收起其他）
 function toggleSettingsGroup(groupId) {
     const allGroups = ['tts-group', 'ai-group', 'other-group'];
-    const content = document.getElementById(groupId);
-    if (!content) return;
-    const willExpand = content.classList.contains('collapsed');
+    const wrapper = document.getElementById(groupId + '-wrapper');
+    if (!wrapper) return;
+    const willExpand = !wrapper.classList.contains('open');
     // 先收起所有
     allGroups.forEach(id => {
-        const c = document.getElementById(id);
+        const w = document.getElementById(id + '-wrapper');
         const icon = document.getElementById(id + '-icon');
-        if (c) c.classList.add('collapsed');
+        if (w) w.classList.remove('open');
         if (icon) icon.style.transform = 'rotate(-90deg)';
     });
     // 如果点击的是收起状态，则展开它
     if (willExpand) {
-        content.classList.remove('collapsed');
+        wrapper.classList.add('open');
         const icon = document.getElementById(groupId + '-icon');
         if (icon) icon.style.transform = 'rotate(0deg)';
     }
