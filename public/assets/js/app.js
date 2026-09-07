@@ -1185,12 +1185,11 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(adjustFullscreenHeight, 200);
         });
     }
-    // 输入框聚焦时也触发一次
+    // 输入框聚焦时也触发一次（只调一次，避免每次点击都动）
     const chatInputForKb = document.getElementById('chat-input');
     if (chatInputForKb) {
         chatInputForKb.addEventListener('focus', () => {
-            setTimeout(adjustFullscreenHeight, 200);
-            setTimeout(adjustFullscreenHeight, 500);
+            setTimeout(adjustFullscreenHeight, 300);
         });
         chatInputForKb.addEventListener('blur', () => {
             setTimeout(adjustFullscreenHeight, 200);
