@@ -222,6 +222,40 @@
   body.theme-obsidian .msg-context-menu button:hover { background: rgba(255,255,255,0.1); }
   .msg-context-menu button.danger { color: #ef4444; }
   .msg-long-press-active { background: rgba(99, 102, 241, 0.1) !important; border-radius: 8px; }
+
+  /* 聊天全屏模式 */
+  body.chat-fullscreen .navbar,
+  body.chat-fullscreen .tabs,
+  body.chat-fullscreen #chat-section > .card-body > div:first-child,
+  body.chat-fullscreen #mode-hint,
+  body.chat-fullscreen #role-card {
+    display: none !important;
+  }
+  body.chat-fullscreen #chat-section {
+    position: fixed !important;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 999;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+  body.chat-fullscreen #chat-section .card-body {
+    padding: 12px !important;
+    height: 100dvh !important;
+  }
+  body.chat-fullscreen main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    height: 100dvh !important;
+  }
+  body.chat-fullscreen #scroll-to-bottom-btn {
+    bottom: 80px !important;
+  }
+  body.chat-fullscreen #exit-fullscreen-btn {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
 </style>
 
 <div id="premium-bg-layer"></div>
@@ -385,8 +419,11 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="card-body p-4 sm:p-6 flex flex-col h-full relative">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="card-title text-lg"><i class="fa-solid fa-comments text-primary"></i> 与乐 语音对话</h2>
-                    <span id="total-tokens-display" class="text-xs text-gray-400 ml-2">0 tokens</span>
-                    <button class="btn btn-ghost btn-xs" onclick="clearChat()"><i class="fa-solid fa-trash"></i> 清空</button>
+                    <div class="flex items-center gap-1">
+                        <span id="total-tokens-display" class="text-xs text-gray-400 ml-2">0 tokens</span>
+                        <button class="btn btn-ghost btn-xs" onclick="toggleChatFullscreen()" title="全屏模式"><i class="fa-solid fa-expand"></i></button>
+                        <button class="btn btn-ghost btn-xs" onclick="clearChat()"><i class="fa-solid fa-trash"></i> 清空</button>
+                    </div>
                 </div>
 
                 <!-- 当前模式提示 -->
@@ -516,6 +553,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <!-- 回到底部按钮 -->
                 <button id="scroll-to-bottom-btn" onclick="scrollToBottom()" class="absolute bottom-20 right-6 z-20 btn btn-circle btn-sm bg-base-200/90 backdrop-blur shadow-lg opacity-0 pointer-events-none transition-all duration-200 hover:scale-110" title="回到底部">
                     <i class="fa-solid fa-arrow-down text-sm"></i>
+                </button>
+                <button id="exit-fullscreen-btn" onclick="toggleChatFullscreen()" class="absolute top-3 right-3 z-20 btn btn-circle btn-sm bg-base-200/90 backdrop-blur shadow-lg opacity-0 pointer-events-none transition-all duration-200 hover:scale-110" title="退出全屏">
+                    <i class="fa-solid fa-compress text-sm"></i>
                 </button>
                 <div class="flex gap-2 items-end">
                     <textarea id="chat-input" placeholder="跟乐说点什么..." class="textarea textarea-bordered textarea-sm flex-1 resize-none" rows="1" style="max-height: 100px; min-height: 40px;" oninput="autoResizeInput(); updateEmotionIndicator();" onkeydown="handleChatKeydown(event)"></textarea>

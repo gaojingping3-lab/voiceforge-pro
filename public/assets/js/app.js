@@ -134,6 +134,26 @@ function initPullToRefresh() {
     });
 }
 
+// 聊天全屏模式切换
+function toggleChatFullscreen() {
+    const isFull = document.body.classList.toggle('chat-fullscreen');
+    const btn = document.querySelector('#chat-section .card-body > div:first-child button[onclick="toggleChatFullscreen()"] i');
+    if (btn) {
+        btn.className = isFull ? 'fa-solid fa-compress' : 'fa-solid fa-expand';
+    }
+    localStorage.setItem('CHAT_FULLSCREEN', isFull ? '1' : '0');
+    sfxClick();
+}
+
+// 初始化全屏模式状态
+function initFullscreenMode() {
+    if (localStorage.getItem('CHAT_FULLSCREEN') === '1') {
+        document.body.classList.add('chat-fullscreen');
+        const btn = document.querySelector('#chat-section .card-body > div:first-child button[onclick="toggleChatFullscreen()"] i');
+        if (btn) btn.className = 'fa-solid fa-compress';
+    }
+}
+
 // 双击消息菜单
 function initLongPressMenu() {
     const container = document.getElementById('chat-messages');
@@ -1075,6 +1095,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initSmartScroll(); // 初始化智能滚动
     initPullToRefresh(); // 初始化下拉刷新
     initLongPressMenu(); // 初始化长按消息菜单
+    initFullscreenMode(); // 初始化全屏模式
 
     // 恢复双角色模式状态
     if (localStorage.getItem('DUAL_ROLE_MODE') === '1') {
