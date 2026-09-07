@@ -43,9 +43,15 @@ function isAtBottom(container) {
 
 function smartScroll(container) {
     if (!container) return;
-    // 完全不自动滚动，只标记有新消息并显示回到底部按钮
-    hasUnreadMessages = true;
-    updateScrollToBottomBtn();
+    // 用户在底部时自动滚动，往上翻历史时不滚，显示回到底部按钮
+    if (isAtBottom(container)) {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+        hasUnreadMessages = false;
+        updateScrollToBottomBtn();
+    } else {
+        hasUnreadMessages = true;
+        updateScrollToBottomBtn();
+    }
 }
 
 function updateScrollToBottomBtn() {
@@ -1581,6 +1587,7 @@ async function sendChatMessage() {
     }
 
     appendChatMessage(text, 'user');
+    scrollToBottom(); // 发消息后强制滚动到底部
     input.value = '';
     input.style.height = 'auto'; // 重置输入框高度
     sfxSend();
