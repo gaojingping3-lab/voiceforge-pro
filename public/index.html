@@ -549,8 +549,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </dialog>
 
-                <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 mb-3 relative">
-                    <button id="exit-fullscreen-btn" onclick="toggleChatFullscreen()" class="sticky top-0 ml-auto z-20 btn btn-circle btn-sm bg-base-200/90 backdrop-blur shadow-lg opacity-0 pointer-events-none transition-all duration-200 hover:scale-110 -mb-8" title="退出全屏">
+                <div class="relative flex-1 min-h-0 flex flex-col">
+                    <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 mb-3"></div>
+                    <button id="exit-fullscreen-btn" onclick="toggleChatFullscreen()" class="absolute top-2 right-2 z-20 btn btn-circle btn-sm bg-base-200/90 backdrop-blur shadow-lg opacity-0 pointer-events-none transition-all duration-200 hover:scale-110" title="退出全屏">
                         <i class="fa-solid fa-compress text-sm"></i>
                     </button>
                 </div>
