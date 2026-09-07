@@ -21,7 +21,7 @@ class SherpaTTS {
     if (this._readyPromise) return this._readyPromise;
 
     this._readyPromise = new Promise((resolve, reject) => {
-      this.worker = new Worker('/sherpa/sherpa-tts-worker.js?v=20260908e');
+      this.worker = new Worker('/sherpa/sherpa-tts-worker.js?v=20260908f');
 
       this.worker.onmessage = (e) => {
         const { type, message, sampleRate, numSpeakers } = e.data;
