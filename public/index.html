@@ -715,13 +715,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     <!-- Settings Modal -->
     <dialog id="settings_modal" class="modal modal-bottom sm:modal-middle">
-        <div class="modal-box glass-panel">
-            <div class="flex items-center justify-between border-b border-base-content/10 pb-2 mb-4">
+        <div class="modal-box glass-panel flex flex-col" style="max-height: 85vh;">
+            <div class="flex items-center justify-between border-b border-base-content/10 pb-2 mb-3 flex-shrink-0">
                 <h3 class="font-bold text-lg"><i class="fa-solid fa-sliders"></i> 全局设置</h3>
                 <button class="btn btn-ghost btn-md btn-circle" onclick="settings_modal.close()" title="关闭"><i class="fa-solid fa-xmark text-xl"></i></button>
             </div>
-            <p class="text-xs text-base-content/70 mb-4">所有设置保存在本地浏览器（LocalStorage），不会上传到服务器。</p>
+            <p class="text-xs text-base-content/70 mb-3 flex-shrink-0">所有设置保存在本地浏览器（LocalStorage），不会上传到服务器。</p>
 
+            <div class="flex-1 overflow-y-auto pr-1 -mr-1 min-h-0">
             <!-- 卡片1：TTS 引擎凭证 -->
             <div class="bg-base-200/60 rounded-xl p-4 mb-4">
                 <h4 class="font-bold text-sm mb-3 flex items-center gap-2">
@@ -847,9 +848,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="text-xs text-base-content/50 mt-1">自定义 AI 的性格、语气、身份等，留空使用默认设定</span>
                 </div>
             </div>
+            </div>
 
-            <div class="modal-action">
-                <button class="btn btn-primary btn-sm px-6 rounded-full" onclick="saveModalKeys()">保存设置</button>
+            <div class="modal-action pt-3 border-t border-base-content/10 flex-shrink-0 mt-2">
+                <button class="btn btn-primary btn-sm px-8 rounded-full" onclick="saveModalKeys()">保存设置</button>
             </div>
         </div>
         <form method="dialog" class="modal-backdrop">
