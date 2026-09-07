@@ -717,116 +717,135 @@ document.addEventListener('DOMContentLoaded', () => {
     <dialog id="settings_modal" class="modal modal-bottom sm:modal-middle">
         <div class="modal-box glass-panel">
             <div class="flex items-center justify-between border-b border-base-content/10 pb-2 mb-4">
-                <h3 class="font-bold text-lg"><i class="fa-solid fa-sliders"></i> 全局 API 凭证管理</h3>
+                <h3 class="font-bold text-lg"><i class="fa-solid fa-sliders"></i> 全局设置</h3>
                 <button class="btn btn-ghost btn-md btn-circle" onclick="settings_modal.close()" title="关闭"><i class="fa-solid fa-xmark text-xl"></i></button>
             </div>
-            <p class="text-xs text-base-content/70 mb-4">保存后将持久化储存在本地浏览器（LocalStorage）。在前端即可直接调用真实服务。</p>
-            
-            <div class="form-control mb-3">
-                <label class="label py-1"><span class="label-text text-sm">Fish TTS API Key</span></label>
-                <input type="password" id="modal-key-fish" class="input input-bordered input-sm w-full font-mono" placeholder="从 fish.audio 获取的 API Key" />
-            </div>
-            <div class="form-control mb-3">
-                <label class="label py-1"><span class="label-text text-sm">SiliconFlow (硅基流动) API Key</span></label>
-                <input type="password" id="modal-key-sili" class="input input-bordered input-sm w-full font-mono" placeholder="sk-..." />
-            </div>
-            <div class="form-control mb-6">
-                <label class="label py-1"><span class="label-text text-sm">阿里云 AppKey / Token</span></label>
-                <input type="password" id="modal-key-aliyun" class="input input-bordered input-sm w-full font-mono" placeholder="阿里云鉴权凭证" />
-            </div>
-            <div class="divider my-2 text-xs">AI 对话配置</div>
-            <div class="form-control mb-3">
-                <label class="label py-1"><span class="label-text text-sm">大模型 API 地址 (Base URL)</span></label>
-                <input type="text" id="modal-llm-url" class="input input-bordered input-sm w-full font-mono" placeholder="https://api.deepseek.com" />
-            </div>
-            <div class="form-control mb-3">
-                <label class="label py-1"><span class="label-text text-sm">大模型 API Key</span></label>
-                <input type="password" id="modal-llm-key" class="input input-bordered input-sm w-full font-mono" placeholder="sk-... (DeepSeek)" />
-            </div>
-            <div class="form-control mb-6">
-                <label class="label py-1"><span class="label-text text-sm">大模型名称 (Model)</span></label>
-                <input type="text" id="modal-llm-model" class="input input-bordered input-sm w-full font-mono" placeholder="deepseek-v4-flash" />
-            </div>
+            <p class="text-xs text-base-content/70 mb-4">所有设置保存在本地浏览器（LocalStorage），不会上传到服务器。</p>
 
-            <div class="form-control mb-6">
-                <label class="label py-1">
-                    <span class="label-text text-sm">温度滑块 (Temperature)</span>
-                    <span class="label-text-alt text-sm font-bold text-primary" id="temp-value">0.8</span>
-                </label>
-                <input type="range" id="modal-llm-temperature" min="0.1" max="1.0" step="0.1" value="0.8" class="range range-primary range-sm" oninput="document.getElementById('temp-value').innerText=this.value" />
-                <div class="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>冷静稳定</span>
-                    <span>活泼创意</span>
+            <!-- 卡片1：TTS 引擎凭证 -->
+            <div class="bg-base-200/60 rounded-xl p-4 mb-4">
+                <h4 class="font-bold text-sm mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-microphone-lines text-primary"></i> TTS 引擎凭证
+                </h4>
+                <div class="form-control mb-3">
+                    <label class="label py-1"><span class="label-text text-sm">Fish Audio API Key</span></label>
+                    <input type="password" id="modal-key-fish" class="input input-bordered input-sm w-full font-mono" placeholder="从 fish.audio 获取的 API Key" />
+                    <span class="text-xs text-base-content/50 mt-1">用于 Fish Audio 在线语音合成</span>
+                </div>
+                <div class="form-control mb-3">
+                    <label class="label py-1"><span class="label-text text-sm">SiliconFlow (硅基流动) API Key</span></label>
+                    <input type="password" id="modal-key-sili" class="input input-bordered input-sm w-full font-mono" placeholder="sk-..." />
+                    <span class="text-xs text-base-content/50 mt-1">用于 SiliconFlow 在线语音合成</span>
+                </div>
+                <div class="form-control">
+                    <label class="label py-1"><span class="label-text text-sm">阿里云 AppKey / Token</span></label>
+                    <input type="password" id="modal-key-aliyun" class="input input-bordered input-sm w-full font-mono" placeholder="阿里云鉴权凭证" />
+                    <span class="text-xs text-base-content/50 mt-1">用于阿里云 CosyVoice 语音合成</span>
                 </div>
             </div>
 
-            <div class="form-control mb-6">
-                <label class="label py-1">
-                    <span class="label-text text-sm">核采样 (Top-P)</span>
-                    <span class="label-text-alt text-sm font-bold text-primary" id="topp-value">0.9</span>
-                </label>
-                <input type="range" id="modal-llm-topp" min="0.1" max="1.0" step="0.1" value="0.9" class="range range-primary range-sm" oninput="document.getElementById('topp-value').innerText=this.value" />
-                <div class="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>保守稳定</span>
-                    <span>灵活发散</span>
+            <!-- 卡片2：AI 对话配置 -->
+            <div class="bg-base-200/60 rounded-xl p-4 mb-4">
+                <h4 class="font-bold text-sm mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-brain text-primary"></i> AI 对话配置
+                </h4>
+                <div class="form-control mb-3">
+                    <label class="label py-1"><span class="label-text text-sm">大模型 API 地址 (Base URL)</span></label>
+                    <input type="text" id="modal-llm-url" class="input input-bordered input-sm w-full font-mono" placeholder="https://api.deepseek.com" />
+                    <span class="text-xs text-base-content/50 mt-1">兼容 OpenAI 格式的 API 地址</span>
+                </div>
+                <div class="form-control mb-3">
+                    <label class="label py-1"><span class="label-text text-sm">大模型 API Key</span></label>
+                    <input type="password" id="modal-llm-key" class="input input-bordered input-sm w-full font-mono" placeholder="sk-... (DeepSeek)" />
+                    <span class="text-xs text-base-content/50 mt-1">大模型服务的访问密钥</span>
+                </div>
+                <div class="form-control mb-4">
+                    <label class="label py-1"><span class="label-text text-sm">大模型名称 (Model)</span></label>
+                    <input type="text" id="modal-llm-model" class="input input-bordered input-sm w-full font-mono" placeholder="deepseek-v4-flash" />
+                    <span class="text-xs text-base-content/50 mt-1">如 deepseek-v4-flash、gpt-4o-mini 等</span>
+                </div>
+                <div class="form-control mb-4">
+                    <label class="label py-1">
+                        <span class="label-text text-sm">温度 (Temperature)</span>
+                        <span class="label-text-alt text-sm font-bold text-primary" id="temp-value">0.8</span>
+                    </label>
+                    <input type="range" id="modal-llm-temperature" min="0.1" max="1.0" step="0.1" value="0.8" class="range range-primary range-sm" oninput="document.getElementById('temp-value').innerText=this.value" />
+                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>冷静稳定</span>
+                        <span>活泼创意</span>
+                    </div>
+                    <span class="text-xs text-base-content/50 mt-1">越高回答越随机有创意，越低越稳定准确</span>
+                </div>
+                <div class="form-control mb-4">
+                    <label class="label py-1">
+                        <span class="label-text text-sm">核采样 (Top-P)</span>
+                        <span class="label-text-alt text-sm font-bold text-primary" id="topp-value">0.9</span>
+                    </label>
+                    <input type="range" id="modal-llm-topp" min="0.1" max="1.0" step="0.1" value="0.9" class="range range-primary range-sm" oninput="document.getElementById('topp-value').innerText=this.value" />
+                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>保守稳定</span>
+                        <span>灵活发散</span>
+                    </div>
+                    <span class="text-xs text-base-content/50 mt-1">控制候选词范围，越小越保守，越大越多样</span>
+                </div>
+                <div class="form-control">
+                    <label class="label py-1"><span class="label-text text-sm">上下文模式</span></label>
+                    <div class="flex gap-2">
+                        <button type="button" id="ctx-mode-full" class="flex-1 py-2 px-2 rounded-lg border border-primary bg-primary/10 text-primary text-xs" onclick="setCtxMode('full')">
+                            全量历史<br /><span class="text-[10px] opacity-70">记住全部对话</span>
+                        </button>
+                        <button type="button" id="ctx-mode-slide" class="flex-1 py-2 px-2 rounded-lg border border-base-300 text-xs" onclick="setCtxMode('slide')">
+                            滑动窗口<br /><span class="text-[10px] opacity-70">仅最近4轮，防降智</span>
+                        </button>
+                    </div>
+                    <span class="text-xs text-base-content/50 mt-1">全量历史消耗更多 token，滑动窗口更省钱</span>
                 </div>
             </div>
 
-            <div class="form-control mb-6">
-                <label class="label py-1"><span class="label-text text-sm">上下文模式</span></label>
-                <div class="flex gap-2">
-                    <button type="button" id="ctx-mode-full" class="flex-1 py-2 px-2 rounded-lg border border-primary bg-primary/10 text-primary text-xs" onclick="setCtxMode('full')">
-                        全量历史<br /><span class="text-[10px] opacity-70">记住全部对话</span>
-                    </button>
-                    <button type="button" id="ctx-mode-slide" class="flex-1 py-2 px-2 rounded-lg border border-base-300 text-xs" onclick="setCtxMode('slide')">
-                        滑动窗口<br /><span class="text-[10px] opacity-70">仅最近4轮，防降智</span>
-                    </button>
+            <!-- 卡片3：其他设置 -->
+            <div class="bg-base-200/60 rounded-xl p-4 mb-4">
+                <h4 class="font-bold text-sm mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-gear text-primary"></i> 其他设置
+                </h4>
+                <div class="form-control mb-4">
+                    <label class="label py-1 cursor-pointer" onclick="toggleRoleConstraint()">
+                        <span class="label-text text-sm">角色扮演强约束</span>
+                        <input type="checkbox" id="role-constraint-toggle" class="toggle toggle-primary toggle-sm" checked />
+                    </label>
+                    <span class="text-xs text-base-content/50">开启后强制动作描写、禁止代打、去AI味；普通问答可关闭</span>
                 </div>
-            </div>
-
-            <div class="form-control mb-6">
-                <label class="label py-1 cursor-pointer" onclick="toggleRoleConstraint()">
-                    <span class="label-text text-sm">角色扮演强约束</span>
-                    <input type="checkbox" id="role-constraint-toggle" class="toggle toggle-primary toggle-sm" checked />
-                </label>
-                <label class="label py-0"><span class="label-text text-xs text-gray-500">开启后强制动作描写、禁止代打、去AI味；普通问答可关闭</span></label>
-            </div>
-
-            <div class="form-control mb-6">
-                <label class="label py-1 cursor-pointer">
-                    <span class="label-text text-sm">音效开关</span>
-                    <input type="checkbox" id="sound-toggle" class="toggle toggle-primary toggle-sm" checked />
-                </label>
-                <label class="label py-0"><span class="label-text text-xs text-gray-500">关闭后所有操作音效静音</span></label>
-            </div>
-
-            <div class="form-control mb-6">
-                <label class="label py-1 cursor-pointer">
-                    <span class="label-text text-sm">双角色互聊模式</span>
-                    <input type="checkbox" id="dual-role-toggle" class="toggle toggle-primary toggle-sm" onchange="toggleDualRoleMode()" />
-                </label>
-                <label class="label py-0"><span class="label-text text-xs text-gray-500">开启后两个AI角色互相对话，你可以插话介入</span></label>
-            </div>
-
-            <div class="form-control mb-6">
-                <label class="label py-1">
-                    <span class="label-text text-sm">双角色对话间隔</span>
-                    <span class="label-text text-sm" id="dual-interval-value">6秒</span>
-                </label>
-                <input type="range" id="dual-interval" min="2" max="15" value="6" class="range range-primary range-sm" oninput="document.getElementById('dual-interval-value').innerText = this.value + '秒'" />
-                <label class="label py-0"><span class="label-text text-xs text-gray-500">两个角色每次对话之间的等待时间（2-15秒）</span></label>
-            </div>
-
-            <div class="form-control mb-6">
-                <label class="label py-1"><span class="label-text text-sm">用户角色设定（角色C）</span></label>
-                <textarea id="user-role-desc" class="textarea textarea-bordered textarea-sm w-full" rows="3" placeholder="描述你自己的身份、性格、和两个角色的关系..."></textarea>
-                <label class="label py-0"><span class="label-text text-xs text-gray-500">双角色互聊时，你作为角色C的设定，两个AI会根据这个设定和你互动</span></label>
-            </div>
-
-            <div class="form-control mb-6">
-                <label class="label py-1"><span class="label-text text-sm">AI 角色设定 (System Prompt)</span></label>
-                <textarea id="modal-llm-system" class="textarea textarea-bordered textarea-sm w-full" rows="4" placeholder="你是乐。这是一个纯粹的私人虚构陪伴空间..."></textarea>
-                <label class="label py-0"><span class="label-text text-xs text-gray-500">自定义 AI 的性格、语气、身份等，留空使用默认设定</span></label>
+                <div class="form-control mb-4">
+                    <label class="label py-1 cursor-pointer">
+                        <span class="label-text text-sm">音效开关</span>
+                        <input type="checkbox" id="sound-toggle" class="toggle toggle-primary toggle-sm" checked />
+                    </label>
+                    <span class="text-xs text-base-content/50">关闭后所有操作音效静音</span>
+                </div>
+                <div class="form-control mb-4">
+                    <label class="label py-1 cursor-pointer">
+                        <span class="label-text text-sm">双角色互聊模式</span>
+                        <input type="checkbox" id="dual-role-toggle" class="toggle toggle-primary toggle-sm" onchange="toggleDualRoleMode()" />
+                    </label>
+                    <span class="text-xs text-base-content/50">开启后两个AI角色互相对话，你可以插话介入</span>
+                </div>
+                <div class="form-control mb-4">
+                    <label class="label py-1">
+                        <span class="label-text text-sm">双角色对话间隔</span>
+                        <span class="label-text text-sm" id="dual-interval-value">6秒</span>
+                    </label>
+                    <input type="range" id="dual-interval" min="2" max="15" value="6" class="range range-primary range-sm" oninput="document.getElementById('dual-interval-value').innerText = this.value + '秒'" />
+                    <span class="text-xs text-base-content/50 mt-1">两个角色每次对话之间的等待时间（2-15秒）</span>
+                </div>
+                <div class="form-control mb-4">
+                    <label class="label py-1"><span class="label-text text-sm">用户角色设定（角色C）</span></label>
+                    <textarea id="user-role-desc" class="textarea textarea-bordered textarea-sm w-full" rows="2" placeholder="描述你自己的身份、性格、和两个角色的关系..."></textarea>
+                    <span class="text-xs text-base-content/50 mt-1">双角色互聊时，你作为角色C的设定</span>
+                </div>
+                <div class="form-control">
+                    <label class="label py-1"><span class="label-text text-sm">AI 角色设定 (System Prompt)</span></label>
+                    <textarea id="modal-llm-system" class="textarea textarea-bordered textarea-sm w-full" rows="3" placeholder="你是乐。这是一个纯粹的私人虚构陪伴空间..."></textarea>
+                    <span class="text-xs text-base-content/50 mt-1">自定义 AI 的性格、语气、身份等，留空使用默认设定</span>
+                </div>
             </div>
 
             <div class="modal-action">
