@@ -224,17 +224,28 @@
             for (const backend of backends) {
                 try {
                     if (onProgress) onProgress('loading', 98, '尝试 ' + backend + ' 后端...');
-                    ttsInstance = await global.KokoroTTS.from_pretrained(MODEL_ID, {
+                    const opts = {
                         dtype: 'q8',
                         device: backend === 'webgl' ? 'wasm' : backend,
-                        session_options: backend === 'webgl' ? { executionProviders: ['webgl'] } : undefined,
                         progress_callback: (progress) => {
                             if (!onProgress) return;
                             if (progress.status === 'done') {
                                 onProgress('loading', 100, '模型加载完成');
                             }
                         }
-                    });
+                    };
+                    // WASM 节俭模式：关闭内存预分配，降低优化等级，减少内存膨胀
+                    if (backend === 'wasm') {
+                        opts.session_options = {
+                            executionProviders: ['wasm'],
+                            enableCpuMemArena: false,
+                            graphOptimizationLevel: 'basic',
+                            executionMode: 'sequential'
+                        };
+                    } else if (backend === 'webgl') {
+                        opts.session_options = { executionProviders: ['webgl'] };
+                    }
+                    ttsInstance = await global.KokoroTTS.from_pretrained(MODEL_ID, opts);
                     lastErr = null;
                     if (onProgress) onProgress('loading', 100, '模型已就绪（' + backend + '），可以合成');
                     break;
