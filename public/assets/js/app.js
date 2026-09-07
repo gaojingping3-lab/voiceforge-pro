@@ -141,6 +141,12 @@ function toggleChatFullscreen() {
     if (btn) {
         btn.className = isFull ? 'fa-solid fa-compress' : 'fa-solid fa-expand';
     }
+    // 退出全屏时清除内联高度
+    if (!isFull) {
+        const chatSection = document.getElementById('chat-section');
+        if (chatSection) chatSection.style.height = '';
+        document.body.style.height = '';
+    }
     localStorage.setItem('CHAT_FULLSCREEN', isFull ? '1' : '0');
     sfxClick();
 }
@@ -1141,6 +1147,13 @@ document.addEventListener('DOMContentLoaded', () => {
         window.visualViewport.addEventListener('resize', () => {
             const vh = window.visualViewport.height;
             document.body.style.height = vh + 'px';
+            // 全屏模式下调整聊天卡片高度，确保控制栏和输入框可见
+            if (document.body.classList.contains('chat-fullscreen')) {
+                const chatSection = document.getElementById('chat-section');
+                if (chatSection) {
+                    chatSection.style.height = vh + 'px';
+                }
+            }
             // 滚动聊天区域到底部
             setTimeout(() => {
                 const chat = document.getElementById('chat-messages');

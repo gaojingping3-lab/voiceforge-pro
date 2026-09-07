@@ -238,16 +238,27 @@
     border-radius: 0 !important;
     margin: 0 !important;
     max-width: 100% !important;
+    height: 100dvh !important;
   }
   body.chat-fullscreen #chat-section .card-body {
     padding: 12px !important;
-    height: 100dvh !important;
+    height: 100% !important;
   }
   body.chat-fullscreen main {
     padding: 0 !important;
     margin: 0 !important;
     max-width: 100% !important;
     height: 100dvh !important;
+  }
+  /* 全屏模式下控制栏和输入框不被挤压 */
+  body.chat-fullscreen #dual-role-bar,
+  body.chat-fullscreen #chat-messages,
+  body.chat-fullscreen .flex.gap-2.items-end {
+    flex-shrink: 0 !important;
+  }
+  body.chat-fullscreen #chat-messages {
+    flex-shrink: 1 !important;
+    min-height: 0 !important;
   }
   body.chat-fullscreen #scroll-to-bottom-btn {
     bottom: 80px !important;
