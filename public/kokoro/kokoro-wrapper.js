@@ -84,9 +84,10 @@
             } catch (e) { /* 回退 WASM */ }
 
             // 尝试多个镜像源，每个最多重试2次
+            // 注意：hf-mirror国内镜像大文件不稳定，优先用官方源（需梯子）
             const mirrors = [
-                { name: 'hf-mirror国内镜像', host: 'https://hf-mirror.com' },
-                { name: 'HuggingFace官方', host: 'https://huggingface.co' }
+                { name: 'HuggingFace官方', host: 'https://huggingface.co' },
+                { name: 'hf-mirror国内镜像', host: 'https://hf-mirror.com' }
             ];
             const maxRetries = 2;
             let lastError = null;
@@ -97,11 +98,11 @@
                     try {
                         if (onProgress) {
                             onProgress('loading', 3,
-                                '正在下载模型（' + mirror.name + '，约40MB，第' + attempt + '次尝试）...');
+                                '正在下载模型（' + mirror.name + '，约120MB，第' + attempt + '次尝试）...');
                         }
 
                         ttsInstance = await global.KokoroTTS.from_pretrained(MODEL_ID, {
-                            dtype: 'q4',
+                            dtype: 'q8',
                             device: device,
                             envConfig: { remoteHost: mirror.host },
                             progress_callback: (progress) => {
