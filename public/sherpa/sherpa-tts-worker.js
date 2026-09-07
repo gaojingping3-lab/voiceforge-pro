@@ -2,7 +2,8 @@
 // 基于官方 sherpa-onnx WASM TTS Worker，模型已打包进 .data 文件
 
 let tts = null;
-const VERSION = '?v=20260908g';
+const VERSION = '?v=20260908h';
+let wasmLogs = [];
 
 self.Module = {
   locateFile: function (path, scriptDirectory) {
@@ -15,10 +16,17 @@ self.Module = {
       self.postMessage({ type: 'status', message: status });
     }
   },
+  print: function (text) {
+    wasmLogs.push('[stdout] ' + text);
+    if (wasmLogs.length > 50) wasmLogs.shift();
+  },
+  printErr: function (text) {
+    wasmLogs.push('[stderr] ' + text);
+    if (wasmLogs.length > 50) wasmLogs.shift();
+  },
   onRuntimeInitialized: function () {
     self.postMessage({ type: 'status', message: '正在初始化语音模型...' });
     try {
-      // 完整配置（包含所有模型字段，避免initConfig访问undefined）
       const config = {
         offlineTtsModelConfig: {
           offlineTtsVitsModelConfig: {
@@ -30,24 +38,6 @@ self.Module = {
             noiseScaleW: 0.8,
             lengthScale: 1.0,
           },
-          offlineTtsMatchaModelConfig: {
-            acousticModel: '', vocoder: '', lexicon: '', tokens: '', dataDir: '',
-            noiseScale: 0.667, lengthScale: 1.0,
-          },
-          offlineTtsKokoroModelConfig: {
-            model: '', voices: '', tokens: '', dataDir: '', lengthScale: 1.0, lexicon: '', lang: '',
-          },
-          offlineTtsKittenModelConfig: {
-            model: '', voices: '', tokens: '', dataDir: '', lengthScale: 1.0,
-          },
-          offlineTtsZipVoiceModelConfig: {
-            tokens: '', encoder: '', decoder: '', vocoder: '', dataDir: '', lexicon: '',
-            featScale: 0.1, tShift: 0.5, targetRMS: 0.1, guidanceScale: 1.0,
-          },
-          offlineTtsPocketModelConfig: {
-            lmFlow: '', lmMain: '', encoder: '', decoder: '', textConditioner: '',
-            vocabJson: '', tokenScoresJson: '', voiceEmbeddingCacheCapacity: 50,
-          },
           numThreads: 1,
           debug: 1,
           provider: 'cpu',
@@ -56,7 +46,54 @@ self.Module = {
         ruleFars: '',
         maxNumSentences: 1,
       };
-      tts = createOfflineTts(self.Module, config);
+
+      // 手动初始化配置并创建TTS，检查handle是否为0
+      const wasmConfig = initSherpaOnnxOfflineTtsConfig(config, self.Module);
+      const handle = self.Module._SherpaOnnxCreateOfflineTts(wasmConfig.ptr);
+      freeConfig(wasmConfig, self.Module);
+
+      self.postMessage({ type: 'status', message: 'TTS handle=' + handle + ', logs=' + wasmLogs.slice(-5).join(' | ') });
+
+      if (!handle) {
+        throw new Error('SherpaOnnxCreateOfflineTts返回0（模型加载失败）。WASM日志: ' + wasmLogs.join('\n'));
+      }
+
+      // handle有效，手动构造OfflineTts对象
+      tts = {
+        handle: handle,
+        sampleRate: self.Module._SherpaOnnxOfflineTtsSampleRate(handle),
+        numSpeakers: self.Module._SherpaOnnxOfflineTtsNumSpeakers(handle),
+        Module: self.Module,
+        generate: function (genConfig) {
+          const textLen = this.Module.lengthBytesUTF8(genConfig.text) + 1;
+          const textPtr = this.Module._malloc(textLen);
+          this.Module.stringToUTF8(genConfig.text, textPtr, textLen);
+          const cfgWasm = initSherpaOnnxGenerationConfig({
+            sid: genConfig.sid ?? 0,
+            speed: genConfig.speed ?? 1.0,
+          }, this.Module);
+          const h = this.Module._SherpaOnnxOfflineTtsGenerateWithConfig(
+            this.handle, textPtr, cfgWasm.ptr, 0, 0);
+          freeSherpaOnnxGenerationConfig(cfgWasm, this.Module);
+          this.Module._free(textPtr);
+          if (!h) throw new Error('TTS generation failed');
+          const base = h / 4;
+          const samplesPtr = this.Module.HEAPU32[base];
+          const numSamples = this.Module.HEAP32[base + 1];
+          const sampleRate = this.Module.HEAP32[base + 2];
+          const samples = new Float32Array(numSamples);
+          samples.set(this.Module.HEAPF32.subarray(samplesPtr / 4, samplesPtr / 4 + numSamples));
+          this.Module._SherpaOnnxDestroyOfflineTtsGeneratedAudio(h);
+          return { samples: samples, sampleRate: sampleRate };
+        },
+        free: function () {
+          if (this.handle) {
+            this.Module._SherpaOnnxDestroyOfflineTts(this.handle);
+            this.handle = 0;
+          }
+        },
+      };
+
       self.postMessage({
         type: 'ready',
         sampleRate: tts.sampleRate,
@@ -71,6 +108,7 @@ self.Module = {
       } else {
         detail = String(e);
       }
+      detail += '\nWASM日志: ' + wasmLogs.join('\n');
       self.postMessage({ type: 'error', message: '模型初始化失败: ' + detail });
     }
   },
