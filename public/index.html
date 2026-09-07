@@ -300,10 +300,10 @@
   }
   /* 设置分组折叠动画 */
   .settings-group-content {
-    max-height: 2000px;
+    max-height: 1200px;
     overflow: hidden;
+    transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
     opacity: 1;
-    transition: max-height 0.35s ease, opacity 0.25s ease, padding 0.3s ease;
   }
   .settings-group-content.collapsed {
     max-height: 0;
