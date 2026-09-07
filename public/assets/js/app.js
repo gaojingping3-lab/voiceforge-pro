@@ -141,15 +141,13 @@ function toggleChatFullscreen() {
     if (btn) {
         btn.className = isFull ? 'fa-solid fa-compress' : 'fa-solid fa-expand';
     }
-    // 进入全屏时如果键盘已弹出，立即调整高度
-    if (isFull && window.visualViewport) {
-        const chatSection = document.getElementById('chat-section');
-        if (chatSection) chatSection.style.setProperty('height', window.visualViewport.height + 'px', 'important');
+    // 进入全屏时设置body高度
+    if (isFull) {
+        const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        document.body.style.setProperty('height', vh + 'px', 'important');
     }
     // 退出全屏时清除内联高度
     if (!isFull) {
-        const chatSection = document.getElementById('chat-section');
-        if (chatSection) chatSection.style.height = '';
         document.body.style.height = '';
     }
     localStorage.setItem('CHAT_FULLSCREEN', isFull ? '1' : '0');
@@ -165,10 +163,14 @@ function initFullscreenMode() {
         document.body.classList.add('chat-fullscreen');
         const btn = document.querySelector('#chat-section .card-body > div:first-child button[onclick="toggleChatFullscreen()"] i');
         if (btn) btn.className = 'fa-solid fa-compress';
+        // 设置body高度
+        const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        document.body.style.setProperty('height', vh + 'px', 'important');
     } else {
         // 非聊天页面强制退出全屏
         document.body.classList.remove('chat-fullscreen');
         localStorage.setItem('CHAT_FULLSCREEN', '0');
+        document.body.style.height = '';
     }
     // 持续检查：非聊天页面时强制退出全屏
     setInterval(() => {
@@ -176,6 +178,7 @@ function initFullscreenMode() {
         if (chat && chat.classList.contains('hidden') && document.body.classList.contains('chat-fullscreen')) {
             document.body.classList.remove('chat-fullscreen');
             localStorage.setItem('CHAT_FULLSCREEN', '0');
+            document.body.style.height = '';
         }
     }, 500);
 }
@@ -1150,16 +1153,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // 键盘弹出时自动调整，防止输入框被遮挡
     function adjustFullscreenHeight() {
         if (!document.body.classList.contains('chat-fullscreen')) return;
-        const chatSection = document.getElementById('chat-section');
-        if (!chatSection) return;
         const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-        chatSection.style.setProperty('height', vh + 'px', 'important');
-        document.body.style.height = vh + 'px';
+        // 只改body高度，卡片用absolute top:0 bottom:0自动撑满
+        document.body.style.setProperty('height', vh + 'px', 'important');
         // 强制重排
-        void chatSection.offsetWidth;
-        // 下一帧再重排一次，确保布局完全更新
+        const chatSection = document.getElementById('chat-section');
+        if (chatSection) void chatSection.offsetWidth;
+        // 下一帧再重排一次
         requestAnimationFrame(() => {
-            void chatSection.offsetWidth;
+            if (chatSection) void chatSection.offsetWidth;
             const chat = document.getElementById('chat-messages');
             if (chat) chat.scrollTop = chat.scrollHeight;
         });
@@ -1167,12 +1169,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => {
             adjustFullscreenHeight();
-            // 延迟再调一次，确保键盘完全弹出后布局正确
             setTimeout(adjustFullscreenHeight, 100);
             setTimeout(adjustFullscreenHeight, 300);
         });
     }
-    // 输入框聚焦时也触发一次（有些键盘弹出不触发visualViewport.resize）
+    // 输入框聚焦时也触发一次
     const chatInputForKb = document.getElementById('chat-input');
     if (chatInputForKb) {
         chatInputForKb.addEventListener('focus', () => {
