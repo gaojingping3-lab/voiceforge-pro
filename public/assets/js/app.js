@@ -610,18 +610,24 @@ function saveModalKeys() {
     settings_modal.close();
 }
 
-// 设置弹窗分组折叠/展开
+// 设置弹窗分组折叠/展开（手风琴效果：展开一个时自动收起其他）
 function toggleSettingsGroup(groupId) {
+    const allGroups = ['tts-group', 'ai-group', 'other-group'];
     const content = document.getElementById(groupId);
-    const icon = document.getElementById(groupId + '-icon');
     if (!content) return;
-    content.classList.toggle('hidden');
-    if (icon) {
-        if (content.classList.contains('hidden')) {
-            icon.style.transform = 'rotate(-90deg)';
-        } else {
-            icon.style.transform = 'rotate(0deg)';
-        }
+    const willExpand = content.classList.contains('hidden');
+    // 先收起所有
+    allGroups.forEach(id => {
+        const c = document.getElementById(id);
+        const icon = document.getElementById(id + '-icon');
+        if (c) c.classList.add('hidden');
+        if (icon) icon.style.transform = 'rotate(-90deg)';
+    });
+    // 如果点击的是收起状态，则展开它
+    if (willExpand) {
+        content.classList.remove('hidden');
+        const icon = document.getElementById(groupId + '-icon');
+        if (icon) icon.style.transform = 'rotate(0deg)';
     }
 }
 
