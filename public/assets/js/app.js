@@ -1,4 +1,22 @@
 
+// 自动检测版本更新，有新版本自动刷新（不丢localStorage数据）
+(async function checkAppUpdate() {
+    try {
+        const currentVer = document.querySelector('meta[name="app-version"]')?.content || '';
+        if (!currentVer) return;
+        if (sessionStorage.getItem('vf_checked_' + currentVer)) return;
+        sessionStorage.setItem('vf_checked_' + currentVer, '1');
+        const resp = await fetch('/?v=' + Date.now(), { cache: 'no-store' });
+        const html = await resp.text();
+        const match = html.match(/<meta[^>]+name=["']app-version["'][^>]+content=["']([^"']+)["']/);
+        const latestVer = match ? match[1] : '';
+        if (latestVer && latestVer !== currentVer) {
+            console.log('发现新版本:', currentVer, '->', latestVer, '自动刷新');
+            location.reload();
+        }
+    } catch (e) { console.log('版本检测失败:', e); }
+})();
+
 // ============================================
 // 情绪感知系统
 // ============================================
