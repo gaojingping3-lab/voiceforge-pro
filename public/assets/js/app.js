@@ -192,7 +192,8 @@ function onEngineChange() {
                     if (span) span.textContent = '模型已就绪，可以合成';
                     window._kokoroPreloading = false;
                 }).catch(err => {
-                    if (span) span.textContent = '下载失败，点此重试';
+                    const errMsg = err && err.message ? err.message : String(err);
+                    if (span) span.textContent = '下载失败: ' + errMsg + ' (点此重试)';
                     window._kokoroPreloading = false;
                     // 点击提示条重试
                     if (kokoroHint) {

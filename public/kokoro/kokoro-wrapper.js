@@ -8,8 +8,12 @@
     'use strict';
 
     const MODEL_ID = 'onnx-community/Kokoro-82M-v1.1-zh-ONNX';
-    // jsDelivr CDN 基础路径（代理 GitHub 仓库文件）
-    const CDN_BASE = 'https://cdn.jsdelivr.net/gh/gaojingping3-lab/voiceforge-pro@main/public/models/kokoro';
+    // 多个 CDN 下载源，自动回退
+    const CDN_BASES = [
+        'https://cdn.jsdelivr.net/gh/gaojingping3-lab/voiceforge-pro@main/public/models/kokoro',
+        'https://cdn.statically.io/gh/gaojingping3-lab/voiceforge-pro/main/public/models/kokoro',
+        'https://raw.githubusercontent.com/gaojingping3-lab/voiceforge-pro/main/public/models/kokoro'
+    ];
     let ttsInstance = null;
     let loadPromise = null;
     let modelBlobs = null; // 本地缓存的模型文件
@@ -59,7 +63,7 @@
         });
     }
 
-    // 从 jsDelivr CDN 下载所有模型文件并合并
+    // 从多个 CDN 下载所有模型文件并合并
     async function downloadModelFiles(onProgress) {
         if (modelBlobs) return modelBlobs;
 
@@ -68,30 +72,32 @@
 
         for (let i = 0; i < total; i++) {
             const file = MODEL_FILES[i];
-            const url = CDN_BASE + '/' + file;
             const pct = Math.round(i / total * 100);
             const shortName = file.split('/').pop();
 
             if (onProgress) onProgress('loading', pct, '下载 ' + shortName + '...');
 
-            // 最多重试3次
+            // 尝试多个下载源
             let lastErr = null;
-            for (let attempt = 1; attempt <= 3; attempt++) {
-                try {
-                    const resp = await fetch(url, { cache: 'force-cache' });
-                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-                    blobs[file] = await resp.blob();
-                    lastErr = null;
-                    break;
-                } catch (err) {
-                    lastErr = err;
-                    if (attempt < 3) {
-                        await new Promise(r => setTimeout(r, 1000));
+            let downloaded = false;
+            for (let baseIdx = 0; baseIdx < CDN_BASES.length && !downloaded; baseIdx++) {
+                const url = CDN_BASES[baseIdx] + '/' + file;
+                for (let attempt = 1; attempt <= 2 && !downloaded; attempt++) {
+                    try {
+                        const resp = await fetch(url);
+                        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                        blobs[file] = await resp.blob();
+                        downloaded = true;
+                    } catch (err) {
+                        lastErr = err;
+                        if (attempt < 2) {
+                            await new Promise(r => setTimeout(r, 500));
+                        }
                     }
                 }
             }
-            if (lastErr) {
-                throw new Error('下载失败: ' + shortName + ' - ' + lastErr.message);
+            if (!downloaded) {
+                throw new Error('下载失败: ' + shortName + ' - ' + (lastErr ? lastErr.message : 'unknown'));
             }
         }
 
