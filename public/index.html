@@ -224,19 +224,25 @@
   .msg-long-press-active { background: rgba(99, 102, 241, 0.1) !important; border-radius: 8px; }
 
   /* 聊天全屏模式 */
+  html.chat-fullscreen-html {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+  }
   body.chat-fullscreen {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
     width: 100% !important;
     overflow: hidden !important;
-    background: inherit !important;
+    margin: 0 !important;
   }
   body.chat-fullscreen #chat-section {
     height: 100% !important;
-  }
-  html.chat-fullscreen-html {
-    overflow: hidden !important;
+    margin: 0 !important;
   }
   body.chat-fullscreen .navbar,
   body.chat-fullscreen .tabs,
