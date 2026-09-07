@@ -183,7 +183,7 @@ function initFullscreenMode() {
         document.body.style.height = '';
         if (chatSection) chatSection.style.height = '';
     }
-    // 持续检查：非聊天页面时强制退出全屏
+    // 持续检查：非聊天页面时强制退出全屏（降低频率减少开销）
     setInterval(() => {
         const chat = document.getElementById('chat-section');
         if (chat && chat.classList.contains('hidden') && document.body.classList.contains('chat-fullscreen')) {
@@ -193,7 +193,7 @@ function initFullscreenMode() {
             document.body.style.height = '';
             if (chat) chat.style.height = '';
         }
-    }, 500);
+    }, 1500);
 }
 
 // 双击消息菜单
@@ -1168,21 +1168,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!document.body.classList.contains('chat-fullscreen')) return;
         const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         const chatSection = document.getElementById('chat-section');
-        // 同时设置body和卡片高度
-        document.body.style.setProperty('height', vh + 'px', 'important');
-        if (chatSection) {
-            chatSection.style.setProperty('height', vh + 'px', 'important');
-        }
-        // 强制页面滚动到顶部，防止iOS自动滚动把控制栏推上去
-        window.scrollTo(0, 0);
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-        // 强制重排
-        if (chatSection) void chatSection.offsetWidth;
-        // 下一帧再重排一次
+        // 用requestAnimationFrame批量更新，避免多次重排
         requestAnimationFrame(() => {
+            document.body.style.setProperty('height', vh + 'px', 'important');
+            if (chatSection) {
+                chatSection.style.setProperty('height', vh + 'px', 'important');
+            }
             window.scrollTo(0, 0);
-            if (chatSection) void chatSection.offsetWidth;
             const chat = document.getElementById('chat-messages');
             if (chat) chat.scrollTop = chat.scrollHeight;
         });
@@ -1190,23 +1182,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => {
             adjustFullscreenHeight();
-            setTimeout(adjustFullscreenHeight, 100);
-            setTimeout(adjustFullscreenHeight, 300);
-            setTimeout(adjustFullscreenHeight, 500);
+            setTimeout(adjustFullscreenHeight, 200);
         });
     }
     // 输入框聚焦时也触发一次
     const chatInputForKb = document.getElementById('chat-input');
     if (chatInputForKb) {
         chatInputForKb.addEventListener('focus', () => {
-            setTimeout(adjustFullscreenHeight, 100);
-            setTimeout(adjustFullscreenHeight, 300);
+            setTimeout(adjustFullscreenHeight, 200);
             setTimeout(adjustFullscreenHeight, 500);
-            setTimeout(adjustFullscreenHeight, 800);
         });
         chatInputForKb.addEventListener('blur', () => {
-            setTimeout(adjustFullscreenHeight, 100);
-            setTimeout(adjustFullscreenHeight, 300);
+            setTimeout(adjustFullscreenHeight, 200);
         });
     }
 
