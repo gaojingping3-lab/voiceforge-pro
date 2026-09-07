@@ -409,7 +409,10 @@ async function callTTS(text, engine, voiceId, apiKey, format, speed) {
             if (hint) {
                 const span = hint.querySelector('span');
                 if (span) {
-                    span.textContent = msg || ('Kokoro：' + (stage === 'loading' ? '下载中' : stage === 'compiling' ? '编译中' : '合成中') + ' ' + pct + '%');
+                    if (stage === 'loading') span.textContent = '下载中 ' + pct + '%';
+                    else if (stage === 'compiling') span.textContent = '编译中...';
+                    else if (stage === 'synth') span.textContent = '合成中 ' + pct + '%';
+                    else span.textContent = pct + '%';
                 }
             }
         });
