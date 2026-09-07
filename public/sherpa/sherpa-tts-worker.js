@@ -2,11 +2,12 @@
 // 基于官方 sherpa-onnx WASM TTS Worker，模型已打包进 .data 文件
 
 let tts = null;
-const VERSION = '?v=20260908h';
+const VERSION = '?v=20260908i';
 let wasmLogs = [];
 
 self.Module = {
   locateFile: function (path, scriptDirectory) {
+    wasmLogs.push('[locateFile] ' + path);
     if (path.endsWith('.wasm')) return '/sherpa/sherpa-onnx.wasm' + VERSION;
     if (path.endsWith('.data')) return '/sherpa/sherpa-onnx.data' + VERSION;
     return '/sherpa/' + path;
@@ -18,21 +19,37 @@ self.Module = {
   },
   print: function (text) {
     wasmLogs.push('[stdout] ' + text);
-    if (wasmLogs.length > 50) wasmLogs.shift();
+    if (wasmLogs.length > 80) wasmLogs.shift();
   },
   printErr: function (text) {
     wasmLogs.push('[stderr] ' + text);
-    if (wasmLogs.length > 50) wasmLogs.shift();
+    if (wasmLogs.length > 80) wasmLogs.shift();
   },
   onRuntimeInitialized: function () {
-    self.postMessage({ type: 'status', message: '正在初始化语音模型...' });
+    self.postMessage({ type: 'status', message: 'WASM运行时已初始化，检查文件系统...' });
+
+    // 尝试检查虚拟文件系统
+    let fsInfo = 'FS不可用';
+    try {
+      const FS = self.Module.FS || self.FS || (typeof Module !== 'undefined' ? Module.FS : null);
+      if (FS && FS.analyzePath) {
+        const files = ['model.onnx', 'lexicon.txt', 'tokens.txt', 'phone.fst', 'date.fst', 'number.fst'];
+        fsInfo = files.map(f => f + ':' + (FS.analyzePath('/' + f).exists ? 'OK' : 'MISSING')).join(' ');
+      }
+    } catch (e) {
+      fsInfo = 'FS检查异常: ' + e.message;
+    }
+    wasmLogs.push('[fs] ' + fsInfo);
+
+    self.postMessage({ type: 'status', message: '文件系统: ' + fsInfo + ', 正在创建TTS...' });
+
     try {
       const config = {
         offlineTtsModelConfig: {
           offlineTtsVitsModelConfig: {
-            model: './model.onnx',
-            lexicon: './lexicon.txt',
-            tokens: './tokens.txt',
+            model: '/model.onnx',
+            lexicon: '/lexicon.txt',
+            tokens: '/tokens.txt',
             dataDir: '',
             noiseScale: 0.667,
             noiseScaleW: 0.8,
@@ -42,7 +59,7 @@ self.Module = {
           debug: 1,
           provider: 'cpu',
         },
-        ruleFsts: './phone.fst,./date.fst,./number.fst',
+        ruleFsts: '/phone.fst,/date.fst,/number.fst',
         ruleFars: '',
         maxNumSentences: 1,
       };
