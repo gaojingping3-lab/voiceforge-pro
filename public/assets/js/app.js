@@ -141,14 +141,18 @@ function toggleChatFullscreen() {
     if (btn) {
         btn.className = isFull ? 'fa-solid fa-compress' : 'fa-solid fa-expand';
     }
-    // 进入全屏时设置body高度
+    // 进入全屏时设置body和卡片高度
     if (isFull) {
         const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         document.body.style.setProperty('height', vh + 'px', 'important');
+        const chatSection = document.getElementById('chat-section');
+        if (chatSection) chatSection.style.setProperty('height', vh + 'px', 'important');
     }
     // 退出全屏时清除内联高度
     if (!isFull) {
         document.body.style.height = '';
+        const chatSection = document.getElementById('chat-section');
+        if (chatSection) chatSection.style.height = '';
     }
     localStorage.setItem('CHAT_FULLSCREEN', isFull ? '1' : '0');
     sfxClick();
@@ -163,14 +167,16 @@ function initFullscreenMode() {
         document.body.classList.add('chat-fullscreen');
         const btn = document.querySelector('#chat-section .card-body > div:first-child button[onclick="toggleChatFullscreen()"] i');
         if (btn) btn.className = 'fa-solid fa-compress';
-        // 设置body高度
+        // 设置body和卡片高度
         const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         document.body.style.setProperty('height', vh + 'px', 'important');
+        if (chatSection) chatSection.style.setProperty('height', vh + 'px', 'important');
     } else {
         // 非聊天页面强制退出全屏
         document.body.classList.remove('chat-fullscreen');
         localStorage.setItem('CHAT_FULLSCREEN', '0');
         document.body.style.height = '';
+        if (chatSection) chatSection.style.height = '';
     }
     // 持续检查：非聊天页面时强制退出全屏
     setInterval(() => {
@@ -179,6 +185,7 @@ function initFullscreenMode() {
             document.body.classList.remove('chat-fullscreen');
             localStorage.setItem('CHAT_FULLSCREEN', '0');
             document.body.style.height = '';
+            if (chat) chat.style.height = '';
         }
     }, 500);
 }
@@ -1154,15 +1161,24 @@ document.addEventListener('DOMContentLoaded', () => {
     function adjustFullscreenHeight() {
         if (!document.body.classList.contains('chat-fullscreen')) return;
         const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-        // 只改body高度，卡片用absolute top:0 bottom:0自动撑满
-        document.body.style.setProperty('height', vh + 'px', 'important');
-        // 强制重排
         const chatSection = document.getElementById('chat-section');
+        // 同时设置body和卡片高度
+        document.body.style.setProperty('height', vh + 'px', 'important');
+        if (chatSection) {
+            chatSection.style.setProperty('height', vh + 'px', 'important');
+        }
+        // 强制重排
         if (chatSection) void chatSection.offsetWidth;
+        // 自动滚动聊天区域，触发浏览器重新计算布局
+        const chat = document.getElementById('chat-messages');
+        if (chat) {
+            const oldScroll = chat.scrollTop;
+            chat.scrollTop = oldScroll + 1;
+            setTimeout(() => { chat.scrollTop = oldScroll; }, 10);
+        }
         // 下一帧再重排一次
         requestAnimationFrame(() => {
             if (chatSection) void chatSection.offsetWidth;
-            const chat = document.getElementById('chat-messages');
             if (chat) chat.scrollTop = chat.scrollHeight;
         });
     }
@@ -1171,6 +1187,7 @@ document.addEventListener('DOMContentLoaded', () => {
             adjustFullscreenHeight();
             setTimeout(adjustFullscreenHeight, 100);
             setTimeout(adjustFullscreenHeight, 300);
+            setTimeout(adjustFullscreenHeight, 500);
         });
     }
     // 输入框聚焦时也触发一次
@@ -1180,6 +1197,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(adjustFullscreenHeight, 100);
             setTimeout(adjustFullscreenHeight, 300);
             setTimeout(adjustFullscreenHeight, 500);
+            setTimeout(adjustFullscreenHeight, 800);
         });
         chatInputForKb.addEventListener('blur', () => {
             setTimeout(adjustFullscreenHeight, 100);
