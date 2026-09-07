@@ -109,14 +109,13 @@
                                 const status = progress.status || '';
                                 const pct = extractProgress(progress);
                                 const file = progress.file || '';
+                                const shortFile = file.split('/').pop() || file;
 
-                                if (status === 'initiate' || status === 'download') {
-                                    onProgress('loading', pct, '开始下载 ' + file);
-                                } else if (status === 'progress') {
-                                    const shortFile = file.split('/').pop() || file;
-                                    onProgress('loading', pct, '下载 ' + shortFile + ' ' + pct + '%');
-                                } else if (status === 'done') {
-                                    onProgress('loading', pct, '下载完成 ' + file);
+                                if (status === 'done') {
+                                    onProgress('loading', 100, shortFile + ' 完成');
+                                } else if (shortFile) {
+                                    // 统一显示：文件名 + 进度%
+                                    onProgress('loading', pct, shortFile + ' ' + pct + '%');
                                 }
                             }
                         });
