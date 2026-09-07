@@ -472,6 +472,25 @@ function onEngineChange() {
         }
     }
 
+    // 双角色声音选择：Edge TTS用下拉框，其他引擎用输入框
+    const dualVoiceASelect = document.getElementById('dual-voice-a');
+    const dualVoiceAInput = document.getElementById('dual-voice-a-input');
+    const dualVoiceBSelect = document.getElementById('dual-voice-b');
+    const dualVoiceBInput = document.getElementById('dual-voice-b-input');
+    if (dualVoiceASelect && dualVoiceAInput && dualVoiceBSelect && dualVoiceBInput) {
+        if (engine === 'edge') {
+            dualVoiceASelect.classList.remove('hidden');
+            dualVoiceAInput.classList.add('hidden');
+            dualVoiceBSelect.classList.remove('hidden');
+            dualVoiceBInput.classList.add('hidden');
+        } else {
+            dualVoiceASelect.classList.add('hidden');
+            dualVoiceAInput.classList.remove('hidden');
+            dualVoiceBSelect.classList.add('hidden');
+            dualVoiceBInput.classList.remove('hidden');
+        }
+    }
+
     // 切换到Fish引擎且有Key时自动查询余额
     const balanceBox = document.getElementById('fish-balance-box');
     if (engine === 'fish' && mainKeyInput.value.trim()) {
@@ -1152,12 +1171,15 @@ async function playChatMessage(bubble) {
     const nameSpan = bubble.querySelector('.text-xs.font-bold');
     if (nameSpan && dualRoleA && dualRoleB) {
         const speakerName = nameSpan.innerText.trim();
+        const isEdge = engine === 'edge';
         const voiceASelect = document.getElementById('dual-voice-a');
+        const voiceAInput = document.getElementById('dual-voice-a-input');
         const voiceBSelect = document.getElementById('dual-voice-b');
-        if (speakerName === dualRoleA.name && voiceASelect) {
-            voiceId = voiceASelect.value;
-        } else if (speakerName === dualRoleB.name && voiceBSelect) {
-            voiceId = voiceBSelect.value;
+        const voiceBInput = document.getElementById('dual-voice-b-input');
+        if (speakerName === dualRoleA.name) {
+            voiceId = isEdge ? (voiceASelect?.value || 'shimmer') : (voiceAInput?.value.trim() || voiceId);
+        } else if (speakerName === dualRoleB.name) {
+            voiceId = isEdge ? (voiceBSelect?.value || 'onyx') : (voiceBInput?.value.trim() || voiceId);
         }
     }
     const apiKey = document.getElementById('main-api-key').value.trim();
