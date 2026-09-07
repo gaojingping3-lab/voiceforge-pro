@@ -1113,7 +1113,15 @@ let isChatAudioPlaying = false; // 播放锁，防止重复点击
 
 async function playChatMessage(bubble) {
     // 读取文字时过滤掉底部的token显示，避免朗读数字
-    const text = bubble.innerText.replace(/\n?\d+\s*tokens\s*$/, '').trim();
+    let text = bubble.innerText.replace(/\n?\d+\s*tokens\s*$/, '').trim();
+    // 如果有角色名span（AI消息），去掉第一行的名字，不朗读
+    const hasNameSpan = bubble.querySelector('.text-xs.font-bold');
+    if (hasNameSpan) {
+        const lines = text.split('\n');
+        if (lines.length > 1) {
+            text = lines.slice(1).join('\n').trim();
+        }
+    }
     // 朗读时去掉括号里的内容（中英文括号、方括号、星号都处理），显示不变
     const speakText = text
         .replace(/【[^】]*】/g, '')
