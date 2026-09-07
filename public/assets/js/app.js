@@ -1144,7 +1144,7 @@ async function playChatMessage(bubble) {
     const format = document.getElementById('tts-format').value;
     const speed = parseFloat(document.getElementById('tts-speed').value);
 
-    if (!apiKey) {
+    if (!apiKey && engine !== 'edge') {
         alert('请先配置 Fish API 密钥');
         isChatAudioPlaying = false;
         return;
