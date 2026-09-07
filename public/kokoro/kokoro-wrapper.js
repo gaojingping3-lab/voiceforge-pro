@@ -176,9 +176,24 @@
             // 等待 ES module 加载完成
             await waitForLibrary();
 
-            if (onProgress) onProgress('loading', 2, '检测到 WebGPU 加速');
+            if (onProgress) onProgress('loading', 2, '检测设备加速能力...');
 
-            // 从 jsDelivr CDN 下载模型文件（国内速度快）
+            // 检测 WebGPU 支持，不可用则回退 WASM
+            let device = 'wasm';
+            try {
+                if (navigator.gpu) {
+                    const adapter = await navigator.gpu.requestAdapter();
+                    if (adapter) {
+                        device = 'webgpu';
+                        if (onProgress) onProgress('loading', 3, '检测到 WebGPU 加速');
+                    }
+                }
+            } catch (e) { /* 回退 WASM */ }
+            if (device === 'wasm' && onProgress) {
+                onProgress('loading', 3, '使用 WASM 模式（WebGPU 不可用）');
+            }
+
+            // 从 CDN 下载模型文件
             await downloadModelFiles(onProgress);
 
             // 安装 fetch 拦截器，让 Transformers.js 读本地文件
@@ -189,7 +204,7 @@
             // 加载模型（从本地缓存读取，不走网络）
             ttsInstance = await global.KokoroTTS.from_pretrained(MODEL_ID, {
                 dtype: 'q8',
-                device: 'webgpu',
+                device: device,
                 progress_callback: (progress) => {
                     if (!onProgress) return;
                     const status = progress.status || '';
