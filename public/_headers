@@ -1,0 +1,18 @@
+# HTML 页面强制不缓存，确保 PWA 桌面图标每次都加载最新版本
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+# 静态资源缓存1天
+/assets/*
+  Cache-Control: public, max-age=86400
+
+# Kokoro 封装脚本缓存1天
+/kokoro/*
+  Cache-Control: public, max-age=86400
