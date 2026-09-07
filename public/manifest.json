@@ -2,7 +2,7 @@
   "name": "VoiceForge Pro",
   "short_name": "VoiceForge",
   "description": "多模态语音合成与克隆，AI语音对话",
-  "start_url": "/",
+  "start_url": "/?v=20260908",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#661ae3",
@@ -17,5 +17,6 @@
       "sizes": "512x512",
       "type": "image/svg+xml"
     }
-  ]
+  ],
+  "version": "20260908"
 }
