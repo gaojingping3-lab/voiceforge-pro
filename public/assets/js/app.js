@@ -1148,22 +1148,41 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('touchstart', unlockAudio);
 
     // 键盘弹出时自动调整，防止输入框被遮挡
+    function adjustFullscreenHeight() {
+        if (!document.body.classList.contains('chat-fullscreen')) return;
+        const chatSection = document.getElementById('chat-section');
+        if (!chatSection) return;
+        const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        chatSection.style.setProperty('height', vh + 'px', 'important');
+        document.body.style.height = vh + 'px';
+        // 强制重排
+        void chatSection.offsetWidth;
+        // 下一帧再重排一次，确保布局完全更新
+        requestAnimationFrame(() => {
+            void chatSection.offsetWidth;
+            const chat = document.getElementById('chat-messages');
+            if (chat) chat.scrollTop = chat.scrollHeight;
+        });
+    }
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => {
-            const vh = window.visualViewport.height;
-            document.body.style.height = vh + 'px';
-            // 全屏模式下调整聊天卡片高度，确保控制栏和输入框可见
-            if (document.body.classList.contains('chat-fullscreen')) {
-                const chatSection = document.getElementById('chat-section');
-                if (chatSection) {
-                    chatSection.style.setProperty('height', vh + 'px', 'important');
-                }
-            }
-            // 滚动聊天区域到底部
-            setTimeout(() => {
-                const chat = document.getElementById('chat-messages');
-                if (chat) chat.scrollTop = chat.scrollHeight;
-            }, 100);
+            adjustFullscreenHeight();
+            // 延迟再调一次，确保键盘完全弹出后布局正确
+            setTimeout(adjustFullscreenHeight, 100);
+            setTimeout(adjustFullscreenHeight, 300);
+        });
+    }
+    // 输入框聚焦时也触发一次（有些键盘弹出不触发visualViewport.resize）
+    const chatInputForKb = document.getElementById('chat-input');
+    if (chatInputForKb) {
+        chatInputForKb.addEventListener('focus', () => {
+            setTimeout(adjustFullscreenHeight, 100);
+            setTimeout(adjustFullscreenHeight, 300);
+            setTimeout(adjustFullscreenHeight, 500);
+        });
+        chatInputForKb.addEventListener('blur', () => {
+            setTimeout(adjustFullscreenHeight, 100);
+            setTimeout(adjustFullscreenHeight, 300);
         });
     }
 
