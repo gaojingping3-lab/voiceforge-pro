@@ -1147,7 +1147,19 @@ async function playChatMessage(bubble) {
     }
 
     const engine = document.getElementById('tts-engine').value;
-    const voiceId = document.getElementById('voice-id').value.trim();
+    let voiceId = document.getElementById('voice-id').value.trim();
+    // 双角色模式：根据消息角色使用不同声音
+    const nameSpan = bubble.querySelector('.text-xs.font-bold');
+    if (nameSpan && dualRoleA && dualRoleB) {
+        const speakerName = nameSpan.innerText.trim();
+        const voiceASelect = document.getElementById('dual-voice-a');
+        const voiceBSelect = document.getElementById('dual-voice-b');
+        if (speakerName === dualRoleA.name && voiceASelect) {
+            voiceId = voiceASelect.value;
+        } else if (speakerName === dualRoleB.name && voiceBSelect) {
+            voiceId = voiceBSelect.value;
+        }
+    }
     const apiKey = document.getElementById('main-api-key').value.trim();
     const format = document.getElementById('tts-format').value;
     const speed = parseFloat(document.getElementById('tts-speed').value);
