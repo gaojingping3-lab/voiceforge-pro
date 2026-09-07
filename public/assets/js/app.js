@@ -148,16 +148,24 @@ function onEngineChange() {
     const kokoroHint = document.getElementById('kokoro-hint');
     const voiceIdInput = document.getElementById('voice-id');
     const kokoroVoiceSelect = document.getElementById('kokoro-voice');
+    const voiceLabel = document.getElementById('voice-label');
+    const zeroshotBox = document.getElementById('zeroshot-box');
+    const zeroshotToggle = document.getElementById('zeroshot-toggle');
     if (engine === 'kokoro') {
         if (apiKeyBar) apiKeyBar.classList.add('hidden');
         if (kokoroHint) kokoroHint.classList.remove('hidden');
         if (voiceIdInput) voiceIdInput.classList.add('hidden');
         if (kokoroVoiceSelect) kokoroVoiceSelect.classList.remove('hidden');
+        if (voiceLabel) voiceLabel.innerText = '选择声音';
+        if (zeroshotBox) zeroshotBox.classList.add('hidden');
+        if (zeroshotToggle) zeroshotToggle.closest('.form-control')?.classList.add('hidden');
     } else {
         if (apiKeyBar) apiKeyBar.classList.remove('hidden');
         if (kokoroHint) kokoroHint.classList.add('hidden');
         if (voiceIdInput) voiceIdInput.classList.remove('hidden');
         if (kokoroVoiceSelect) kokoroVoiceSelect.classList.add('hidden');
+        if (voiceLabel) voiceLabel.innerText = '模型 ID (Voice/Ref ID)';
+        if (zeroshotToggle) zeroshotToggle.closest('.form-control')?.classList.remove('hidden');
     }
 
     // 语速控制：Fish Audio 不支持语速调整，禁用滑块并提示
@@ -396,14 +404,12 @@ async function callTTS(text, engine, voiceId, apiKey, format, speed) {
     } else if (engine === 'kokoro') {
         // Kokoro 本地离线合成：不需要 API Key，不需要网络
         const kokoroVoice = document.getElementById('kokoro-voice')?.value || 'zf_xiaobei';
-        const audioBlob = await KokoroWrapper.synthesize(text, kokoroVoice, speed, (stage, pct) => {
+        const audioBlob = await KokoroWrapper.synthesize(text, kokoroVoice, speed, (stage, pct, msg) => {
             const hint = document.getElementById('kokoro-hint');
             if (hint) {
                 const span = hint.querySelector('span');
                 if (span) {
-                    if (stage === 'loading') span.textContent = 'Kokoro：正在下载模型 ' + pct + '%...';
-                    else if (stage === 'compiling') span.textContent = 'Kokoro：正在编译模型...';
-                    else if (stage === 'synth') span.textContent = 'Kokoro：正在合成 ' + pct + '%...';
+                    span.textContent = msg || ('Kokoro：' + (stage === 'loading' ? '下载中' : stage === 'compiling' ? '编译中' : '合成中') + ' ' + pct + '%');
                 }
             }
         });
@@ -479,7 +485,7 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
 
         audioPlayer.src = audioUrl;
         downloadBtn.href = audioUrl;
-        downloadBtn.download = `voice_${Date.now()}.${format}`;
+        downloadBtn.download = `voice_${Date.now()}.${engine === 'kokoro' ? 'wav' : format}`;
         playerBox.classList.remove('hidden');
         stopAllAudio(); // 停止所有其他音频
         audioPlayer.play().catch(() => {});

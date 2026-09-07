@@ -18,29 +18,72 @@
         { key: 'zf_xiaoyi', name: '小艺（自然女声）' }
     ];
 
+    // 等待 KokoroTTS 库加载完成（ES module 是异步加载的）
+    function waitForLibrary(timeout) {
+        timeout = timeout || 15000;
+        return new Promise((resolve, reject) => {
+            if (global.KokoroTTS) return resolve();
+            const start = Date.now();
+            const check = () => {
+                if (global.KokoroTTS) {
+                    resolve();
+                } else if (Date.now() - start > timeout) {
+                    reject(new Error('KokoroTTS 库加载超时，请刷新页面重试'));
+                } else {
+                    setTimeout(check, 100);
+                }
+            };
+            check();
+        });
+    }
+
+    // 从进度对象中提取百分比（兼容多种格式）
+    function extractProgress(p) {
+        if (!p) return 0;
+        // 格式1: { progress: 0.5 }
+        if (typeof p.progress === 'number' && p.progress > 0) {
+            return Math.min(100, Math.round(p.progress * 100));
+        }
+        // 格式2: { loaded: 123, total: 456 }
+        if (p.loaded && p.total) {
+            return Math.min(100, Math.round(p.loaded / p.total * 100));
+        }
+        // 格式3: { percent: 50 }
+        if (typeof p.percent === 'number') {
+            return Math.min(100, Math.round(p.percent));
+        }
+        return 0;
+    }
+
     /**
      * 加载模型（只加载一次）
-     * @param {function} onProgress - (stage, percent) => void
+     * @param {function} onProgress - (stage, percent, message) => void
      */
     function load(onProgress) {
         if (ttsInstance) return Promise.resolve(ttsInstance);
         if (loadPromise) return loadPromise;
 
         loadPromise = (async () => {
-            if (!global.KokoroTTS) {
-                throw new Error('KokoroTTS 库未加载，请检查 index.html 中的 script 引入');
-            }
+            if (onProgress) onProgress('loading', 0, '正在加载 Kokoro 引擎...');
 
-            if (onProgress) onProgress('loading', 0);
+            // 等待 ES module 加载完成
+            await waitForLibrary();
+
+            if (onProgress) onProgress('loading', 1, '正在检测设备加速能力...');
 
             // 检测 WebGPU 支持
             let device = 'wasm';
             try {
                 if (navigator.gpu) {
                     const adapter = await navigator.gpu.requestAdapter();
-                    if (adapter) device = 'webgpu';
+                    if (adapter) {
+                        device = 'webgpu';
+                        if (onProgress) onProgress('loading', 2, '检测到 WebGPU 加速');
+                    }
                 }
             } catch (e) { /* 回退 WASM */ }
+
+            if (onProgress) onProgress('loading', 3, '正在下载模型（约120MB，仅首次需要）...');
 
             ttsInstance = await global.KokoroTTS.from_pretrained(MODEL_ID, {
                 dtype: 'q8',
@@ -50,16 +93,22 @@
                     remoteHost: 'https://hf-mirror.com'
                 },
                 progress_callback: (progress) => {
-                    if (onProgress && progress.status === 'downloading') {
-                        const pct = progress.progress ? Math.round(progress.progress * 100) : 0;
-                        onProgress('loading', pct);
-                    } else if (onProgress && progress.status === 'compiling') {
-                        onProgress('compiling', 50);
+                    if (!onProgress) return;
+                    const status = progress.status || progress.state || '';
+                    const pct = extractProgress(progress);
+
+                    if (status === 'downloading' || status === 'progress') {
+                        const file = progress.file || '';
+                        onProgress('loading', pct, '正在下载模型 ' + (file ? '(' + file + ')' : '') + ' ' + pct + '%');
+                    } else if (status === 'compiling' || status === 'init') {
+                        onProgress('compiling', pct || 50, '正在编译模型...');
+                    } else if (status === 'done' || status === 'ready') {
+                        onProgress('loading', 100, '模型加载完成');
                     }
                 }
             });
 
-            if (onProgress) onProgress('loading', 100);
+            if (onProgress) onProgress('loading', 100, '模型加载完成，可以开始合成');
             return ttsInstance;
         })();
 
@@ -71,7 +120,7 @@
      * @param {string} text - 中文文本
      * @param {string} voiceKey - 声音 key
      * @param {number} speed - 语速 0.5~2.0
-     * @param {function} onProgress - (stage, percent) => void
+     * @param {function} onProgress - (stage, percent, message) => void
      * @returns {Promise<Blob>} WAV 音频 Blob
      */
     async function synthesize(text, voiceKey, speed, onProgress) {
@@ -79,65 +128,18 @@
 
         const tts = await load(onProgress);
 
-        if (onProgress) onProgress('synth', 10);
+        if (onProgress) onProgress('synth', 10, '正在合成语音...');
 
         const audio = await tts.generate(text, {
             voice: voiceKey || 'zf_xiaobei',
             speed: speed || 1.0
         });
 
-        if (onProgress) onProgress('synth', 100);
+        if (onProgress) onProgress('synth', 100, '合成完成');
 
         // Kokoro 的 audio 对象有 toBlob() 直接返回 WAV Blob
         const blob = audio.toBlob();
         return blob;
-    }
-
-    // AudioBuffer -> WAV Blob（备用）
-    function audioBufferToWavBlob(buffer) {
-        const numChannels = buffer.numberOfChannels;
-        const sampleRate = buffer.sampleRate;
-        const format = 1; // PCM
-        const bitDepth = 16;
-        const bytesPerSample = bitDepth / 8;
-        const blockAlign = numChannels * bytesPerSample;
-        const dataLength = buffer.length * blockAlign;
-        const bufferArray = new ArrayBuffer(44 + dataLength);
-        const view = new DataView(bufferArray);
-
-        function writeStr(offset, str) {
-            for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-        }
-
-        writeStr(0, 'RIFF');
-        view.setUint32(4, 36 + dataLength, true);
-        writeStr(8, 'WAVE');
-        writeStr(12, 'fmt ');
-        view.setUint32(16, 16, true);
-        view.setUint16(20, format, true);
-        view.setUint16(22, numChannels, true);
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, sampleRate * blockAlign, true);
-        view.setUint16(32, blockAlign, true);
-        view.setUint16(34, bitDepth, true);
-        writeStr(36, 'data');
-        view.setUint32(40, dataLength, true);
-
-        const channels = [];
-        for (let i = 0; i < numChannels; i++) {
-            channels.push(buffer.getChannelData(i));
-        }
-
-        let offset = 44;
-        for (let i = 0; i < buffer.length; i++) {
-            for (let ch = 0; ch < numChannels; ch++) {
-                let sample = Math.max(-1, Math.min(1, channels[ch][i]));
-                view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-                offset += 2;
-            }
-        }
-
-        return new Blob([bufferArray], { type: 'audio/wav' });
     }
 
     function isLoaded() { return !!ttsInstance; }
