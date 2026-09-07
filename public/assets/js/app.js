@@ -1127,6 +1127,27 @@ function appendChatMessage(text, type) {
     return bubble;
 }
 
+// 自动朗读开关
+let autoPlayTTS = localStorage.getItem('AUTOPLAY_TTS') === 'true';
+
+function toggleAutoPlay() {
+    autoPlayTTS = !autoPlayTTS;
+    localStorage.setItem('AUTOPLAY_TTS', autoPlayTTS);
+    updateAutoPlayBtn();
+}
+
+function updateAutoPlayBtn() {
+    const btn = document.getElementById('autoplay-btn');
+    if (!btn) return;
+    if (autoPlayTTS) {
+        btn.classList.add('text-primary', 'bg-primary/10');
+        btn.title = '自动朗读：开';
+    } else {
+        btn.classList.remove('text-primary', 'bg-primary/10');
+        btn.title = '自动朗读：关';
+    }
+}
+
 // 播放指定文本的语音（聊天消息用）
 let isChatAudioPlaying = false; // 播放锁，防止重复点击
 
@@ -1283,6 +1304,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initPullToRefresh(); // 初始化下拉刷新
     initLongPressMenu(); // 初始化长按消息菜单
     initFullscreenMode(); // 初始化全屏模式
+    updateAutoPlayBtn(); // 恢复自动朗读按钮状态
 
     // 恢复双角色模式状态
     if (localStorage.getItem('DUAL_ROLE_MODE') === '1') {
@@ -1790,6 +1812,11 @@ async function sendChatMessage() {
         saveChatHistory(); // 保存到本地，刷新不丢失
 
         sfxReceive();
+
+        // 自动朗读
+        if (autoPlayTTS) {
+            setTimeout(() => playChatMessage(loadingBubble), 300);
+        }
 
     } catch (err) {
         loadingBubble.innerText = '出错啦: ' + err.message;
@@ -2462,7 +2489,10 @@ ${currentRole.desc}
         dualRoundCount++;
         updateDualRoundCount();
 
-        // 双角色模式不自动播放语音，省额度（需要听可以手动点播放按钮）
+        // 自动朗读（如果开启了自动朗读）
+        if (autoPlayTTS) {
+            setTimeout(() => playChatMessage(replyBubble), 300);
+        }
 
         sfxReceive();
 
