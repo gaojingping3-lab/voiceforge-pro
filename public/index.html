@@ -298,6 +298,19 @@
     opacity: 1 !important;
     pointer-events: auto !important;
   }
+  /* 设置分组折叠动画 */
+  .settings-group-content {
+    max-height: 2000px;
+    overflow: hidden;
+    opacity: 1;
+    transition: max-height 0.35s ease, opacity 0.25s ease, padding 0.3s ease;
+  }
+  .settings-group-content.collapsed {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
   /* 白色主题卡片优化：增加背景色、边框、阴影，提升辨识度 */
   body:not(.theme-obsidian):not(.theme-dark) #dual-role-bar {
     background: #f1f5f9 !important;
@@ -731,7 +744,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </span>
                     <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200" id="tts-group-icon" style="transform: rotate(-90deg);"></i>
                 </h4>
-                <div id="tts-group" class="px-4 pb-4 hidden">
+                <div id="tts-group" class="settings-group-content collapsed px-4 pb-4">
                 <div class="form-control mb-3">
                     <label class="label py-1"><span class="label-text text-sm">Fish Audio API Key</span></label>
                     <input type="password" id="modal-key-fish" class="input input-bordered input-sm w-full font-mono" placeholder="从 fish.audio 获取的 API Key" />
@@ -758,7 +771,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </span>
                     <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200" id="ai-group-icon"></i>
                 </h4>
-                <div id="ai-group" class="px-4 pb-4">
+                <div id="ai-group" class="settings-group-content px-4 pb-4">
                 <div class="form-control mb-3">
                     <label class="label py-1"><span class="label-text text-sm">大模型 API 地址 (Base URL)</span></label>
                     <input type="text" id="modal-llm-url" class="input input-bordered input-sm w-full font-mono" placeholder="https://api.deepseek.com" />
@@ -821,7 +834,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </span>
                     <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200" id="other-group-icon" style="transform: rotate(-90deg);"></i>
                 </h4>
-                <div id="other-group" class="px-4 pb-4 hidden">
+                <div id="other-group" class="settings-group-content collapsed px-4 pb-4">
                 <div class="form-control mb-4">
                     <label class="label py-1 cursor-pointer" onclick="toggleRoleConstraint()">
                         <span class="label-text text-sm">角色扮演强约束</span>

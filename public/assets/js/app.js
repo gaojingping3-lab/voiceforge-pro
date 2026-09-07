@@ -615,17 +615,17 @@ function toggleSettingsGroup(groupId) {
     const allGroups = ['tts-group', 'ai-group', 'other-group'];
     const content = document.getElementById(groupId);
     if (!content) return;
-    const willExpand = content.classList.contains('hidden');
+    const willExpand = content.classList.contains('collapsed');
     // 先收起所有
     allGroups.forEach(id => {
         const c = document.getElementById(id);
         const icon = document.getElementById(id + '-icon');
-        if (c) c.classList.add('hidden');
+        if (c) c.classList.add('collapsed');
         if (icon) icon.style.transform = 'rotate(-90deg)';
     });
     // 如果点击的是收起状态，则展开它
     if (willExpand) {
-        content.classList.remove('hidden');
+        content.classList.remove('collapsed');
         const icon = document.getElementById(groupId + '-icon');
         if (icon) icon.style.transform = 'rotate(0deg)';
     }
