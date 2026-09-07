@@ -413,6 +413,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             </span>
                         </label>
                         <input type="text" id="voice-id" placeholder="留空为默认音色" class="input input-bordered input-sm w-full font-mono text-sm" />
+                        <select id="edge-voice-select" class="select select-bordered select-sm w-full hidden" onchange="document.getElementById('voice-id').value=this.value">
+                            <option value="shimmer">晓晓 - 温柔女声（推荐）</option>
+                            <option value="onyx">晓伊 - 活泼女声</option>
+                            <option value="echo">东北女声</option>
+                        </select>
                     </div>
 
                     <!-- 零样本克隆切换 -->

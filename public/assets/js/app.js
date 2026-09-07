@@ -458,10 +458,16 @@ function onEngineChange() {
 
     // 声音ID提示
     const voiceInput = document.getElementById('voice-id');
-    if (voiceInput) {
+    const edgeVoiceSelect = document.getElementById('edge-voice-select');
+    if (voiceInput && edgeVoiceSelect) {
         if (engine === 'edge') {
-            voiceInput.placeholder = 'shimmer(晓晓)/onyx(晓伊)/echo(东北)，留空默认晓晓';
+            voiceInput.classList.add('hidden');
+            edgeVoiceSelect.classList.remove('hidden');
+            // 同步下拉框值到输入框
+            voiceInput.value = edgeVoiceSelect.value;
         } else {
+            voiceInput.classList.remove('hidden');
+            edgeVoiceSelect.classList.add('hidden');
             voiceInput.placeholder = '留空为默认音色';
         }
     }
@@ -723,17 +729,18 @@ ttsText.addEventListener('input', () => {
 // 统一 TTS 调用函数（Fish引擎使用参考版本参数，声音更真实）
 async function callTTS(text, engine, voiceId, apiKey, format, speed) {
     if (engine === 'edge') {
-        // Edge TTS：直接调用 Cloudflare Worker，免费无需用户密钥
-        const res = await fetch('https://raspy-violet-a1c0.gaojingping3.workers.dev/v1/audio/speech', {
+        // Edge TTS：通过本地代理调用，避免CORS问题
+        const res = await fetch('/api/edge/tts', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer sk-edge-tts-2026'
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                input: text,
-                voice: voiceId || 'shimmer',
-                speed: speed || 1.0
+                text,
+                voiceId,
+                format,
+                speed,
+                prompt: ''
             })
         });
         return res;
