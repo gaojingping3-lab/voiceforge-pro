@@ -143,6 +143,23 @@ function onEngineChange() {
     } else {
         balanceBox.classList.add('hidden');
     }
+    // Kokoro 本地离线模式：隐藏API Key栏，显示提示，声音用下拉选择
+    const apiKeyBar = document.getElementById('api-key-bar');
+    const kokoroHint = document.getElementById('kokoro-hint');
+    const voiceIdInput = document.getElementById('voice-id');
+    const kokoroVoiceSelect = document.getElementById('kokoro-voice');
+    if (engine === 'kokoro') {
+        if (apiKeyBar) apiKeyBar.classList.add('hidden');
+        if (kokoroHint) kokoroHint.classList.remove('hidden');
+        if (voiceIdInput) voiceIdInput.classList.add('hidden');
+        if (kokoroVoiceSelect) kokoroVoiceSelect.classList.remove('hidden');
+    } else {
+        if (apiKeyBar) apiKeyBar.classList.remove('hidden');
+        if (kokoroHint) kokoroHint.classList.add('hidden');
+        if (voiceIdInput) voiceIdInput.classList.remove('hidden');
+        if (kokoroVoiceSelect) kokoroVoiceSelect.classList.add('hidden');
+    }
+
     // 语速控制：Fish Audio 不支持语速调整，禁用滑块并提示
     const speedSlider = document.getElementById('tts-speed');
     const speedVal = document.getElementById('val-speed');
@@ -376,6 +393,26 @@ async function callTTS(text, engine, voiceId, apiKey, format, speed) {
             })
         });
         return res;
+    } else if (engine === 'kokoro') {
+        // Kokoro 本地离线合成：不需要 API Key，不需要网络
+        const kokoroVoice = document.getElementById('kokoro-voice')?.value || 'zf_xiaobei';
+        const audioBlob = await KokoroWrapper.synthesize(text, kokoroVoice, speed, (stage, pct) => {
+            const hint = document.getElementById('kokoro-hint');
+            if (hint) {
+                const span = hint.querySelector('span');
+                if (span) {
+                    if (stage === 'loading') span.textContent = 'Kokoro：正在下载模型 ' + pct + '%...';
+                    else if (stage === 'compiling') span.textContent = 'Kokoro：正在编译模型...';
+                    else if (stage === 'synth') span.textContent = 'Kokoro：正在合成 ' + pct + '%...';
+                }
+            }
+        });
+        return {
+            ok: true,
+            status: 200,
+            blob: async () => audioBlob,
+            json: async () => ({})
+        };
     } else {
         // 其他引擎保持原调用方式
         const res = await fetch(`/api/${engine}/tts`, {
@@ -411,7 +448,7 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
         alert("请输入要合成的文本内容！");
         return;
     }
-    if (!apiKey) {
+    if (!apiKey && engine !== 'kokoro') {
         alert(`请在上方输入 ${engineSelect.options[engineSelect.selectedIndex].text} 的 API 密钥！`);
         mainKeyInput.focus();
         return;
@@ -540,7 +577,7 @@ async function generateAndPlayAudio(text) {
     const format = document.getElementById('tts-format').value;
     const speed = parseFloat(document.getElementById('tts-speed').value);
 
-    if (!apiKey) {
+    if (!apiKey && engine !== 'kokoro') {
         console.warn('未配置 TTS API Key，跳过语音播放');
         return;
     }
@@ -732,7 +769,7 @@ async function playChatMessage(bubble) {
     const format = document.getElementById('tts-format').value;
     const speed = parseFloat(document.getElementById('tts-speed').value);
 
-    if (!apiKey) {
+    if (!apiKey && engine !== 'kokoro') {
         alert('请先配置 Fish API 密钥');
         isChatAudioPlaying = false;
         return;
