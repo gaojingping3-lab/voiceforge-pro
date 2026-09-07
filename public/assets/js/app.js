@@ -439,10 +439,32 @@ function onEngineChange() {
     const nameMap = {
         'fish': 'Fish API 密钥:',
         'siliconflow': 'SiliconFlow 密钥:',
-        'aliyun': '阿里云 AppKey/Token:'
+        'aliyun': '阿里云 AppKey/Token:',
+        'edge': 'Edge TTS (免费，无需密钥):'
     };
     keyLabel.innerText = nameMap[engine] || 'API 密钥:';
     mainKeyInput.value = localStorage.getItem(`${engine.toUpperCase()}_KEY`) || '';
+
+    // Edge TTS 不需要密钥，禁用输入框
+    if (engine === 'edge') {
+        mainKeyInput.disabled = true;
+        mainKeyInput.style.opacity = '0.5';
+        mainKeyInput.placeholder = '免费引擎，无需密钥';
+    } else {
+        mainKeyInput.disabled = false;
+        mainKeyInput.style.opacity = '1';
+        mainKeyInput.placeholder = '';
+    }
+
+    // 声音ID提示
+    const voiceInput = document.getElementById('voice-id');
+    if (voiceInput) {
+        if (engine === 'edge') {
+            voiceInput.placeholder = 'shimmer(晓晓)/onyx(晓伊)/echo(东北)，留空默认晓晓';
+        } else {
+            voiceInput.placeholder = '留空为默认音色';
+        }
+    }
 
     // 切换到Fish引擎且有Key时自动查询余额
     const balanceBox = document.getElementById('fish-balance-box');
@@ -700,6 +722,22 @@ ttsText.addEventListener('input', () => {
 
 // 统一 TTS 调用函数（Fish引擎使用参考版本参数，声音更真实）
 async function callTTS(text, engine, voiceId, apiKey, format, speed) {
+    if (engine === 'edge') {
+        // Edge TTS：直接调用 Cloudflare Worker，免费无需用户密钥
+        const res = await fetch('https://raspy-violet-a1c0.gaojingping3.workers.dev/v1/audio/speech', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer sk-edge-tts-2026'
+            },
+            body: JSON.stringify({
+                input: text,
+                voice: voiceId || 'shimmer',
+                speed: speed || 1.0
+            })
+        });
+        return res;
+    }
     if (engine === 'fish') {
         // 检查是否开启零样本克隆
         const useZeroShot = document.getElementById('zeroshot-toggle')?.checked && zeroshotAudioBuffer;
@@ -777,7 +815,7 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
         alert("请输入要合成的文本内容！");
         return;
     }
-    if (!apiKey) {
+    if (!apiKey && engine !== 'edge') {
         alert(`请在上方输入 ${engineSelect.options[engineSelect.selectedIndex].text} 的 API 密钥！`);
         mainKeyInput.focus();
         return;
@@ -906,7 +944,7 @@ async function generateAndPlayAudio(text) {
     const format = document.getElementById('tts-format').value;
     const speed = parseFloat(document.getElementById('tts-speed').value);
 
-    if (!apiKey) {
+    if (!apiKey && engine !== 'edge') {
         console.warn('未配置 TTS API Key，跳过语音播放');
         return;
     }
