@@ -14,8 +14,8 @@ async function loadWasm() {
   self.importScripts(baseUrl + 'sherpa-onnx-wasm.js');
   self.importScripts(baseUrl + 'sherpa-onnx-tts.js');
 
-  // 初始化 WASM 模块（self.Module 是 sherpa-onnx-wasm.js 导出的工厂函数）
-  wasmModule = await self.Module({
+  // 初始化 WASM 模块（SherpaOnnxWasmModule 是 sherpa-onnx-wasm.js 导出的工厂函数）
+  wasmModule = await self.SherpaOnnxWasmModule({
     locateFile: (path) => {
       if (path.endsWith('.wasm')) {
         return baseUrl + 'sherpa-onnx.wasm';
