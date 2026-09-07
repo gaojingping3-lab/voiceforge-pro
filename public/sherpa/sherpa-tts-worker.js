@@ -2,7 +2,7 @@
 // 基于官方 sherpa-onnx WASM TTS Worker，模型已打包进 .data 文件
 
 let tts = null;
-const VERSION = '?v=20260908i';
+const VERSION = '?v=20260908j';
 let wasmLogs = [];
 
 self.Module = {
@@ -48,9 +48,9 @@ self.Module = {
         offlineTtsModelConfig: {
           offlineTtsVitsModelConfig: {
             model: '/model.onnx',
-            lexicon: '/lexicon.txt',
+            lexicon: '',
             tokens: '/tokens.txt',
-            dataDir: '',
+            dataDir: '/espeak-ng-data',
             noiseScale: 0.667,
             noiseScaleW: 0.8,
             lengthScale: 1.0,
@@ -59,7 +59,7 @@ self.Module = {
           debug: 1,
           provider: 'cpu',
         },
-        ruleFsts: '/phone.fst,/date.fst,/number.fst',
+        ruleFsts: '',
         ruleFars: '',
         maxNumSentences: 1,
       };
