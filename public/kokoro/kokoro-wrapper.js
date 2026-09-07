@@ -97,11 +97,11 @@
                     try {
                         if (onProgress) {
                             onProgress('loading', 3,
-                                '正在下载模型（' + mirror.name + '，第' + attempt + '次尝试）...');
+                                '正在下载模型（' + mirror.name + '，约40MB，第' + attempt + '次尝试）...');
                         }
 
                         ttsInstance = await global.KokoroTTS.from_pretrained(MODEL_ID, {
-                            dtype: 'q8',
+                            dtype: 'q4',
                             device: device,
                             envConfig: { remoteHost: mirror.host },
                             progress_callback: (progress) => {
