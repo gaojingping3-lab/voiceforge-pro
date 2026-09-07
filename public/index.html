@@ -135,6 +135,93 @@
   #scroll-to-bottom-btn {
     transform: translateY(10px);
   }
+
+  /* ===== UI优化 v1.5 ===== */
+  /* 1. 行高优化 */
+  .chat-bubble { line-height: 1.65; }
+  .textarea, .input { line-height: 1.5; }
+
+  /* 2. 标签切换过渡 */
+  .tab-content-section { transition: opacity 0.2s ease; }
+  .tab-content-section.fading { opacity: 0; }
+  .tab { position: relative; transition: all 0.2s ease; }
+  .tab.tab-active::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    left: 20%;
+    right: 20%;
+    height: 2px;
+    background: currentColor;
+    border-radius: 2px;
+    animation: tabUnderline 0.3s ease-out;
+  }
+  @keyframes tabUnderline {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+
+  /* 3. 角色头像 */
+  .role-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 14px; color: white;
+    flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+
+  /* 4. 深色模式优化 */
+  body.theme-obsidian .chat-bubble { background: rgba(55, 65, 81, 0.8) !important; color: #f3f4f6 !important; }
+  body.theme-obsidian .chat-end .chat-bubble { background: rgba(99, 102, 241, 0.7) !important; }
+  body.theme-obsidian .bg-base-100\/60, body.theme-obsidian .bg-base-100\/80 { background: rgba(30, 41, 59, 0.7) !important; }
+  body.theme-obsidian .bg-base-200\/50 { background: rgba(51, 65, 85, 0.5) !important; }
+  body.theme-obsidian .text-gray-400, body.theme-obsidian .text-gray-500 { color: #9ca3af !important; }
+  body.theme-obsidian .border-base-300 { border-color: rgba(75, 85, 99, 0.5) !important; }
+  body.theme-obsidian .input, body.theme-obsidian .textarea, body.theme-obsidian .select {
+    background: rgba(30, 41, 59, 0.8) !important;
+    border-color: rgba(75, 85, 99, 0.5) !important;
+    color: #f3f4f6 !important;
+  }
+  body.theme-obsidian .tabs-boxed { background: rgba(30, 41, 59, 0.6) !important; }
+  body.theme-obsidian .tab { color: #9ca3af !important; }
+  body.theme-obsidian .tab.tab-active { color: #a5b4fc !important; background: rgba(99, 102, 241, 0.15) !important; }
+
+  /* 5. 下拉刷新 */
+  .pull-refresh-indicator {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%) translateY(-100%);
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 8px; color: #6b7280; font-size: 12px;
+    transition: transform 0.2s ease;
+  }
+  .pull-refresh-indicator.visible { transform: translateX(-50%) translateY(0); }
+  .pull-refresh-indicator .spinner {
+    width: 24px; height: 24px; border: 2px solid #e5e7eb; border-top-color: #6366f1;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 6. 长按消息菜单 */
+  .msg-context-menu {
+    position: fixed; z-index: 100; background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(10px); border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    padding: 6px; min-width: 140px;
+    animation: menuPop 0.15s ease-out;
+  }
+  body.theme-obsidian .msg-context-menu { background: rgba(30, 41, 59, 0.95) !important; }
+  @keyframes menuPop {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .msg-context-menu button {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 10px 14px; border: none; background: transparent;
+    border-radius: 8px; font-size: 14px; cursor: pointer;
+    color: inherit; text-align: left;
+  }
+  .msg-context-menu button:hover { background: rgba(0,0,0,0.05); }
+  body.theme-obsidian .msg-context-menu button:hover { background: rgba(255,255,255,0.1); }
+  .msg-context-menu button.danger { color: #ef4444; }
+  .msg-long-press-active { background: rgba(99, 102, 241, 0.1) !important; border-radius: 8px; }
 </style>
 
 <div id="premium-bg-layer"></div>
@@ -186,7 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
 
         <!-- TTS Section -->
-        <div id="tts-section" class="card glass-panel shadow-xl flex-1 min-h-0 overflow-y-auto">
+        <div id="tts-section" class="card glass-panel shadow-xl flex-1 min-h-0 overflow-y-auto tab-content-section">
             <div class="card-body p-6">
                 <!-- API Key Bar directly on top -->
                 <div class="p-3 bg-primary/10 border border-primary/20 rounded-xl mb-4 flex flex-col sm:flex-row items-center gap-3">
@@ -294,7 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
 
         <!-- AI Chat Section -->
-        <div id="chat-section" class="card glass-panel shadow-xl hidden flex-1 min-h-0">
+        <div id="chat-section" class="card glass-panel shadow-xl hidden flex-1 min-h-0 tab-content-section">
             <div class="card-body p-4 sm:p-6 flex flex-col h-full relative">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="card-title text-lg"><i class="fa-solid fa-comments text-primary"></i> 与乐 语音对话</h2>
@@ -346,7 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div id="role-card" class="mb-3 rounded-xl border border-base-300 overflow-hidden bg-base-100/60 backdrop-blur">
                     <div class="flex items-center justify-between px-3 py-2 cursor-pointer" onclick="toggleRoleCard()">
                         <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-user-astronaut text-primary"></i>
+                            <div id="role-avatar" class="role-avatar">?</div>
                             <span class="font-bold text-sm" id="role-card-name">角色卡</span>
                             <span class="text-xs text-gray-400" id="role-card-status">已展开</span>
                         </div>
@@ -459,7 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         </div>
         <!-- Clone Section -->
-        <div id="clone-section" class="card glass-panel shadow-xl hidden flex-1 min-h-0 overflow-y-auto">
+        <div id="clone-section" class="card glass-panel shadow-xl hidden flex-1 min-h-0 overflow-y-auto tab-content-section">
             <div class="card-body p-6">
                 <h2 class="card-title text-xl mb-2"><i class="fa-solid fa-dna text-secondary"></i> 声音ID生成</h2>
                 <div class="alert alert-info py-2 px-3 text-xs mb-4">
@@ -501,7 +588,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
 
         <!-- History Section -->
-        <div id="history-section" class="card glass-panel shadow-xl hidden flex-1 min-h-0 overflow-y-auto">
+        <div id="history-section" class="card glass-panel shadow-xl hidden flex-1 min-h-0 overflow-y-auto tab-content-section">
             <div class="card-body p-6">
                 <div class="flex justify-between items-center mb-3">
                     <h2 class="card-title text-xl"><i class="fa-solid fa-clock-rotate-left text-accent"></i> 生成历史</h2>

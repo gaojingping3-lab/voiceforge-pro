@@ -79,6 +79,198 @@ function initSmartScroll() {
     });
 }
 
+// 下拉刷新
+function initPullToRefresh() {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+
+    // 创建刷新指示器
+    const indicator = document.createElement('div');
+    indicator.className = 'pull-refresh-indicator';
+    indicator.innerHTML = '<div class="spinner"></div><span>下拉刷新</span>';
+    container.style.position = 'relative';
+    container.appendChild(indicator);
+
+    let startY = 0;
+    let pulling = false;
+    let pullDistance = 0;
+    const THRESHOLD = 60;
+
+    container.addEventListener('touchstart', (e) => {
+        if (container.scrollTop <= 0) {
+            startY = e.touches[0].clientY;
+            pulling = true;
+        }
+    }, { passive: true });
+
+    container.addEventListener('touchmove', (e) => {
+        if (!pulling) return;
+        pullDistance = e.touches[0].clientY - startY;
+        if (pullDistance > 0 && container.scrollTop <= 0) {
+            e.preventDefault();
+            const progress = Math.min(pullDistance / THRESHOLD, 1);
+            indicator.style.transform = `translateX(-50%) translateY(${pullDistance * 0.5}px)`;
+            indicator.querySelector('span').innerText = pullDistance > THRESHOLD ? '释放刷新' : '下拉刷新';
+        }
+    }, { passive: false });
+
+    container.addEventListener('touchend', () => {
+        if (!pulling) return;
+        pulling = false;
+        if (pullDistance > THRESHOLD) {
+            indicator.classList.add('visible');
+            indicator.querySelector('span').innerText = '刷新中...';
+            setTimeout(() => {
+                indicator.classList.remove('visible');
+                indicator.style.transform = '';
+                // 刷新动作：重新渲染历史 + 检查更新
+                renderChatHistory();
+                checkAppVersion();
+            }, 800);
+        } else {
+            indicator.style.transform = '';
+        }
+        pullDistance = 0;
+    });
+}
+
+// 长按消息菜单
+function initLongPressMenu() {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+
+    let pressTimer = null;
+    let pressTarget = null;
+    let startX = 0, startY = 0;
+    const LONG_PRESS_MS = 500;
+    const MOVE_THRESHOLD = 10;
+
+    container.addEventListener('touchstart', (e) => {
+        const msgEl = e.target.closest('.chat');
+        if (!msgEl) return;
+        pressTarget = msgEl;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        pressTimer = setTimeout(() => {
+            showMsgContextMenu(msgEl, e.touches[0].clientX, e.touches[0].clientY);
+            if (navigator.vibrate) navigator.vibrate(10);
+        }, LONG_PRESS_MS);
+    }, { passive: true });
+
+    container.addEventListener('touchmove', (e) => {
+        if (!pressTimer) return;
+        const dx = Math.abs(e.touches[0].clientX - startX);
+        const dy = Math.abs(e.touches[0].clientY - startY);
+        if (dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
+    }, { passive: true });
+
+    container.addEventListener('touchend', () => {
+        if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
+    });
+
+    // 桌面端右键菜单
+    container.addEventListener('contextmenu', (e) => {
+        const msgEl = e.target.closest('.chat');
+        if (!msgEl) return;
+        e.preventDefault();
+        showMsgContextMenu(msgEl, e.clientX, e.clientY);
+    });
+}
+
+function showMsgContextMenu(msgEl, x, y) {
+    // 移除已有菜单
+    document.querySelectorAll('.msg-context-menu').forEach(m => m.remove());
+
+    const isUser = msgEl.classList.contains('chat-end');
+    const bubble = msgEl.querySelector('.chat-bubble');
+    const text = bubble ? bubble.innerText : '';
+
+    const menu = document.createElement('div');
+    menu.className = 'msg-context-menu';
+
+    // 复制
+    const copyBtn = document.createElement('button');
+    copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i> 复制文本';
+    copyBtn.onclick = () => {
+        navigator.clipboard.writeText(text).then(() => {
+            sfxSave();
+        }).catch(() => {});
+        menu.remove();
+    };
+    menu.appendChild(copyBtn);
+
+    // 重新生成（仅AI消息）
+    if (!isUser) {
+        const regenBtn = document.createElement('button');
+        regenBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> 重新生成';
+        regenBtn.onclick = () => {
+            menu.remove();
+            // 删除当前消息并重新生成
+            const idx = Array.from(document.querySelectorAll('#chat-messages .chat')).indexOf(msgEl);
+            if (idx >= 0 && chatHistory[idx]) {
+                // 找到这条消息之前的用户消息，重新发送
+                let userMsg = null;
+                for (let i = idx - 1; i >= 0; i--) {
+                    if (chatHistory[i] && chatHistory[i].role === 'user') {
+                        userMsg = chatHistory[i].content;
+                        break;
+                    }
+                }
+                // 删除从用户消息开始的后续消息
+                if (userMsg) {
+                    chatHistory = chatHistory.slice(0, idx - 1);
+                    saveChatHistory();
+                    renderChatHistory();
+                    sendChatMessage(userMsg);
+                }
+            }
+        };
+        menu.appendChild(regenBtn);
+    }
+
+    // 删除
+    const delBtn = document.createElement('button');
+    delBtn.className = 'danger';
+    delBtn.innerHTML = '<i class="fa-regular fa-trash-can"></i> 删除';
+    delBtn.onclick = () => {
+        const idx = Array.from(document.querySelectorAll('#chat-messages .chat')).indexOf(msgEl);
+        if (idx >= 0 && chatHistory[idx]) {
+            chatHistory.splice(idx, 1);
+            saveChatHistory();
+            renderChatHistory();
+        }
+        menu.remove();
+    };
+    menu.appendChild(delBtn);
+
+    // 定位菜单，避免超出屏幕
+    document.body.appendChild(menu);
+    const rect = menu.getBoundingClientRect();
+    const maxX = window.innerWidth - rect.width - 10;
+    const maxY = window.innerHeight - rect.height - 10;
+    menu.style.left = Math.min(x, maxX) + 'px';
+    menu.style.top = Math.min(y, maxY) + 'px';
+
+    // 点击外部关闭
+    setTimeout(() => {
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener('touchstart', closeMenu);
+                document.removeEventListener('click', closeMenu);
+            }
+        };
+        document.addEventListener('touchstart', closeMenu);
+        document.addEventListener('click', closeMenu);
+    }, 10);
+}
+
 const EMOTION_LABELS = {
     happy: '开心', sad: '难过', angry: '生气', tired: '疲惫',
     anxious: '焦虑', love: '亲昵', neutral: '平静'
@@ -100,13 +292,32 @@ function switchTab(tabId) {
     const activeTab = document.getElementById(`tab-${tabId}`);
     if (activeTab) activeTab.classList.add('tab-active', 'text-primary');
 
-    document.getElementById('tts-section').classList.add('hidden');
-    document.getElementById('chat-section').classList.add('hidden');
-    document.getElementById('clone-section').classList.add('hidden');
-    document.getElementById('history-section').classList.add('hidden');
+    // 淡出当前可见的section
+    const sections = ['tts-section', 'chat-section', 'clone-section', 'history-section'];
+    sections.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && !el.classList.contains('hidden')) {
+            el.classList.add('fading');
+        }
+    });
 
-    document.getElementById(`${tabId}-section`).classList.remove('hidden');
-    if (tabId === 'history') renderHistory();
+    setTimeout(() => {
+        document.getElementById('tts-section').classList.add('hidden');
+        document.getElementById('chat-section').classList.add('hidden');
+        document.getElementById('clone-section').classList.add('hidden');
+        document.getElementById('history-section').classList.add('hidden');
+
+        const target = document.getElementById(`${tabId}-section`);
+        target.classList.remove('hidden');
+        target.classList.remove('fading');
+        // 触发重排后淡入
+        void target.offsetWidth;
+        target.classList.add('fading');
+        requestAnimationFrame(() => target.classList.remove('fading'));
+
+        if (tabId === 'history') renderHistory();
+    }, 150);
+
     sfxClick();
 }
 
@@ -886,6 +1097,8 @@ document.addEventListener('DOMContentLoaded', () => {
     renderChatHistory(); // 渲染历史消息
     initVoiceInput(); // 初始化语音输入
     initSmartScroll(); // 初始化智能滚动
+    initPullToRefresh(); // 初始化下拉刷新
+    initLongPressMenu(); // 初始化长按消息菜单
 
     // 恢复双角色模式状态
     if (localStorage.getItem('DUAL_ROLE_MODE') === '1') {
@@ -1403,6 +1616,34 @@ function renderRoleCard() {
     const role = getCurrentRole();
     document.getElementById('role-card-name').innerText = role.name;
     document.getElementById('role-card-desc').innerText = role.desc;
+    // 生成首字母+渐变色头像
+    const avatar = document.getElementById('role-avatar');
+    if (avatar) {
+        const firstChar = role.name ? role.name.charAt(0).toUpperCase() : '?';
+        avatar.innerText = firstChar;
+        avatar.style.background = getAvatarGradient(role.name);
+    }
+}
+
+// 根据名字生成渐变色头像
+function getAvatarGradient(name) {
+    const gradients = [
+        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+        'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+        'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+        'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+        'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+        'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+        'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)',
+        'linear-gradient(135deg, #d299c2 0%, #fef9d7 100%)',
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return gradients[Math.abs(hash) % gradients.length];
 }
 
 function toggleRoleCard() {
