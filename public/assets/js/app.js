@@ -134,48 +134,35 @@ function initPullToRefresh() {
     });
 }
 
-// 长按消息菜单
+// 双击消息菜单
 function initLongPressMenu() {
     const container = document.getElementById('chat-messages');
     if (!container) return;
 
-    let pressTimer = null;
-    let pressTarget = null;
-    let startX = 0, startY = 0;
-    const LONG_PRESS_MS = 500;
-    const MOVE_THRESHOLD = 10;
+    let lastTapTime = 0;
+    let lastTapTarget = null;
+    const DOUBLE_TAP_MS = 300;
 
-    container.addEventListener('touchstart', (e) => {
+    container.addEventListener('touchend', (e) => {
         const msgEl = e.target.closest('.chat');
         if (!msgEl) return;
-        pressTarget = msgEl;
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-        pressTimer = setTimeout(() => {
-            showMsgContextMenu(msgEl, e.touches[0].clientX, e.touches[0].clientY);
+        const now = Date.now();
+        if (now - lastTapTime < DOUBLE_TAP_MS && lastTapTarget === msgEl) {
+            // 双击
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            showMsgContextMenu(msgEl, touch.clientX, touch.clientY);
             if (navigator.vibrate) navigator.vibrate(10);
-        }, LONG_PRESS_MS);
-    }, { passive: true });
-
-    container.addEventListener('touchmove', (e) => {
-        if (!pressTimer) return;
-        const dx = Math.abs(e.touches[0].clientX - startX);
-        const dy = Math.abs(e.touches[0].clientY - startY);
-        if (dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD) {
-            clearTimeout(pressTimer);
-            pressTimer = null;
+            lastTapTime = 0;
+            lastTapTarget = null;
+        } else {
+            lastTapTime = now;
+            lastTapTarget = msgEl;
         }
-    }, { passive: true });
+    }, { passive: false });
 
-    container.addEventListener('touchend', () => {
-        if (pressTimer) {
-            clearTimeout(pressTimer);
-            pressTimer = null;
-        }
-    });
-
-    // 桌面端右键菜单
-    container.addEventListener('contextmenu', (e) => {
+    // 桌面端双击
+    container.addEventListener('dblclick', (e) => {
         const msgEl = e.target.closest('.chat');
         if (!msgEl) return;
         e.preventDefault();
