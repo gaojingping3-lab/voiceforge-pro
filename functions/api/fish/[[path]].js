@@ -32,7 +32,7 @@ export async function onRequest(context) {
   } else if (subPath === "/model") {
     upstreamUrl = "https://api.fish.audio/model";
   } else if (subPath === "/v1/models") {
-    upstreamUrl = "https://api.fish.audio/wallet/self/api-credit";
+    upstreamUrl = "https://api.fish.audio/v1/models";
   } else {
     return new Response(
       JSON.stringify({ error: "未知的 API 路径", path: subPath }),

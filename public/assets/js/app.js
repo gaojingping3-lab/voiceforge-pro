@@ -143,6 +143,22 @@ function onEngineChange() {
     } else {
         balanceBox.classList.add('hidden');
     }
+    // 语速控制：Fish Audio 不支持语速调整，禁用滑块并提示
+    const speedSlider = document.getElementById('tts-speed');
+    const speedVal = document.getElementById('val-speed');
+    if (speedSlider && speedVal) {
+        if (engine === 'fish') {
+            speedSlider.disabled = true;
+            speedSlider.style.opacity = '0.4';
+            speedVal.innerText = '不支持';
+            speedVal.title = 'Fish Audio 暂不支持语速调整';
+        } else {
+            speedSlider.disabled = false;
+            speedSlider.style.opacity = '1';
+            speedVal.innerText = speedSlider.value;
+            speedVal.title = '';
+        }
+    }
 }
 
 // 查询 Fish Audio 余额
@@ -600,7 +616,35 @@ function renderChatHistory() {
             div.appendChild(bubble);
             container.appendChild(div);
         } else {
-            appendChatMessage(msg.content, 'ai');
+            // 修复：解析双角色 [角色名] 内容格式，正确显示角色名标签和颜色
+            const match = msg.content.match(/^\[([^\]]+)\]\s*([\s\S]*)$/);
+            if (match) {
+                const speakerName = match[1];
+                const content = match[2];
+                // 判断角色颜色：如果双角色已开启，A橙色B蓝色；否则根据角色名在列表中的位置奇偶决定
+                let color = '#fb923c';
+                if (dualRoleA && dualRoleB) {
+                    color = speakerName === dualRoleA.name ? '#fb923c' : '#3b82f6';
+                } else {
+                    const roleList = getRoleList();
+                    const idx = roleList.findIndex(r => r.name === speakerName);
+                    if (idx >= 0) color = idx % 2 === 0 ? '#fb923c' : '#3b82f6';
+                }
+                const div = document.createElement('div');
+                div.className = 'chat chat-start relative msg-enter';
+                const bubble = document.createElement('div');
+                bubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
+                bubble.innerHTML = '<span class="text-xs font-bold block mb-1" style="color:' + color + '">' + escapeHtml(speakerName) + '</span>' + formatChatText(content);
+                const playBtn = document.createElement('button');
+                playBtn.className = 'play-voice-btn absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
+                playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
+                playBtn.title = '播放语音';
+                playBtn.onclick = () => playChatMessage(bubble);
+                div.appendChild(playBtn);
+                container.appendChild(div);
+            } else {
+                appendChatMessage(msg.content, 'ai');
+            }
         }
     }
     container.scrollTop = container.scrollHeight;
@@ -1137,8 +1181,9 @@ async function sendChatMessage() {
                 requestBody.reasoning_effort = effortMap[reasoningLevel] || 'low';
             }
         }
-        // 开启流式输出
+        // 开启流式输出，并要求返回 usage（用于 token 统计）
         requestBody.stream = true;
+        requestBody.stream_options = { include_usage: true };
 
         let res;
         for (let attempt = 0; attempt < 2; attempt++) {
@@ -1544,6 +1589,9 @@ function toggleDualRoleMode() {
     } else {
         bar.classList.add('hidden');
         stopDualChat();
+        // 关键：清空角色引用，防止关闭后 sendChatMessage 仍走双角色逻辑
+        dualRoleA = null;
+        dualRoleB = null;
         document.getElementById('role-card').classList.remove('hidden');
     }
 }
@@ -1588,7 +1636,22 @@ function startDualChat() {
     // 判断是否是第一次开始（没有对话历史）
     const isFirstStart = chatHistory.length === 0;
 
-    if (isFirstStart) {
+    // 检测历史消息中是否有非双角色格式的消息（单角色模式遗留）
+    const hasNonDualHistory = chatHistory.some(m =>
+        m.role === 'assistant' && !/^\[[^\]]+\]/.test(m.content)
+    );
+    if (!isFirstStart && hasNonDualHistory) {
+        if (!confirm('检测到当前聊天记录是单角色模式产生的，与双角色格式不兼容。\n\n确定：清空聊天记录，用双角色重新开始\n取消：保留记录继续（可能导致角色人设混乱）')) {
+            // 用户选择保留，继续执行
+        } else {
+            // 用户选择清空
+            chatHistory = [];
+            localStorage.removeItem('PERM_CHAT_HISTORY');
+            document.getElementById('chat-messages').innerHTML = '';
+        }
+    }
+
+    if (chatHistory.length === 0) {
         // 第一次开始：角色A先发开场白
         dualCurrentSpeaker = 'B'; // A发完开场白后，轮到B回复
         dualRoundCount = 0;
@@ -1622,14 +1685,14 @@ function startDualChat() {
         dualTimeoutId = setTimeout(() => {
             if (isDualRunning) dualChatNext();
         }, getDualInterval());
-    } else {
+    } else if (chatHistory.length > 0) {
         // 暂停后继续：不发开场白，根据最后一条消息判断该谁说话
         const lastMsg = chatHistory[chatHistory.length - 1];
         const lastContent = lastMsg?.content || '';
         // 解析最后一条是谁说的
         const match = lastContent.match(/^\[([^\]]+)\]/);
         const lastSpeaker = match ? match[1] : '';
-        // 如果最后一条是A说的，轮到B；如果是B说的，轮到A
+        // 如果最后一条是A说的，轮到B；如果是B说的或无法识别，轮到A
         dualCurrentSpeaker = lastSpeaker === dualRoleA.name ? 'B' : 'A';
         // 恢复轮数（从历史记录数估算）
         dualRoundCount = chatHistory.filter(m => m.role === 'assistant').length;
@@ -1822,6 +1885,7 @@ ${currentRole.desc}
                 temperature: parseFloat(localStorage.getItem('LLM_TEMPERATURE') || '0.8'),
                 top_p: parseFloat(localStorage.getItem('LLM_TOPP') || '0.9'),
                 stream: false,
+                useSlideWindow: localStorage.getItem('CTX_MODE') === 'slide',
             }),
             signal: dualAbortController.signal,
         });
