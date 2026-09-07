@@ -284,9 +284,12 @@ const EMOTION_PROMPTS = {
 
 // Tab Switching
 function switchTab(tabId) {
-    // 切换到非聊天标签时自动退出全屏
+    // 切换到非聊天标签时强制退出全屏（不用toggle，直接移除）
     if (tabId !== 'chat' && document.body.classList.contains('chat-fullscreen')) {
-        toggleChatFullscreen();
+        document.body.classList.remove('chat-fullscreen');
+        localStorage.setItem('CHAT_FULLSCREEN', '0');
+        const btn = document.querySelector('#chat-section .card-body > div:first-child button[onclick="toggleChatFullscreen()"] i');
+        if (btn) btn.className = 'fa-solid fa-expand';
     }
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('tab-active', 'text-primary'));
     const activeTab = document.getElementById(`tab-${tabId}`);
