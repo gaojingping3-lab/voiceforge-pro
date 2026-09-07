@@ -174,7 +174,12 @@
 
             if (dbKey) {
                 const blob = await getFromDB(dbKey);
-                if (blob) return new Response(blob);
+                if (blob) {
+                    // 用流式响应，减少内存副本
+                    return new Response(blob.stream(), {
+                        headers: { 'Content-Type': 'application/octet-stream' }
+                    });
+                }
             }
 
             return originalFetch(url, options);
