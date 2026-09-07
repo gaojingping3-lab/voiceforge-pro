@@ -37,12 +37,12 @@
         });
     }
 
-    // 从进度对象中提取百分比（兼容多种格式）
+    // 从进度对象中提取百分比（Transformers.js 的 progress 已经是 0-100）
     function extractProgress(p) {
         if (!p) return 0;
-        // 格式1: { progress: 0.5 }
-        if (typeof p.progress === 'number' && p.progress > 0) {
-            return Math.min(100, Math.round(p.progress * 100));
+        // 格式1: { progress: 50 } 已经是 0-100 的百分比
+        if (typeof p.progress === 'number' && p.progress >= 0) {
+            return Math.min(100, Math.round(p.progress));
         }
         // 格式2: { loaded: 123, total: 456 }
         if (p.loaded && p.total) {
@@ -85,28 +85,37 @@
 
             if (onProgress) onProgress('loading', 3, '正在下载模型（约120MB，仅首次需要）...');
 
-            ttsInstance = await global.KokoroTTS.from_pretrained(MODEL_ID, {
-                dtype: 'q8',
-                device: device,
-                // 使用国内镜像加速下载
-                envConfig: {
-                    remoteHost: 'https://hf-mirror.com'
-                },
-                progress_callback: (progress) => {
-                    if (!onProgress) return;
-                    const status = progress.status || progress.state || '';
-                    const pct = extractProgress(progress);
-
-                    if (status === 'downloading' || status === 'progress') {
+            try {
+                ttsInstance = await global.KokoroTTS.from_pretrained(MODEL_ID, {
+                    dtype: 'q8',
+                    device: device,
+                    // 使用国内镜像加速下载
+                    envConfig: {
+                        remoteHost: 'https://hf-mirror.com'
+                    },
+                    progress_callback: (progress) => {
+                        if (!onProgress) return;
+                        const status = progress.status || '';
+                        const pct = extractProgress(progress);
                         const file = progress.file || '';
-                        onProgress('loading', pct, '正在下载模型 ' + (file ? '(' + file + ')' : '') + ' ' + pct + '%');
-                    } else if (status === 'compiling' || status === 'init') {
-                        onProgress('compiling', pct || 50, '正在编译模型...');
-                    } else if (status === 'done' || status === 'ready') {
-                        onProgress('loading', 100, '模型加载完成');
+
+                        if (status === 'initiate' || status === 'download') {
+                            onProgress('loading', pct, '开始下载 ' + file);
+                        } else if (status === 'progress') {
+                            // 显示当前文件名和进度
+                            const shortFile = file.split('/').pop() || file;
+                            onProgress('loading', pct, '下载 ' + shortFile + ' ' + pct + '%');
+                        } else if (status === 'done') {
+                            onProgress('loading', pct, '下载完成 ' + file);
+                        }
                     }
-                }
-            });
+                });
+            } catch (err) {
+                // 下载失败，重置 loadPromise 允许重试
+                loadPromise = null;
+                const msg = err && err.message ? err.message : String(err);
+                throw new Error('模型下载失败：' + msg + '。请检查网络后刷新页面重试。');
+            }
 
             if (onProgress) onProgress('loading', 100, '模型加载完成，可以开始合成');
             return ttsInstance;

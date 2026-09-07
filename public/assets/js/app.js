@@ -427,8 +427,9 @@ async function callTTS(text, engine, voiceId, apiKey, format, speed) {
             if (hint) {
                 const span = hint.querySelector('span');
                 if (span) {
-                    if (stage === 'loading') span.textContent = '下载中 ' + pct + '%';
-                    else if (stage === 'compiling') span.textContent = '编译中...';
+                    // 优先显示详细消息（含文件名），没有则显示简洁进度
+                    if (msg) span.textContent = msg;
+                    else if (stage === 'loading') span.textContent = '下载中 ' + pct + '%';
                     else if (stage === 'synth') span.textContent = '合成中 ' + pct + '%';
                     else span.textContent = pct + '%';
                 }
