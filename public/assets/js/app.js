@@ -1202,11 +1202,17 @@ document.addEventListener('DOMContentLoaded', () => {
             adjustFullscreenHeight();
         });
     }
-    // 监听页面滚动，全屏模式下强制滚回顶部
+    // 监听页面滚动，全屏模式下强制滚回顶部（用rAF批量处理避免跳动）
+    let scrollFixRaf = null;
     window.addEventListener('scroll', () => {
-        if (document.body.classList.contains('chat-fullscreen')) {
-            window.scrollTo(0, 0);
-        }
+        if (!document.body.classList.contains('chat-fullscreen')) return;
+        if (scrollFixRaf) return;
+        scrollFixRaf = requestAnimationFrame(() => {
+            scrollFixRaf = null;
+            if (window.scrollY > 0 || window.scrollX > 0) {
+                window.scrollTo(0, 0);
+            }
+        });
     }, { passive: true });
     // 输入框聚焦时也触发一次（只调一次，避免每次点击都动）
     const chatInputForKb = document.getElementById('chat-input');
