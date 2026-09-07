@@ -147,11 +147,26 @@ function toggleChatFullscreen() {
 
 // 初始化全屏模式状态
 function initFullscreenMode() {
-    if (localStorage.getItem('CHAT_FULLSCREEN') === '1') {
+    // 只有聊天页面可见时才启用全屏
+    const chatSection = document.getElementById('chat-section');
+    const isChatVisible = chatSection && !chatSection.classList.contains('hidden');
+    if (localStorage.getItem('CHAT_FULLSCREEN') === '1' && isChatVisible) {
         document.body.classList.add('chat-fullscreen');
         const btn = document.querySelector('#chat-section .card-body > div:first-child button[onclick="toggleChatFullscreen()"] i');
         if (btn) btn.className = 'fa-solid fa-compress';
+    } else {
+        // 非聊天页面强制退出全屏
+        document.body.classList.remove('chat-fullscreen');
+        localStorage.setItem('CHAT_FULLSCREEN', '0');
     }
+    // 持续检查：非聊天页面时强制退出全屏
+    setInterval(() => {
+        const chat = document.getElementById('chat-section');
+        if (chat && chat.classList.contains('hidden') && document.body.classList.contains('chat-fullscreen')) {
+            document.body.classList.remove('chat-fullscreen');
+            localStorage.setItem('CHAT_FULLSCREEN', '0');
+        }
+    }, 500);
 }
 
 // 双击消息菜单
