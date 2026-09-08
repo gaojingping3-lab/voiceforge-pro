@@ -8,6 +8,12 @@ const OPENAI_VOICE_MAP = {
   onyx: "zh-CN-XiaoyiNeural",
   nova: "zh-CN-YunxiNeural",
   echo: "zh-CN-liaoning-XiaobeiNeural",
+  xiaohan: "zh-CN-XiaohanNeural",
+  xiaomeng: "zh-CN-XiaomengNeural",
+  xiaomo: "zh-CN-XiaomoNeural",
+  xiaoxuan: "zh-CN-XiaoxuanNeural",
+  xiaoyan: "zh-CN-XiaoyanNeural",
+  xiaozhen: "zh-CN-XiaozhenNeural",
 };
 
 let tokenInfo = { endpoint: null, token: null, expiredAt: null };
