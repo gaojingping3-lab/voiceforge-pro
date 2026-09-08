@@ -800,7 +800,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="form-control w-full mb-4">
                     <label class="label py-1"><span class="label-text font-bold">生图模型</span></label>
                     <select id="image-model-select" class="select select-bordered w-full text-sm" onchange="saveImageModel()">
-                        <option value="dreamshaper">DreamShaper 8 LCM（推荐，审核宽松，速度快）</option>
+                        <option value="auto">🤖 AI自动选模型（推荐，失败自动轮换）</option>
+                        <option value="dreamshaper">DreamShaper 8 LCM（审核宽松，速度快）</option>
                         <option value="pollinations-flux-realism">Pollinations Flux 写实（照片级，几乎无审核）</option>
                         <option value="pollinations-zimage">Pollinations Z-Image（高画质+2x超分，几乎无审核）</option>
                         <option value="pollinations-seedream">Pollinations Seedream（中文友好，几乎无审核）</option>

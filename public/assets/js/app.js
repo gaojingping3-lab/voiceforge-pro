@@ -3435,7 +3435,7 @@ function saveImageModel() {
 }
 
 function getImageModel() {
-    const model = localStorage.getItem('IMAGE_MODEL') || 'dreamshaper';
+    const model = localStorage.getItem('IMAGE_MODEL') || 'auto';
     // 兼容旧版本：pollinations -> pollinations-flux
     if (model === 'pollinations') return 'pollinations-flux';
     return model;
@@ -3484,32 +3484,86 @@ async function optimizeImagePrompt(prompt) {
 }
 
 // 生图核心函数：先优化提示词（细节拉满），再生成图片，不自动降级
+// 根据提示词关键词自动挑选最合适的Pollinations模型
+function pickModelByPrompt(prompt) {
+    const p = prompt.toLowerCase();
+    // 写实人像/照片类 → flux-realism
+    if (/(photo|realistic|portrait|person|woman|man|girl|boy|face|照片|写实|人像|人物|女孩|男孩|女人|男人|脸)/.test(p)) {
+        return 'pollinations-flux-realism';
+    }
+    // 中文场景/国风/艺术 → seedream
+    if (/(chinese|china|ancient|国风|古风|中式|场景|风景|山水)/.test(p)) {
+        return 'pollinations-seedream';
+    }
+    // 默认通用 → flux
+    return 'pollinations-flux';
+}
+
+// 自动轮换队列（只使用Pollinations无审核系列，去掉不稳定的zimage）
+const AUTO_MODEL_QUEUE = ['pollinations-flux-realism', 'pollinations-seedream', 'pollinations-flux'];
+
 async function generateImageWithSafety(prompt, model, onStatusUpdate) {
     // 第一步：用LLM把提示词优化成细节拉满的版本
     if (onStatusUpdate) onStatusUpdate('正在优化提示词细节...');
     const optimizedPrompt = await optimizeImagePrompt(prompt);
 
-    // 第二步：生成图片
-    if (onStatusUpdate) onStatusUpdate('正在生成图片...');
-
-    const response = await fetch('/api/image/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: optimizedPrompt, model: model })
-    });
-
-    if (!response.ok) {
-        // 读取错误信息，直接抛出，不自动降级重试
-        let errorMsg = '生成失败';
-        try {
-            const errData = await response.json();
-            errorMsg = errData.error || errorMsg;
-        } catch (e) {}
-        throw new Error(errorMsg);
+    // 第二步：确定使用的模型列表
+    let modelsToTry;
+    if (model === 'auto') {
+        // 自动模式：DeepSeek根据提示词选第一个，失败后按队列轮换
+        const firstModel = pickModelByPrompt(optimizedPrompt);
+        // 把选中的模型放第一个，后面跟队列里其他模型（去重）
+        modelsToTry = [firstModel, ...AUTO_MODEL_QUEUE.filter(m => m !== firstModel)];
+        if (onStatusUpdate) onStatusUpdate(`AI自动选择模型: ${firstModel.replace('pollinations-', '')}（第1/3次）`);
+    } else {
+        // 手动指定模型：只用这一个，不轮换
+        modelsToTry = [model];
     }
 
-    const blob = await response.blob();
-    return { blob: blob, prompt: optimizedPrompt };
+    // 第三步：逐个尝试生成，最多3次
+    let lastError = null;
+    for (let attempt = 0; attempt < modelsToTry.length; attempt++) {
+        const currentModel = modelsToTry[attempt];
+        const modelName = currentModel.replace('pollinations-', '');
+
+        if (attempt > 0 && onStatusUpdate) {
+            onStatusUpdate(`上一个模型失败，自动更换为 ${modelName}（第${attempt + 1}/3次）`);
+        }
+
+        try {
+            const response = await fetch('/api/image/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: optimizedPrompt, model: currentModel })
+            });
+
+            if (!response.ok) {
+                let errorMsg = '生成失败';
+                try {
+                    const errData = await response.json();
+                    errorMsg = errData.error || errorMsg;
+                } catch (e) {}
+                throw new Error(errorMsg);
+            }
+
+            const blob = await response.blob();
+            return { blob: blob, prompt: optimizedPrompt, model: currentModel };
+        } catch (err) {
+            lastError = err;
+            // 如果是手动模式或者已经是最后一次，不再重试
+            if (model !== 'auto' || attempt === modelsToTry.length - 1) {
+                break;
+            }
+            // 自动模式：等待1秒后换下一个模型
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+
+    // 所有尝试都失败
+    if (model === 'auto') {
+        throw new Error('所有备选模型请求失败（已尝试3次），生成终止，请稍后重试。最后错误: ' + (lastError ? lastError.message : '未知错误'));
+    }
+    throw lastError;
 }
 
 async function generateImage() {
