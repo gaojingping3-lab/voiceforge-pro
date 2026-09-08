@@ -67,10 +67,6 @@ export async function onRequestPost(context) {
       flux: {
         id: '@cf/black-forest-labs/flux-1-schnell',
         params: { prompt: prompt }
-      },
-      sdxl: {
-        id: '@cf/stabilityai/stable-diffusion-xl-base-1.0',
-        params: { prompt: prompt, num_steps: 15, guidance: 5.0 }
       }
     };
 
