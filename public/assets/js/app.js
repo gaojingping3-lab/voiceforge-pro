@@ -1359,11 +1359,11 @@ function renderChatHistory() {
         if (msg.role === 'user') {
             const div = document.createElement('div');
             div.className = 'chat chat-end gap-2';
-            div.appendChild(createChatAvatar('我', true));
             const bubble = document.createElement('div');
             bubble.className = 'chat-bubble bg-primary text-primary-content';
             bubble.innerText = msg.content;
             div.appendChild(bubble);
+            div.appendChild(createChatAvatar('我', true));
             container.appendChild(div);
         } else {
             // 修复：解析双角色 [角色名] 内容格式，正确显示角色名标签和颜色
@@ -1382,11 +1382,11 @@ function renderChatHistory() {
                 }
                 const div = document.createElement('div');
                 div.className = 'chat chat-start relative msg-enter gap-2';
+                div.appendChild(createChatAvatar(speakerName, false));
                 const bubble = document.createElement('div');
                 bubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
                 bubble.innerHTML = '<span class="text-xs font-bold block mb-1" style="color:' + color + '">' + escapeHtml(speakerName) + '</span>' + formatChatText(content);
                 div.appendChild(bubble);
-                div.appendChild(createChatAvatar(speakerName, false));
                 const playBtn = document.createElement('button');
                 playBtn.className = 'play-voice-btn absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
                 playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
@@ -1426,17 +1426,20 @@ function appendChatMessage(text, type) {
     const isUser = type === 'user';
     const role = getCurrentRole();
     const avatarName = isUser ? '我' : (role ? role.name : 'AI');
-    // 微信风：用户头像在右，AI头像在左
-    if (isUser) {
-        div.appendChild(createChatAvatar(avatarName, true));
-    }
     const bubble = document.createElement('div');
     bubble.className = `chat-bubble ${type === 'user' ? 'bg-primary text-white' : 'bg-base-200 text-base-content'} relative pr-8`;
     // AI消息台词上色，用户消息保持原样
     bubble.innerHTML = type === 'ai' ? formatChatText(text) : escapeHtml(text);
-    div.appendChild(bubble);
+
+    // 微信风正确顺序：
+    // chat-start(AI左): 头像在前，气泡在后
+    // chat-end(用户右): 气泡在前，头像在后
     if (!isUser) {
         div.appendChild(createChatAvatar(avatarName, false));
+    }
+    div.appendChild(bubble);
+    if (isUser) {
+        div.appendChild(createChatAvatar(avatarName, true));
     }
 
     // AI消息后面加播放按钮（放在右下角）
@@ -1973,12 +1976,12 @@ async function sendChatMessage() {
     const container = document.getElementById('chat-messages');
     const loadingDiv = document.createElement('div');
     loadingDiv.className = 'chat chat-start relative msg-enter gap-2';
+    const role = getCurrentRole();
+    loadingDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
     const loadingBubble = document.createElement('div');
     loadingBubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
     loadingBubble.innerHTML = '乐正在思考 <span class="thinking-dots"><span></span><span></span><span></span></span>';
     loadingDiv.appendChild(loadingBubble);
-    const role = getCurrentRole();
-    loadingDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
     container.appendChild(loadingDiv);
     smartScroll(container);
     sfxStart();
@@ -2258,7 +2261,8 @@ function createChatAvatar(name, isUser) {
     const wrap = document.createElement('div');
     wrap.className = 'chat-image avatar flex-shrink-0';
     const inner = document.createElement('div');
-    inner.className = 'w-9 h-9 rounded-full overflow-hidden flex items-center justify-center text-white text-sm font-bold shadow-md';
+    // 微信风格：圆角矩形（8px圆角），40px固定宽高
+    inner.className = 'w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center text-white text-sm font-bold shadow-md';
     if (avatarData.type === 'image') {
         const img = document.createElement('img');
         img.src = avatarData.src;
@@ -2462,11 +2466,11 @@ function switchRole(id) {
         if (role.opening && chatContainer) {
             const aiDiv = document.createElement('div');
             aiDiv.className = 'chat chat-start msg-enter relative gap-2';
+            aiDiv.appendChild(createChatAvatar(role.name, false));
             const bubble = document.createElement('div');
             bubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
             bubble.innerHTML = formatChatText(role.opening);
             aiDiv.appendChild(bubble);
-            aiDiv.appendChild(createChatAvatar(role.name, false));
             // 加播放按钮
             const playBtn = document.createElement('button');
             playBtn.className = 'play-voice-btn absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
@@ -2885,11 +2889,11 @@ ${currentRole.desc}
     const container = document.getElementById('chat-messages');
     const thinkingDiv = document.createElement('div');
     thinkingDiv.className = 'chat chat-start relative msg-enter gap-2';
+    thinkingDiv.appendChild(createChatAvatar(currentRole.name, false));
     const thinkingBubble = document.createElement('div');
     thinkingBubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
     thinkingBubble.innerHTML = `${currentRole.name}正在思考 <span class="thinking-dots"><span></span><span></span><span></span></span>`;
     thinkingDiv.appendChild(thinkingBubble);
-    thinkingDiv.appendChild(createChatAvatar(currentRole.name, false));
     container.appendChild(thinkingDiv);
     smartScroll(container);
 
@@ -2925,13 +2929,13 @@ ${currentRole.desc}
         thinkingDiv.remove();
         const replyDiv = document.createElement('div');
         replyDiv.className = 'chat chat-start relative msg-enter gap-2';
+        replyDiv.appendChild(createChatAvatar(currentRole.name, false));
         const replyBubble = document.createElement('div');
         // 角色A用橙色，角色B用蓝色，区分两个角色
         const color = dualCurrentSpeaker === 'A' ? '#fb923c' : '#3b82f6';
         replyBubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
         replyBubble.innerHTML = `<span class="text-xs font-bold block mb-1" style="color:${color}">${escapeHtml(currentRole.name)}</span>${formatChatText(reply)}`;
         replyDiv.appendChild(replyBubble);
-        replyDiv.appendChild(createChatAvatar(currentRole.name, false));
 
         // 加播放按钮
         const playBtn = document.createElement('button');
