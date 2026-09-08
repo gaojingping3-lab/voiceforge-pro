@@ -1887,7 +1887,7 @@ async function sendChatMessage() {
     if (!text) return;
 
     // 检测生图关键词：发送"拍张照片"等消息时直接触发生图，不走普通对话
-    const photoKeywords = ['拍张照片', '拍张照', '拍照看看', '拍个照', '发张照片', '发张图', '画张图', '生成图片', '拍照片', '看看照片', '什么样子'];
+    const photoKeywords = ['拍张照片', '拍张照', '拍照看看', '拍个照', '发张照片', '发张图', '画张图', '生成图片', '拍照片', '看看照片'];
     const isPhotoRequest = photoKeywords.some(kw => text.includes(kw));
     if (isPhotoRequest) {
         input.value = '';
@@ -2087,6 +2087,14 @@ async function sendChatMessage() {
 
         if (!res.ok) {
             const errText = await res.text();
+            // 402余额不足：给出友好中文提示
+            if (res.status === 402 || errText.includes('Insufficient Balance')) {
+                throw new Error('大模型API余额不足，请前往DeepSeek开放平台充值，或在设置中更换API Key');
+            }
+            // 401认证失败
+            if (res.status === 401) {
+                throw new Error('API Key无效或已过期，请检查设置中的API Key是否正确');
+            }
             throw new Error(`大模型请求失败: ${res.status} ${errText.substring(0, 100)}`);
         }
 
@@ -3655,7 +3663,7 @@ async function generateImage() {
         if (errMsg.includes('NSFW') || errMsg.includes('8007')) {
             alert('生成失败：提示词包含敏感元素，已被安全审核拦截。\n\n建议：描述一些日常、温馨的场景。');
         } else if (errMsg.includes('429')) {
-            alert('生成失败：请求太频繁被限流了。\n\n建议：等10-20秒再试，或者换成 DreamShaper 模型。');
+            alert('生成失败：请求太频繁被限流了。\n\n建议：等10-20秒再试，或者切换其他生图模型。');
         } else {
             alert('生成失败: ' + errMsg + '\n\n可能原因：\n1. 免费额度已用完（每天重置）\n2. 网络问题，请重试\n3. 请求太频繁，稍后再试');
         }
@@ -3670,13 +3678,22 @@ async function generateImage() {
 // 根据对话生成图片
 // ============================================
 
+// 生图防重复触发标志
+let isGeneratingChatImage = false;
+
 async function generateImageFromChat() {
+    // 防重复：正在生成时直接返回
+    if (isGeneratingChatImage) {
+        alert('图片正在生成中，请稍候...');
+        return;
+    }
     // 取最近两条消息（1用户+1AI）
     const recentMessages = chatHistory.slice(-2);
     if (recentMessages.length < 2) {
         alert('至少需要一轮对话才能生成图片');
         return;
     }
+    isGeneratingChatImage = true;
 
     // 在聊天区显示加载气泡
     const container = document.getElementById('chat-messages');
@@ -3776,7 +3793,7 @@ async function generateImageFromChat() {
                 imageBubble.querySelector('img').src = newImageUrl;
                 imageBubble.querySelector('a[download]').href = newImageUrl;
             } catch (err) {
-                alert('重新生成失败: ' + (err.message || err));
+                alert('重新生成失败，图片未更新（仍是原图）: ' + (err.message || err));
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> 重新生成';
@@ -3785,15 +3802,17 @@ async function generateImageFromChat() {
         imageDiv.appendChild(imageBubble);
         container.appendChild(imageDiv);
         smartScroll(container);
+        isGeneratingChatImage = false;
 
     } catch (error) {
         console.error('对话生图失败:', error);
         loadingDiv.remove();
+        isGeneratingChatImage = false;
         const errMsg = error.message || '';
         if (errMsg.includes('NSFW') || errMsg.includes('8007')) {
             alert('生成失败：对话内容包含敏感元素，已被安全审核拦截。\n\n建议：聊一些日常、温馨的场景再试试。');
         } else if (errMsg.includes('429')) {
-            alert('生成失败：请求太频繁被限流了。\n\n建议：等10-20秒再试，或者换成 DreamShaper 模型。');
+            alert('生成失败：请求太频繁被限流了。\n\n建议：等10-20秒再试，或者切换其他生图模型。');
         } else {
             alert('生成失败: ' + errMsg + '\n\n可能原因：\n1. 生图免费额度已用完（每天重置）\n2. 网络问题，请重试\n3. 请求太频繁，稍后再试');
         }
