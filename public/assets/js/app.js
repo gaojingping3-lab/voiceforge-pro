@@ -3473,3 +3473,126 @@ async function generateImage() {
         btn.classList.remove('btn-disabled');
     }
 }
+
+// ============================================
+// 根据对话生成图片
+// ============================================
+
+async function generateImageFromChat() {
+    // 取最近两轮对话（4条消息：2用户+2AI）
+    const recentMessages = chatHistory.slice(-4);
+    if (recentMessages.length < 2) {
+        alert('至少需要一轮对话才能生成图片');
+        return;
+    }
+
+    // 在聊天区显示加载气泡
+    const container = document.getElementById('chat-messages');
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'chat chat-start relative gap-2';
+    const role = getCurrentRole();
+    loadingDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
+    const loadingBubble = document.createElement('div');
+    loadingBubble.className = 'chat-bubble bg-base-200 text-base-content';
+    loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在根据对话生成图片...</span></div>';
+    loadingDiv.appendChild(loadingBubble);
+    container.appendChild(loadingDiv);
+    smartScroll(container);
+
+    try {
+        // 1. 调用 LLM 把对话整理成生图提示词
+        const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+        const llmKey = localStorage.getItem('LLM_KEY') || '';
+        const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+
+        if (!llmKey) {
+            alert('请先在设置里配置大模型 API Key');
+            loadingDiv.remove();
+            return;
+        }
+
+        const conversationText = recentMessages.map(m =>
+            `${m.role === 'user' ? '我' : 'AI'}: ${m.content}`
+        ).join('\n');
+
+        const promptResponse = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${llmKey}`
+            },
+            body: JSON.stringify({
+                baseUrl: llmUrl,
+                model: llmModel,
+                messages: [
+                    {
+                        role: 'system',
+                        content: '你是一个专业的AI绘画提示词工程师。根据用户提供的对话内容，提取关键场景、人物、动作、环境、氛围等信息，生成一段适合Stable Diffusion/Flux模型的英文生图提示词。要求：1.只用英文输出 2.描述具体的视觉元素 3.包含光线、氛围、风格 4.不要输出任何解释或前缀，直接输出提示词本身 5.长度控制在50-100个单词'
+                    },
+                    {
+                        role: 'user',
+                        content: `根据以下对话生成生图提示词：\n\n${conversationText}`
+                    }
+                ],
+                temperature: 0.7,
+                stream: false
+            })
+        });
+
+        if (!promptResponse.ok) {
+            throw new Error('提示词生成失败');
+        }
+
+        const promptData = await promptResponse.json();
+        const imagePrompt = promptData.choices?.[0]?.message?.content?.trim() || conversationText;
+
+        // 更新加载状态
+        loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在绘制图片...</span></div>';
+
+        // 2. 调用生图 API
+        const imageResponse = await fetch('/api/image/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: imagePrompt })
+        });
+
+        if (!imageResponse.ok) {
+            let errorMsg = '图片生成失败';
+            try {
+                const errData = await imageResponse.json();
+                errorMsg = errData.error || errorMsg;
+            } catch (e) {}
+            throw new Error(errorMsg);
+        }
+
+        // 3. 获取图片 blob，创建 URL
+        const blob = await imageResponse.blob();
+        const imageUrl = URL.createObjectURL(blob);
+
+        // 4. 把图片插入聊天记录
+        loadingDiv.remove();
+
+        const imageDiv = document.createElement('div');
+        imageDiv.className = 'chat chat-start relative gap-2';
+        imageDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
+
+        const imageBubble = document.createElement('div');
+        imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-2 max-w-[80%]';
+        imageBubble.innerHTML = `
+            <div class="text-xs text-gray-500 mb-2">🎨 根据对话生成</div>
+            <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
+            <div class="text-xs text-gray-400 mt-2 break-all">${escapeHtml(imagePrompt.substring(0, 100))}${imagePrompt.length > 100 ? '...' : ''}</div>
+            <div class="flex gap-2 mt-2">
+                <a href="${imageUrl}" download="chat-generated.jpg" class="btn btn-primary btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
+            </div>
+        `;
+        imageDiv.appendChild(imageBubble);
+        container.appendChild(imageDiv);
+        smartScroll(container);
+
+    } catch (error) {
+        console.error('对话生图失败:', error);
+        loadingDiv.remove();
+        alert('生成失败: ' + error.message + '\n\n可能原因：\n1. 大模型API Key未配置\n2. 生图免费额度已用完\n3. 网络问题，请重试');
+    }
+}
