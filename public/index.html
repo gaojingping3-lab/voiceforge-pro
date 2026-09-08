@@ -843,10 +843,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     <textarea id="image-prompt" class="textarea textarea-bordered w-full h-28 text-sm" placeholder="描述你想要生成的画面，例如：一只可爱的橘猫在阳光下看书，温馨的书房氛围"></textarea>
                 </div>
 
-                <!-- 生成按钮 -->
-                <button id="image-generate-btn" class="btn btn-primary w-full mb-4" onclick="generateImage()">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> 生成图片
-                </button>
+                <!-- 按钮区：AI优化提示词 + 生成图片 -->
+                <div class="flex gap-2 mb-4">
+                    <button id="btn-optimize-prompt" class="btn btn-secondary flex-1" onclick="optimizePromptManual()">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> AI优化提示词
+                    </button>
+                    <button id="image-generate-btn" class="btn btn-primary flex-1" onclick="generateImage()">
+                        <i class="fa-solid fa-image"></i> 生成图片
+                    </button>
+                </div>
 
                 <!-- 生成状态 -->
                 <div id="image-status" class="hidden mb-4 p-3 bg-base-200/60 rounded-xl text-center">
@@ -1219,6 +1224,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </dialog>
 
-    <script src="assets/js/app.js?v=20260909t"></script>
+    <script src="assets/js/app.js?v=20260909u"></script>
 </body>
 </html>

@@ -1772,6 +1772,14 @@ document.addEventListener('DOMContentLoaded', () => {
     initSingleVoiceSelect(); // 恢复单人模式AI声音选择
     loadImageModelSelect(); // 恢复生图模型选择
 
+    // 生图页面：用户手动编辑提示词时，清除"已优化"标记
+    const imagePromptInput = document.getElementById('image-prompt');
+    if (imagePromptInput) {
+        imagePromptInput.addEventListener('input', () => {
+            isPromptOptimized = false;
+        });
+    }
+
     // 第一次用户交互时强制恢复 AudioContext（解决移动端音效不生效）
     const unlockAudio = () => {
         const ctx = getAudioCtx();
@@ -3810,6 +3818,39 @@ async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimiz
     throw lastError;
 }
 
+// 生图页面：提示词是否已被AI优化（优化后生成时不再重复优化）
+let isPromptOptimized = false;
+
+// 手动点击"AI优化提示词"按钮
+async function optimizePromptManual() {
+    const input = document.getElementById('image-prompt');
+    const btn = document.getElementById('btn-optimize-prompt');
+    const prompt = input.value.trim();
+
+    if (!prompt) {
+        alert('请先输入画面描述');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 优化中...';
+
+    try {
+        const optimized = await optimizeImagePrompt(prompt);
+        input.value = optimized;
+        isPromptOptimized = true;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> 已优化';
+        setTimeout(() => {
+            btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> AI优化提示词';
+            btn.disabled = false;
+        }, 1500);
+    } catch (e) {
+        alert('提示词优化失败: ' + (e.message || e));
+        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> AI优化提示词';
+        btn.disabled = false;
+    }
+}
+
 async function generateImage() {
     const prompt = document.getElementById('image-prompt').value.trim();
     const model = getImageModel();
@@ -3830,9 +3871,14 @@ async function generateImage() {
     btn.classList.add('btn-disabled');
 
     try {
+        // 如果已经手动优化过提示词，直接用当前文本，不再重复优化
+        const preOptimized = isPromptOptimized ? prompt : null;
         const result = await generateImageWithSafety(prompt, model, (msg) => {
             if (statusText) statusText.textContent = msg;
-        });
+        }, preOptimized);
+
+        // 生成完成后重置优化标记，下次输入新提示词时重新优化
+        isPromptOptimized = false;
 
         const imageUrl = URL.createObjectURL(result.blob);
 
