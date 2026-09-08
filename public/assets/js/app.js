@@ -2165,7 +2165,7 @@ async function sendChatMessage() {
         if (isV4OrReasoner) {
             if (reasoningLevel === 'low' || reasoningLevel === 'medium' || reasoningLevel === 'high') {
                 // 用户主动开启思考：低/中/高（修正映射，中=medium）
-                const effortMap = { 'low': 'low', 'medium': 'medium', 'high': 'max' };
+                const effortMap = { 'low': 'low', 'medium': 'medium', 'high': 'high' };
                 requestBody.thinking = { type: 'enabled' };
                 requestBody.reasoning_effort = effortMap[reasoningLevel] || 'low';
             } else {
@@ -2177,25 +2177,27 @@ async function sendChatMessage() {
         requestBody.stream = true;
         requestBody.stream_options = { include_usage: true };
 
+        // 只对网络层异常快速重试一次（不固定等待1秒）；HTTP错误已收到服务器响应，不重试
         let res;
-        for (let attempt = 0; attempt < 2; attempt++) {
-            try {
-                res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${llmKey}`
-                    },
-                    body: JSON.stringify(requestBody)
-                });
-                break; // 成功就跳出循环
-            } catch (e) {
-                if (attempt === 0) {
-                    await new Promise(r => setTimeout(r, 1000)); // 等1秒再重试
-                    continue;
-                }
-                throw e; // 第二次还失败就抛出
-            }
+        try {
+            res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${llmKey}`
+                },
+                body: JSON.stringify(requestBody)
+            });
+        } catch (firstError) {
+            // 网络异常（断网/CORS/超时）才快速重试一次
+            res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${llmKey}`
+                },
+                body: JSON.stringify(requestBody)
+            });
         }
 
         if (!res.ok) {
@@ -3117,7 +3119,7 @@ ${currentRole.desc}
         const dualIsV4 = llmModel.toLowerCase().includes('v4') || llmModel.toLowerCase().includes('reasoner');
         if (dualIsV4) {
             if (dualReasoningLevel === 'low' || dualReasoningLevel === 'medium' || dualReasoningLevel === 'high') {
-                const effortMap = { 'low': 'low', 'medium': 'medium', 'high': 'max' };
+                const effortMap = { 'low': 'low', 'medium': 'medium', 'high': 'high' };
                 dualRequestBody.thinking = { type: 'enabled' };
                 dualRequestBody.reasoning_effort = effortMap[dualReasoningLevel] || 'low';
             } else {
