@@ -321,7 +321,7 @@
   body:not(.theme-obsidian):not(.theme-dark) .chat-bubble {
     box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
   }
-  /* 微信风头像布局：确保左右并排不重叠 */
+  /* 微信风头像布局：确保左右并排不重叠，顶部完美对齐 */
   #chat-messages .chat {
     display: flex !important;
     align-items: flex-start !important;
@@ -335,11 +335,21 @@
   }
   #chat-messages .chat-image {
     flex-shrink: 0 !important;
-    margin-top: 2px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    align-self: flex-start !important;
+    line-height: 0 !important;
+  }
+  #chat-messages .chat-image > div {
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1 !important;
   }
   #chat-messages .chat-bubble {
     max-width: calc(100% - 52px) !important;
     word-break: break-word !important;
+    margin: 0 !important;
+    align-self: flex-start !important;
   }
 </style>
 
