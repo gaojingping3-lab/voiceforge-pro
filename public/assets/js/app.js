@@ -400,19 +400,22 @@ let ttsKeepAliveGain = null;
 let ttsAudioInited = false;
 
 // 用户点击时调用：激活 AudioContext 并启动静音振荡器保活
-function initTTSAudio() {
+async function initTTSAudio() {
     if (ttsAudioInited) return;
     const ctx = getAudioCtx();
-    if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
+    // 严格等待硬件音频会话激活
+    if (ctx.state !== 'running') {
+        await ctx.resume();
     }
     // 静音振荡器，gain 几乎为 0，保持音频会话活跃
-    ttsKeepAliveOsc = ctx.createOscillator();
-    ttsKeepAliveGain = ctx.createGain();
-    ttsKeepAliveGain.gain.value = 0.00001;
-    ttsKeepAliveOsc.connect(ttsKeepAliveGain);
-    ttsKeepAliveGain.connect(ctx.destination);
-    ttsKeepAliveOsc.start();
+    if (!ttsKeepAliveOsc) {
+        ttsKeepAliveOsc = ctx.createOscillator();
+        ttsKeepAliveGain = ctx.createGain();
+        ttsKeepAliveGain.gain.value = 0.00001;
+        ttsKeepAliveOsc.connect(ttsKeepAliveGain);
+        ttsKeepAliveGain.connect(ctx.destination);
+        ttsKeepAliveOsc.start();
+    }
     ttsAudioInited = true;
 }
 
@@ -441,11 +444,12 @@ function stopTTSCurrent() {
 }
 
 // 播放 AudioBuffer
-function playTTSBuffer(audioBuffer, onEnded) {
+async function playTTSBuffer(audioBuffer, onEnded) {
     stopTTSCurrent();
     const ctx = getAudioCtx();
-    if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
+    // 关键：严格等待 AudioContext 真正就绪，否则 iOS 会静默丢帧
+    if (ctx.state !== 'running') {
+        await ctx.resume();
     }
     const source = ctx.createBufferSource();
     source.buffer = audioBuffer;
@@ -1252,8 +1256,8 @@ async function playChatMessage(bubble) {
 
     // 播放锁：正在播放中，忽略新的点击
     if (isChatAudioPlaying) return;
-    isChatAudioPlaying = true;
-    stopAllAudio();
+    stopAllAudio(); // 先停止之前的播放
+    isChatAudioPlaying = true; // 然后设置新锁（不会被stopAllAudio重置）
 
     // 如果有缓存的音频，直接播放，不用再调用API
     if (bubble.cachedAudioUrl) {
@@ -1261,7 +1265,7 @@ async function playChatMessage(bubble) {
             const res = await fetch(bubble.cachedAudioUrl);
             const arrayBuffer = await res.arrayBuffer();
             const audioBuffer = await decodeTTSAudio(arrayBuffer);
-            playTTSBuffer(audioBuffer, () => { isChatAudioPlaying = false; });
+            await playTTSBuffer(audioBuffer, () => { isChatAudioPlaying = false; });
         } catch (err) {
             console.error('缓存播放失败:', err);
             isChatAudioPlaying = false;
@@ -1300,12 +1304,12 @@ async function playChatMessage(bubble) {
         const res = await callTTS(speakText, engine, voiceId, apiKey, format, speed);
         if (!res.ok) throw new Error('TTS请求失败');
         const audioBlob = await res.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
-        // 缓存到bubble上，下次播放直接用
-        bubble.cachedAudioUrl = audioUrl;
+        // 缓存 blob URL 供手动播放/下载使用
+        bubble.cachedAudioUrl = URL.createObjectURL(audioBlob);
+        // 直接用 blob.arrayBuffer()，不走 fetch 避免 iOS WebKit 伪协议层问题
         const arrayBuffer = await audioBlob.arrayBuffer();
         const audioBuffer = await decodeTTSAudio(arrayBuffer);
-        playTTSBuffer(audioBuffer, () => { isChatAudioPlaying = false; });
+        await playTTSBuffer(audioBuffer, () => { isChatAudioPlaying = false; });
     } catch (err) {
         console.error('播放失败:', err);
         isChatAudioPlaying = false;
@@ -1622,7 +1626,7 @@ function toggleVoiceInput() {
 
 // 发送聊天消息
 async function sendChatMessage() {
-    initTTSAudio(); // 激活 iOS 音频会话，保持自动播放权限
+    await initTTSAudio(); // 激活 iOS 音频会话，保持自动播放权限
     const input = document.getElementById('chat-input');
     const text = input.value.trim();
     if (!text) return;
@@ -2252,8 +2256,8 @@ function fillDualRoleSelects() {
 }
 
 // 开始双角色对话
-function startDualChat() {
-    initTTSAudio(); // 激活 iOS 音频会话，保持自动播放权限
+async function startDualChat() {
+    await initTTSAudio(); // 激活 iOS 音频会话，保持自动播放权限
     const roleAId = document.getElementById('dual-role-a').value;
     const roleBId = document.getElementById('dual-role-b').value;
     if (!roleAId || !roleBId) {
