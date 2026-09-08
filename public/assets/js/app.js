@@ -3607,12 +3607,10 @@ async function generateImageFromChat() {
         imageDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
 
         const imageBubble = document.createElement('div');
-        imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-2 max-w-[80%]';
+        imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-1 max-w-[80%]';
         imageBubble.innerHTML = `
-            <div class="text-xs text-gray-500 mb-2">🎨 根据对话生成</div>
             <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
-            <div class="text-xs text-gray-400 mt-2 break-all">${escapeHtml(result.prompt.substring(0, 100))}${result.prompt.length > 100 ? '...' : ''}</div>
-            <div class="flex gap-2 mt-2">
+            <div class="flex gap-2 mt-2 px-1 pb-1">
                 <a href="${imageUrl}" download="chat-generated.png" class="btn btn-primary btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
             </div>
         `;
