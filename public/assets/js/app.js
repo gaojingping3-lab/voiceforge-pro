@@ -1648,6 +1648,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dualToggle) dualToggle.checked = true;
         toggleDualRoleMode();
     }
+    initDualRoleBarCollapse(); // 恢复双角色控制面板折叠状态
 
     // 第一次用户交互时强制恢复 AudioContext（解决移动端音效不生效）
     const unlockAudio = () => {
@@ -2600,6 +2601,40 @@ let dualRoundCount = 0;
 const DUAL_MAX_ROUNDS = 20; // 最大自动轮数，防止无限消耗
 let dualAbortController = null;
 let dualTimeoutId = null; // 保存双角色对话的setTimeout ID，用户发消息时清除
+
+// 折叠/展开双角色控制面板
+function toggleDualRoleBar() {
+    const details = document.getElementById('dual-role-details');
+    const icon = document.getElementById('dual-collapse-icon');
+    if (!details || !icon) return;
+    const isCollapsed = details.style.maxHeight === '0px';
+    if (isCollapsed) {
+        // 展开
+        details.style.maxHeight = '500px';
+        icon.style.transform = 'rotate(0deg)';
+        localStorage.setItem('DUAL_BAR_COLLAPSED', '0');
+    } else {
+        // 折叠
+        details.style.maxHeight = '0px';
+        icon.style.transform = 'rotate(180deg)';
+        localStorage.setItem('DUAL_BAR_COLLAPSED', '1');
+    }
+}
+
+// 初始化双角色控制面板折叠状态
+function initDualRoleBarCollapse() {
+    const collapsed = localStorage.getItem('DUAL_BAR_COLLAPSED') === '1';
+    const details = document.getElementById('dual-role-details');
+    const icon = document.getElementById('dual-collapse-icon');
+    if (!details || !icon) return;
+    if (collapsed) {
+        details.style.maxHeight = '0px';
+        icon.style.transform = 'rotate(180deg)';
+    } else {
+        details.style.maxHeight = '500px';
+        icon.style.transform = 'rotate(0deg)';
+    }
+}
 
 // 切换双角色模式
 function toggleDualRoleMode() {

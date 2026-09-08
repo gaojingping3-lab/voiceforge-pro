@@ -546,52 +546,71 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
 
                 <!-- 双角色互聊控制栏（默认隐藏） -->
-                <div id="dual-role-bar" class="hidden mb-3 p-3 bg-base-200 rounded-xl">
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="text-xs font-bold">角色A</span>
-                        <select id="dual-role-a" class="select select-bordered select-xs flex-1"></select>
-                        <span class="text-xs font-bold">角色B</span>
-                        <select id="dual-role-b" class="select select-bordered select-xs flex-1"></select>
+                <div id="dual-role-bar" class="hidden mb-3 bg-base-200 rounded-xl overflow-hidden">
+                    <!-- 标题栏：常驻，含折叠按钮 -->
+                    <div class="flex items-center justify-between px-3 py-2 cursor-pointer select-none" onclick="toggleDualRoleBar()">
+                        <span class="text-xs font-bold flex items-center gap-1">
+                            <i class="fa-solid fa-people-arrows text-primary"></i> 双角色互聊
+                        </span>
+                        <div class="flex items-center gap-2">
+                            <span id="dual-round-count" class="text-xs text-gray-500">0轮</span>
+                            <i id="dual-collapse-icon" class="fa-solid fa-chevron-up text-xs text-gray-400 transition-transform duration-200"></i>
+                        </div>
                     </div>
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="text-xs font-bold w-10 whitespace-nowrap">A声</span>
-                        <select id="dual-voice-a" class="select select-bordered select-xs flex-1 min-w-0">
-                            <option value="shimmer">晓晓(温柔)</option>
-                            <option value="onyx">晓伊(活泼)</option>
-                            <option value="echo">东北女声</option>
-                        </select>
-                        <input type="text" id="dual-voice-a-input" class="input input-bordered input-xs flex-1 min-w-0 hidden" placeholder="声音ID" />
-                        <span class="text-xs font-bold w-10 whitespace-nowrap">B声</span>
-                        <select id="dual-voice-b" class="select select-bordered select-xs flex-1 min-w-0">
-                            <option value="onyx">晓伊(活泼)</option>
-                            <option value="shimmer">晓晓(温柔)</option>
-                            <option value="echo">东北女声</option>
-                        </select>
-                        <input type="text" id="dual-voice-b-input" class="input input-bordered input-xs flex-1 min-w-0 hidden" placeholder="声音ID" />
+
+                    <!-- 详细设置区：可折叠 -->
+                    <div id="dual-role-details" class="px-3 overflow-hidden transition-all duration-300 ease-in-out" style="max-height: 500px;">
+                        <div class="pb-2">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-xs font-bold">角色A</span>
+                                <select id="dual-role-a" class="select select-bordered select-xs flex-1"></select>
+                                <span class="text-xs font-bold">角色B</span>
+                                <select id="dual-role-b" class="select select-bordered select-xs flex-1"></select>
+                            </div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-xs font-bold w-10 whitespace-nowrap">A声</span>
+                                <select id="dual-voice-a" class="select select-bordered select-xs flex-1 min-w-0">
+                                    <option value="shimmer">晓晓(温柔)</option>
+                                    <option value="onyx">晓伊(活泼)</option>
+                                    <option value="echo">东北女声</option>
+                                </select>
+                                <input type="text" id="dual-voice-a-input" class="input input-bordered input-xs flex-1 min-w-0 hidden" placeholder="声音ID" />
+                                <span class="text-xs font-bold w-10 whitespace-nowrap">B声</span>
+                                <select id="dual-voice-b" class="select select-bordered select-xs flex-1 min-w-0">
+                                    <option value="onyx">晓伊(活泼)</option>
+                                    <option value="shimmer">晓晓(温柔)</option>
+                                    <option value="echo">东北女声</option>
+                                </select>
+                                <input type="text" id="dual-voice-b-input" class="input input-bordered input-xs flex-1 min-w-0 hidden" placeholder="声音ID" />
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-bold">指定回复</span>
+                                <select id="dual-reply-target" class="select select-bordered select-xs flex-1">
+                                    <option value="auto">自动轮流</option>
+                                    <option value="A">角色A回复</option>
+                                    <option value="B">角色B回复</option>
+                                    <option value="both">A+B一起回复</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="text-xs font-bold">指定回复</span>
-                        <select id="dual-reply-target" class="select select-bordered select-xs flex-1">
-                            <option value="auto">自动轮流</option>
-                            <option value="A">角色A回复</option>
-                            <option value="B">角色B回复</option>
-                            <option value="both">A+B一起回复</option>
-                        </select>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button id="dual-start-btn" class="btn btn-primary btn-xs flex-1" onclick="startDualChat()">
-                            <i class="fa-solid fa-play"></i> 开始
-                        </button>
-                        <button id="dual-pause-btn" class="btn btn-warning btn-xs flex-1 hidden" onclick="pauseDualChat()">
-                            <i class="fa-solid fa-pause"></i> 暂停
-                        </button>
-                        <button class="btn btn-error btn-xs flex-1" onclick="stopDualChat()">
-                            <i class="fa-solid fa-stop"></i> 终止
-                        </button>
-                        <span id="dual-round-count" class="text-xs text-gray-500 ml-2">0轮</span>
-                    </div>
-                    <div class="text-xs text-gray-500 mt-2">
-                        <i class="fa-solid fa-info-circle"></i> 两个AI自动对话，你可以随时在输入框打字插话
+
+                    <!-- 按钮常驻区：永远显示 -->
+                    <div class="px-3 pb-3 pt-1">
+                        <div class="flex items-center gap-2">
+                            <button id="dual-start-btn" class="btn btn-primary btn-xs flex-1" onclick="startDualChat()">
+                                <i class="fa-solid fa-play"></i> 开始
+                            </button>
+                            <button id="dual-pause-btn" class="btn btn-warning btn-xs flex-1 hidden" onclick="pauseDualChat()">
+                                <i class="fa-solid fa-pause"></i> 暂停
+                            </button>
+                            <button class="btn btn-error btn-xs flex-1" onclick="stopDualChat()">
+                                <i class="fa-solid fa-stop"></i> 终止
+                            </button>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-2">
+                            <i class="fa-solid fa-info-circle"></i> 两个AI自动对话，你可以随时在输入框打字插话
+                        </div>
                     </div>
                 </div>
 
