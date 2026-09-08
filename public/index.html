@@ -223,29 +223,31 @@
   .msg-context-menu button.danger { color: #ef4444; }
   .msg-long-press-active { background: rgba(99, 102, 241, 0.1) !important; border-radius: 8px; }
 
-  /* 聊天全屏模式 */
-  html.chat-fullscreen-html {
-    overflow: hidden !important;
-    height: 100% !important;
-  }
-  body.chat-fullscreen {
+  /* ======================================= */
+  /* 聊天全屏模式 - 原生沉浸式边缘对齐 */
+  /* ======================================= */
+  html.chat-fullscreen-html, body.chat-fullscreen {
     overflow: hidden !important;
     height: 100% !important;
     margin: 0 !important;
-    position: relative !important;
-    background: #1a1a2e !important;
+    padding: 0 !important;
+  }
+  body.chat-fullscreen {
+    background: var(--fallback-b2,oklch(var(--b2)/1)) !important;
   }
   body.chat-fullscreen #chat-section {
     position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
+    top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+    height: 100% !important; width: 100% !important; max-width: 100% !important;
+    margin: 0 !important; border-radius: 0 !important; border: none !important;
+    background: var(--fallback-b2,oklch(var(--b2)/1)) !important;
+    z-index: 999;
+  }
+  body.chat-fullscreen #chat-section .card-body {
+    padding: 0 !important;
     height: 100% !important;
-    margin: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
-    border-radius: 0 !important;
+    display: flex;
+    flex-direction: column;
   }
   body.chat-fullscreen main {
     height: 100% !important;
@@ -253,38 +255,41 @@
     padding: 0 !important;
     margin: 0 !important;
   }
+  /* 1. 彻底隐藏掉所有不相关的顶部控制栏 */
   body.chat-fullscreen .navbar,
   body.chat-fullscreen .tabs,
   body.chat-fullscreen #chat-section > .card-body > div:first-child,
   body.chat-fullscreen #mode-hint,
+  body.chat-fullscreen #single-voice-bar,
+  body.chat-fullscreen #dual-role-bar,
   body.chat-fullscreen #role-card {
     display: none !important;
   }
-  body.chat-fullscreen #chat-section {
-    position: absolute !important;
-    top: 0; left: 0; right: 0;
-    z-index: 999;
+  /* 2. 微信风原生导航栏 */
+  body.chat-fullscreen #fullscreen-header {
+    display: flex !important;
+    padding-top: max(env(safe-area-inset-top), 12px) !important;
+    background: var(--fallback-b2,oklch(var(--b2)/1)) !important;
+    border-bottom: 1px solid rgba(128,128,128,0.2) !important;
+  }
+  /* 3. 聊天容器 - 消除白底圆角盒中盒 */
+  html body.chat-fullscreen #chat-messages,
+  body.chat-fullscreen:not(.theme-obsidian):not(.theme-dark) #chat-messages {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
     border-radius: 0 !important;
+    padding: 16px !important;
     margin: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
+    flex: 1 !important;
   }
-  body.chat-fullscreen #chat-section .card-body {
-    padding: 12px !important;
-    height: 100% !important;
-  }
-  body.chat-fullscreen main {
-    padding: 0 !important;
-    margin: 0 !important;
-    max-width: 100% !important;
-    height: 100% !important;
-    min-height: 0 !important;
-  }
-  /* 全屏模式下控制栏和输入框不被挤压 */
-  body.chat-fullscreen #dual-role-bar,
-  body.chat-fullscreen #chat-messages,
+  /* 4. 底部输入区左右和底部彻底贴边 */
   body.chat-fullscreen .flex.gap-2.items-end {
-    flex-shrink: 0 !important;
+    padding: 10px 16px;
+    padding-bottom: max(env(safe-area-inset-bottom), 10px) !important;
+    background: var(--fallback-b2,oklch(var(--b2)/1)) !important;
+    border-top: 1px solid rgba(128,128,128,0.2) !important;
+    margin: 0 !important;
   }
   body.chat-fullscreen #chat-messages {
     flex-shrink: 1 !important;
@@ -293,20 +298,7 @@
   body.chat-fullscreen #scroll-to-bottom-btn {
     bottom: 80px !important;
   }
-  body.chat-fullscreen #exit-fullscreen-btn,
-  body.chat-fullscreen #fullscreen-clear-btn {
-    opacity: 1 !important;
-    pointer-events: auto !important;
-  }
-  /* === 仿微信顶部导航栏 === */
-  body.chat-fullscreen #fullscreen-header {
-    display: flex !important;
-    padding-top: max(env(safe-area-inset-top), 12px) !important;
-    background: var(--fallback-b2,oklch(var(--b2)/1)) !important;
-  }
-  body.chat-fullscreen #chat-section .card-body {
-    padding-top: 0 !important;
-  }
+  /* 隐藏老版本的悬浮圆圈按钮 */
   body.chat-fullscreen #exit-fullscreen-btn,
   body.chat-fullscreen #fullscreen-clear-btn {
     display: none !important;
@@ -764,13 +756,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 <div class="relative flex-1 min-h-0 flex flex-col">
                     <!-- 全屏模式原生顶部导航栏 (仿微信) -->
-                    <div id="fullscreen-header" class="hidden shrink-0 items-center justify-between px-4 py-3 z-50 border-b border-base-300 shadow-sm">
+                    <div id="fullscreen-header" class="hidden shrink-0 items-center justify-between px-4 py-2 z-50 border-b border-base-300 shadow-sm transition-opacity">
                         <button class="btn btn-ghost btn-sm px-2 -ml-2" onclick="toggleChatFullscreen()">
                             <i class="fa-solid fa-chevron-left text-lg"></i>
                         </button>
                         <span id="fullscreen-title" class="font-bold text-base truncate max-w-[60%]">聊天</span>
-                        <button class="btn btn-ghost btn-sm btn-circle" onclick="clearChat()">
-                            <i class="fa-solid fa-eraser"></i>
+                        <button class="btn btn-ghost btn-sm btn-circle text-error" onclick="clearChat()">
+                            <i class="fa-solid fa-eraser text-lg"></i>
                         </button>
                     </div>
                     <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 mb-3"></div>
@@ -1227,6 +1219,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </dialog>
 
-    <script src="assets/js/app.js?v=20260909c"></script>
+    <script src="assets/js/app.js?v=20260909d"></script>
 </body>
 </html>
