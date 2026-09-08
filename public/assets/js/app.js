@@ -1,3 +1,26 @@
+// ============================================
+// 手机端可视化日志悬浮窗（黑底白字，3秒自动消失）
+// ============================================
+function screenLog(msg) {
+    try {
+        let container = document.getElementById('screen-log-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'screen-log-container';
+            container.style.cssText = 'position:fixed;top:8px;left:8px;right:8px;z-index:999999;pointer-events:none;';
+            document.body.appendChild(container);
+        }
+        const item = document.createElement('div');
+        item.style.cssText = 'background:rgba(0,0,0,0.88);color:#fff;padding:7px 10px;border-radius:6px;font-size:11px;margin-bottom:3px;word-break:break-all;max-height:70px;overflow:hidden;line-height:1.4;';
+        item.textContent = String(msg);
+        container.appendChild(item);
+        setTimeout(() => {
+            item.style.transition = 'opacity 0.3s';
+            item.style.opacity = '0';
+            setTimeout(() => { if (item.parentNode) item.remove(); }, 350);
+        }, 3000);
+    } catch (e) {}
+}
 
 // ============================================
 // 情绪感知系统
@@ -465,10 +488,41 @@ async function playTTSBuffer(audioBuffer, onEnded) {
     source.start(0);
 }
 
-// 切回前台时恢复 AudioContext
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && audioCtx && audioCtx.state === 'suspended') {
-        audioCtx.resume().catch(() => {});
+// ============================================
+// 优化3：系统级打断恢复（电话/闹钟导致的永久静音）
+// ============================================
+document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible') return;
+    if (!audioCtx) return;
+
+    screenLog('[DEBUG-LONGPLAY] 切回前台，状态: ' + audioCtx.state);
+
+    if (audioCtx.state === 'interrupted' || audioCtx.state === 'closed') {
+        screenLog('[DEBUG-LONGPLAY] AudioContext已挂，尝试重建...');
+        try {
+            if (ttsKeepAliveOsc) {
+                try { ttsKeepAliveOsc.stop(); } catch (e) {}
+                ttsKeepAliveOsc = null;
+            }
+            if (ttsKeepAliveGain) {
+                try { ttsKeepAliveGain.disconnect(); } catch (e) {}
+                ttsKeepAliveGain = null;
+            }
+            try { await audioCtx.close(); } catch (e) {}
+            audioCtx = null;
+            ttsAudioInited = false;
+            await initTTSAudio();
+            screenLog('[DEBUG-LONGPLAY] AudioContext重建成功');
+        } catch (e) {
+            screenLog('[DEBUG-LONGPLAY] 重建失败: ' + e.message);
+        }
+    } else if (audioCtx.state === 'suspended') {
+        try {
+            await audioCtx.resume();
+            screenLog('[DEBUG-LONGPLAY] 已resume，状态: ' + audioCtx.state);
+        } catch (e) {
+            screenLog('[DEBUG-LONGPLAY] resume失败: ' + e.message);
+        }
     }
 });
 
@@ -556,6 +610,18 @@ const ttsQueueManager = {
 
             if (this.taskToken !== currentToken) return;
 
+            // 优化2：长文本切片 - 超过100字拆成多句，剩余插入队列前面连续播放
+            let playText = task.text || speakText;
+            if (!task.text && playText.length > 100) {
+                const segments = splitLongText(playText);
+                if (segments.length > 1) {
+                    playText = segments[0];
+                    for (let i = segments.length - 1; i >= 1; i--) {
+                        this.queue.unshift({ bubble: bubble, text: segments[i] });
+                    }
+                }
+            }
+
             // 获取音频blob
             let audioBlob;
             if (task.blob instanceof Blob) {
@@ -585,7 +651,7 @@ const ttsQueueManager = {
                 const speed = parseFloat(document.getElementById('tts-speed').value);
                 if (!apiKey && engine !== 'edge') throw new Error('请先配置API密钥');
 
-                const res = await callTTS(speakText, engine, voiceId, apiKey, format, speed);
+                const res = await callTTS(playText, engine, voiceId, apiKey, format, speed);
                 if (!res.ok) throw new Error('TTS请求失败');
                 audioBlob = await res.blob();
                 bubble.cachedAudioUrl = URL.createObjectURL(audioBlob);
@@ -621,7 +687,7 @@ const ttsQueueManager = {
             source.start(0);
 
         } catch (err) {
-            console.error('[TTS播放错误]:', err);
+            screenLog('[DEBUG-LONGPLAY] TTS播放错误: ' + err.message);
             if (this.taskToken === currentToken) this.processNext();
         }
     }
@@ -1396,6 +1462,68 @@ function playChatMessage(bubble, isAuto = false) {
 }
 
 // ============================================
+// 优化1：防止OOM - 只保留最近10条消息的音频缓存
+// ============================================
+function cleanupOldAudioCache() {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+    const bubbles = container.querySelectorAll('.chat-bubble');
+    if (bubbles.length <= 10) return;
+
+    let freed = 0;
+    for (let i = 0; i < bubbles.length - 10; i++) {
+        const bubble = bubbles[i];
+        if (bubble.cachedAudioUrl) {
+            URL.revokeObjectURL(bubble.cachedAudioUrl);
+            bubble.cachedAudioUrl = null;
+            freed++;
+        }
+        if (bubble.cachedAudioBlob) {
+            bubble.cachedAudioBlob = null;
+            freed++;
+        }
+    }
+    screenLog('[DEBUG-LONGPLAY] OOM清理: 释放' + freed + '个缓存，当前' + bubbles.length + '条消息');
+}
+
+// ============================================
+// 优化2：长文本分句切片（不用零宽断言，iOS安全）
+// ============================================
+function splitLongText(text, maxLen) {
+    maxLen = maxLen || 100;
+    if (text.length <= maxLen) return [text];
+
+    // 普通字符遍历分割标点，不用零宽断言
+    const punctuation = ['。', '！', '？', '；', '.', '!', '?', ';'];
+    const sentences = [];
+    let current = '';
+    for (let i = 0; i < text.length; i++) {
+        current += text[i];
+        if (punctuation.indexOf(text[i]) !== -1) {
+            if (current.trim()) sentences.push(current.trim());
+            current = '';
+        }
+    }
+    if (current.trim()) sentences.push(current.trim());
+
+    // 合并短句，每段不超过maxLen
+    const result = [];
+    let buf = '';
+    for (let i = 0; i < sentences.length; i++) {
+        if ((buf + sentences[i]).length > maxLen && buf) {
+            result.push(buf);
+            buf = sentences[i];
+        } else {
+            buf += sentences[i];
+        }
+    }
+    if (buf) result.push(buf);
+
+    screenLog('[DEBUG-LONGPLAY] 长文本切片: ' + text.length + '字 → ' + result.length + '段');
+    return result;
+}
+
+// ============================================
 // 思考程度切换（DeepSeek Reasoning）
 // ============================================
 const REASONING_LABELS = {
@@ -1978,6 +2106,7 @@ async function sendChatMessage() {
         saveChatHistory(); // 保存到本地，刷新不丢失
 
         sfxReceive();
+        cleanupOldAudioCache(); // 优化1：清理旧消息音频缓存防OOM
 
         // 自动朗读
         if (autoPlayTTS) {
@@ -2640,6 +2769,7 @@ ${currentRole.desc}
 
         container.appendChild(replyDiv);
         smartScroll(container);
+        cleanupOldAudioCache(); // 优化1：清理旧消息音频缓存防OOM
 
         // 加入对话历史
         chatHistory.push({ role: 'assistant', content: `[${currentRole.name}] ${reply}` });
