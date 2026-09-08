@@ -552,19 +552,59 @@ const ttsQueueManager = {
     currentSource: null,
     taskToken: 0, // 任务令牌，切断已被丢弃的异步任务
 
-    // 安全唤醒，带超时，返回是否成功
+    // 安全唤醒，带超时+重试，返回是否成功
     async safeResume(ctx) {
         if (!ctx) return false;
         if (ctx.state === 'running') return true;
+        // 第一次尝试，500ms超时
         try {
             await Promise.race([
                 ctx.resume(),
-                new Promise(resolve => setTimeout(resolve, 300))
+                new Promise(resolve => setTimeout(resolve, 500))
             ]);
         } catch (e) {
-            console.warn('Resume 被浏览器中断');
+            console.warn('Resume第一次尝试失败:', e);
+        }
+        if (ctx.state === 'running') return true;
+        // 第二次尝试，等待200ms后再试
+        await new Promise(r => setTimeout(r, 200));
+        try {
+            await Promise.race([
+                ctx.resume(),
+                new Promise(resolve => setTimeout(resolve, 500))
+            ]);
+        } catch (e) {
+            console.warn('Resume第二次尝试失败:', e);
         }
         return ctx.state === 'running';
+    },
+
+    // 强制重置音频系统（销毁旧的AudioContext，重新初始化）
+    async resetAudioSystem() {
+        console.warn('音频系统异常，强制重置...');
+        try {
+            if (ttsKeepAliveOsc) {
+                try { ttsKeepAliveOsc.stop(); } catch (e) {}
+                ttsKeepAliveOsc = null;
+            }
+            if (ttsKeepAliveGain) {
+                try { ttsKeepAliveGain.disconnect(); } catch (e) {}
+                ttsKeepAliveGain = null;
+            }
+            if (audioCtx) {
+                try { await audioCtx.close(); } catch (e) {}
+                audioCtx = null;
+            }
+            ttsAudioInited = false;
+            this.currentSource = null;
+            this.isPlaying = false;
+            await initTTSAudio();
+            console.warn('音频系统重置完成');
+            return true;
+        } catch (e) {
+            console.error('音频系统重置失败:', e);
+            return false;
+        }
     },
 
     enqueue(item) {
@@ -605,10 +645,16 @@ const ttsQueueManager = {
                 await initTTSAudio();
             }
 
-            // 严格等待唤醒
-            const isAwake = await this.safeResume(audioCtx);
+            // 严格等待唤醒，失败后强制重置音频系统
+            let isAwake = await this.safeResume(audioCtx);
             if (!isAwake) {
-                throw new Error('由于iOS限制，自动播放失败，请手动点击');
+                console.warn('AudioContext唤醒失败，尝试强制重置...');
+                await this.resetAudioSystem();
+                // 重置后再尝试一次
+                isAwake = await this.safeResume(audioCtx);
+                if (!isAwake) {
+                    throw new Error('音频系统唤醒失败，请手动点击播放按钮重试');
+                }
             }
             if (this.taskToken !== currentToken) return;
 
@@ -638,6 +684,14 @@ const ttsQueueManager = {
                         this.queue.unshift({ bubble: bubble, text: segments[i] });
                     }
                 }
+            }
+
+            // 空文本检查：避免请求空TTS
+            if (!playText || playText.trim().length === 0) {
+                console.warn('朗读文本为空，跳过');
+                this.isPlaying = false;
+                this.processNext();
+                return;
             }
 
             // 获取音频blob
@@ -704,8 +758,8 @@ const ttsQueueManager = {
                 try { source.disconnect(); } catch (e) {}
                 if (this.currentSource === source) this.currentSource = null;
                 if (this.taskToken === currentToken) {
-                    // 安全延迟300ms，防止TTS连续请求触发429限流
-                    setTimeout(() => this.processNext(), 300);
+                    // 安全延迟500ms，防止TTS连续请求触发429限流
+                    setTimeout(() => this.processNext(), 500);
                 }
             };
 
@@ -714,8 +768,8 @@ const ttsQueueManager = {
         } catch (err) {
             // screenLog('[DEBUG-LONGPLAY] TTS播放错误: ' + err.message);
             if (this.taskToken === currentToken) {
-                // 安全延迟300ms，防止TTS连续请求触发429限流
-                setTimeout(() => this.processNext(), 300);
+                // 安全延迟500ms，防止TTS连续请求触发429限流
+                setTimeout(() => this.processNext(), 500);
             }
         }
     }
