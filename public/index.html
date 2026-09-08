@@ -801,7 +801,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     <label class="label py-1"><span class="label-text font-bold">生图模型</span></label>
                     <select id="image-model-select" class="select select-bordered w-full text-sm" onchange="saveImageModel()">
                         <option value="dreamshaper">DreamShaper 8 LCM（推荐，审核宽松，速度快）</option>
-                        <option value="pollinations">Pollinations Flux（写实，几乎无审核，免费无限制）</option>
+                        <option value="pollinations-flux-realism">Pollinations Flux 写实（照片级，几乎无审核）</option>
+                        <option value="pollinations-zimage">Pollinations Z-Image（高画质+2x超分，几乎无审核）</option>
+                        <option value="pollinations-seedream">Pollinations Seedream（中文友好，几乎无审核）</option>
+                        <option value="pollinations-flux">Pollinations Flux 通用（速度快，几乎无审核）</option>
                         <option value="flux">Flux 1 Schnell（画质好，审核严，每天1000张）</option>
                     </select>
                 </div>

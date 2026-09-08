@@ -3435,7 +3435,10 @@ function saveImageModel() {
 }
 
 function getImageModel() {
-    return localStorage.getItem('IMAGE_MODEL') || 'dreamshaper';
+    const model = localStorage.getItem('IMAGE_MODEL') || 'dreamshaper';
+    // 兼容旧版本：pollinations -> pollinations-flux
+    if (model === 'pollinations') return 'pollinations-flux';
+    return model;
 }
 
 function loadImageModelSelect() {

@@ -16,10 +16,11 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Pollinations.ai：第三方免费生图，几乎无内容审核，flux模型写实
-    if (model === 'pollinations') {
+    // Pollinations.ai：第三方免费生图，几乎无内容审核，多模型可选
+    if (model.startsWith('pollinations-')) {
+      const pollinationsModel = model.replace('pollinations-', '');
       const encodedPrompt = encodeURIComponent(prompt);
-      const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?model=flux&width=1024&height=1024&nologo=true`;
+      const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?model=${pollinationsModel}&width=1024&height=1024&nologo=true`;
 
       // 最多重试3次，遇到429限流时等待后重试
       let lastError = null;
