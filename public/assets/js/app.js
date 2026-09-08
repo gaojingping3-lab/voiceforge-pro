@@ -3580,7 +3580,7 @@ async function generateImageFromChat() {
                     <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
                     <div class="text-xs text-gray-400 mt-2 break-all">${escapeHtml(imagePrompt.substring(0, 100))}${imagePrompt.length > 100 ? '...' : ''}</div>
                     <div class="flex gap-2 mt-2">
-                        <a href="${imageUrl}" download="chat-generated.jpg" class="btn btn-primary btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
+                        <a href="${imageUrl}" download="chat-generated.png" class="btn btn-primary btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
                     </div>
                 `;
                 imageDiv.appendChild(imageBubble);

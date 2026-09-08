@@ -1,5 +1,5 @@
 // Cloudflare Workers AI 生图接口
-// 使用 Flux 1 Schnell 模型，免费额度每天约230张
+// 使用 Stable Diffusion XL 模型（审核比 Flux 宽松），免费
 // 返回 JPEG 图片二进制数据
 
 export async function onRequestPost(context) {
@@ -16,10 +16,14 @@ export async function onRequestPost(context) {
     }
 
     // 调用 Cloudflare Workers AI 生图
-    // Flux 1 Schnell 返回 { image: "base64字符串" }，格式是 JPEG
+    // Stable Diffusion XL 返回 { image: "base64字符串" }，格式是 PNG
     const result = await env.AI.run(
-      '@cf/black-forest-labs/flux-1-schnell',
-      { prompt: prompt }
+      '@cf/stabilityai/stable-diffusion-xl-base-1.0',
+      {
+        prompt: prompt,
+        num_steps: 20,
+        guidance: 7.5
+      }
     );
 
     // 从 base64 转换成二进制
@@ -30,11 +34,11 @@ export async function onRequestPost(context) {
       imgBytes[i] = binaryString.charCodeAt(i);
     }
 
-    // 直接返回 JPEG 图片二进制数据
+    // 直接返回 PNG 图片二进制数据
     return new Response(imgBytes, {
       status: 200,
       headers: {
-        'Content-Type': 'image/jpeg',
+        'Content-Type': 'image/png',
         'Cache-Control': 'no-cache'
       }
     });
