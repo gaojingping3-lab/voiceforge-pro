@@ -3839,6 +3839,17 @@ async function optimizePromptManual() {
         const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
         const llmKey = localStorage.getItem('LLM_KEY') || '';
         const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+        // 读取用户设置里的System Prompt，让优化提示词的AI也遵守
+        const customSystem = localStorage.getItem('LLM_SYSTEM') || '';
+
+        const messages = [];
+        // 先加用户的System Prompt（如果有设置）
+        if (customSystem) {
+            messages.push({ role: 'system', content: customSystem });
+        }
+        // 再加优化提示词的指令
+        messages.push({ role: 'system', content: '你是AI绘画提示词大师。把用户输入的简单描述扩展成细节丰富的英文生图提示词。要求：1.只用英文输出 2.包含人物外貌、服装、动作、表情、环境、光线、氛围 3.写实照片风格：photorealistic, shot on DSLR, natural skin texture, detailed background 4.不要输出任何解释或前缀，直接输出提示词 5.长度100-180个单词' });
+        messages.push({ role: 'user', content: `优化这个生图提示词：${prompt}` });
 
         const fetchPromise = fetch('/api/chat', {
             method: 'POST',
@@ -3849,10 +3860,7 @@ async function optimizePromptManual() {
             body: JSON.stringify({
                 baseUrl: llmUrl,
                 model: llmModel,
-                messages: [
-                    { role: 'system', content: '你是AI绘画提示词大师。把用户输入的简单描述扩展成细节丰富的英文生图提示词。要求：1.只用英文输出 2.包含人物外貌、服装、动作、表情、环境、光线、氛围 3.写实照片风格：photorealistic, shot on DSLR, natural skin texture, detailed background 4.不要输出任何解释或前缀，直接输出提示词 5.长度100-180个单词' },
-                    { role: 'user', content: `优化这个生图提示词：${prompt}` }
-                ],
+                messages: messages,
                 temperature: 0.7,
                 stream: false,
                 thinking: { type: 'disabled' }
