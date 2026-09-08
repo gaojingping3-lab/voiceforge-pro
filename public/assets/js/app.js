@@ -3691,6 +3691,8 @@ async function generateImageFromChat() {
         // 3. 把图片插入聊天记录
         loadingDiv.remove();
         const imageUrl = URL.createObjectURL(result.blob);
+        // 保存优化后的提示词，重新生成时直接用，不再优化
+        const savedPrompt = result.prompt;
 
         const imageDiv = document.createElement('div');
         imageDiv.className = 'chat chat-start relative gap-2';
@@ -3705,22 +3707,32 @@ async function generateImageFromChat() {
                 <a href="${imageUrl}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
             </div>
         `;
-        // 保存对话上下文，用于重新生成
-        imageBubble.dataset.conversationText = conversationText;
-        // 重新生成按钮事件
+        // 保存优化后的提示词，用于重新生成（直接用，不再优化）
+        imageBubble.dataset.savedPrompt = savedPrompt;
+        // 重新生成按钮事件：用保存的提示词直接生成，不再优化
         imageBubble.querySelector('.regenerate-btn').onclick = async function() {
             const btn = this;
             btn.disabled = true;
             btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中...';
             try {
-                const newResult = await generateImageWithSafety(conversationText, getImageModel(), (msg) => {
-                    btn.innerHTML = `<span class="loading loading-spinner loading-xs"></span> ${msg.substring(0, 10)}`;
+                // 直接调用后端，用保存的优化后提示词，不经过optimizeImagePrompt
+                const response = await fetch('/api/image/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: savedPrompt, model: getImageModel(), agnesApiKey: getAgnesApiKey() })
                 });
-                const newImageUrl = URL.createObjectURL(newResult.blob);
+                if (!response.ok) {
+                    let errorMsg = '生成失败';
+                    try {
+                        const errData = await response.json();
+                        errorMsg = errData.error || errorMsg;
+                    } catch (e) {}
+                    throw new Error(errorMsg);
+                }
+                const blob = await response.blob();
+                const newImageUrl = URL.createObjectURL(blob);
                 imageBubble.querySelector('img').src = newImageUrl;
                 imageBubble.querySelector('a[download]').href = newImageUrl;
-                // 更新保存的上下文
-                imageBubble.dataset.conversationText = conversationText;
             } catch (err) {
                 alert('重新生成失败: ' + (err.message || err));
             } finally {
