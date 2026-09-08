@@ -5,7 +5,7 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#661ae3",
+  "theme_color": "#fdf5eb",
   "icons": [
     {
       "src": "https://api.iconify.design/mdi/microphone.svg?color=%23661ae3",

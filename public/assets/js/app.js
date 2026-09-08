@@ -202,6 +202,14 @@ function toggleChatFullscreen() {
     }
     localStorage.setItem('CHAT_FULLSCREEN', isFull ? '1' : '0');
     updateFullscreenTitle();
+    // 全屏切换时也更新状态栏颜色
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+        requestAnimationFrame(() => {
+            const bodyStyles = getComputedStyle(document.body);
+            metaThemeColor.setAttribute('content', bodyStyles.backgroundColor);
+        });
+    }
     sfxClick();
 }
 
@@ -753,7 +761,18 @@ let isDark = localStorage.getItem('theme') === 'dark';
 
 function applyTheme() {
     htmlEl.setAttribute('data-theme', isDark ? 'dark' : 'light');
-    // if (themeToggle) themeToggle.innerHTML = isDark ? '<i class="fa-solid fa-sun text-lg"></i>' : '<i class="fa-solid fa-moon text-lg"></i>';
+    // 动态切换iOS状态栏颜色，跟着主题走
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+        // 延迟一帧，等CSS变量生效后再读取
+        requestAnimationFrame(() => {
+            const bodyStyles = getComputedStyle(document.body);
+            const bgColor = bodyStyles.backgroundColor;
+            if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)') {
+                metaThemeColor.setAttribute('content', bgColor);
+            }
+        });
+    }
 }
 applyTheme();
 
