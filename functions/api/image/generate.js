@@ -21,8 +21,7 @@ export async function onRequestPost(context) {
       '@cf/lykon/dreamshaper-8-lcm',
       {
         prompt: prompt,
-        num_steps: 8,
-        guidance: 1.5
+        num_steps: 6
       }
     );
 
