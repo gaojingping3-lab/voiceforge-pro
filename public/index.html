@@ -378,6 +378,16 @@ function switchPremiumTheme(themeClass) {
   document.querySelector(`.theme-dot-btn[data-theme-class="${themeClass}"]`).classList.add('active');
   document.documentElement.setAttribute('data-theme', themeClass === 'theme-obsidian' ? 'dark' : 'light');
   localStorage.setItem('PREMIUM_THEME', themeClass);
+  // 动态切换iOS状态栏颜色，跟随主题
+  const themeColors = {
+    'theme-pearl': '#ffffff',
+    'theme-obsidian': '#0d1117',
+    'theme-amber': '#fdf5eb'
+  };
+  const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+  if (metaThemeColor && themeColors[themeClass]) {
+    metaThemeColor.setAttribute('content', themeColors[themeClass]);
+  }
 }
 // 页面加载时恢复主题
 document.addEventListener('DOMContentLoaded', () => {
@@ -1220,6 +1230,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </dialog>
 
-    <script src="assets/js/app.js?v=20260909e"></script>
+    <script src="assets/js/app.js?v=20260909f"></script>
 </body>
 </html>

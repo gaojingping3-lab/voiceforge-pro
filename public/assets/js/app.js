@@ -203,13 +203,7 @@ function toggleChatFullscreen() {
     localStorage.setItem('CHAT_FULLSCREEN', isFull ? '1' : '0');
     updateFullscreenTitle();
     // 全屏切换时也更新状态栏颜色
-    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
-    if (metaThemeColor) {
-        requestAnimationFrame(() => {
-            const bodyStyles = getComputedStyle(document.body);
-            metaThemeColor.setAttribute('content', bodyStyles.backgroundColor);
-        });
-    }
+    updateStatusBarColor();
     sfxClick();
 }
 
@@ -761,10 +755,23 @@ let isDark = localStorage.getItem('theme') === 'dark';
 
 function applyTheme() {
     htmlEl.setAttribute('data-theme', isDark ? 'dark' : 'light');
-    // 动态切换iOS状态栏颜色，跟着主题走
+    // 动态切换iOS状态栏颜色，跟随主题
+    updateStatusBarColor();
+}
+
+// 根据当前主题更新iOS状态栏颜色
+function updateStatusBarColor() {
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
-    if (metaThemeColor) {
-        // 延迟一帧，等CSS变量生效后再读取
+    if (!metaThemeColor) return;
+    const themeColors = {
+        'theme-pearl': '#ffffff',
+        'theme-obsidian': '#0d1117',
+        'theme-amber': '#fdf5eb'
+    };
+    // 全屏模式下用b2底色，非全屏用主题色
+    const isFullscreen = document.body.classList.contains('chat-fullscreen');
+    if (isFullscreen) {
+        // 全屏时读取body的计算背景色（b2变量）
         requestAnimationFrame(() => {
             const bodyStyles = getComputedStyle(document.body);
             const bgColor = bodyStyles.backgroundColor;
@@ -772,6 +779,12 @@ function applyTheme() {
                 metaThemeColor.setAttribute('content', bgColor);
             }
         });
+    } else {
+        // 非全屏时根据主题class设置
+        const currentTheme = document.body.className.match(/theme-(pearl|obsidian|amber)/);
+        if (currentTheme && themeColors['theme-' + currentTheme[1]]) {
+            metaThemeColor.setAttribute('content', themeColors['theme-' + currentTheme[1]]);
+        }
     }
 }
 applyTheme();
