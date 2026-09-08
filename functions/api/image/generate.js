@@ -1,5 +1,5 @@
 // Cloudflare Workers AI 生图接口
-// 使用 Stable Diffusion XL 模型（审核比 Flux 宽松），免费
+// 使用 DreamShaper 8 LCM 模型（SD微调，偏写实，审核宽松，生成快），免费
 // 返回 PNG 图片二进制数据
 
 export async function onRequestPost(context) {
@@ -16,12 +16,13 @@ export async function onRequestPost(context) {
     }
 
     // 调用 Cloudflare Workers AI 生图
+    // DreamShaper 8 LCM 是 SD 1.5 的微调模型，LCM版本生成速度快
     const result = await env.AI.run(
-      '@cf/stabilityai/stable-diffusion-xl-base-1.0',
+      '@cf/lykon/dreamshaper-8-lcm',
       {
         prompt: prompt,
-        num_steps: 20,
-        guidance: 7.5
+        num_steps: 8,
+        guidance: 1.5
       }
     );
 
