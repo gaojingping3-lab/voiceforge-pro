@@ -610,9 +610,10 @@ const ttsQueueManager = {
 
             if (this.taskToken !== currentToken) return;
 
-            // 优化2：长文本切片 - 超过100字拆成多句，剩余插入队列前面连续播放
+            // 优化2：长文本切片 - 超过20字拆成多句，剩余插入队列前面连续播放
             let playText = task.text || speakText;
-            if (!task.text && playText.length > 100) {
+            screenLog('[DEBUG-LONGPLAY] 准备朗读，当前字数: ' + playText.length + (task.text ? ' (切片段)' : ' (完整消息)'));
+            if (!task.text && playText.length > 20) {
                 const segments = splitLongText(playText);
                 if (segments.length > 1) {
                     playText = segments[0];
@@ -626,7 +627,8 @@ const ttsQueueManager = {
             let audioBlob;
             if (task.blob instanceof Blob) {
                 audioBlob = task.blob;
-            } else if (bubble.cachedAudioUrl) {
+            } else if (!task.text && bubble.cachedAudioUrl) {
+                // 只有完整消息（非切片段）才用缓存
                 const res = await fetch(bubble.cachedAudioUrl);
                 audioBlob = await res.blob();
             } else {
@@ -654,7 +656,10 @@ const ttsQueueManager = {
                 const res = await callTTS(playText, engine, voiceId, apiKey, format, speed);
                 if (!res.ok) throw new Error('TTS请求失败');
                 audioBlob = await res.blob();
-                bubble.cachedAudioUrl = URL.createObjectURL(audioBlob);
+                // 只有完整消息（非切片段）才缓存，切片段不覆盖缓存
+                if (!task.text) {
+                    bubble.cachedAudioUrl = URL.createObjectURL(audioBlob);
+                }
             }
 
             if (this.taskToken !== currentToken) return;
@@ -1470,6 +1475,12 @@ function cleanupOldAudioCache() {
     const bubbles = container.querySelectorAll('.chat-bubble');
     if (bubbles.length <= 10) return;
 
+    // 先统计有多少个带缓存的
+    let withCache = 0;
+    for (let i = 0; i < bubbles.length; i++) {
+        if (bubbles[i].cachedAudioUrl) withCache++;
+    }
+
     let freed = 0;
     for (let i = 0; i < bubbles.length - 10; i++) {
         const bubble = bubbles[i];
@@ -1483,14 +1494,14 @@ function cleanupOldAudioCache() {
             freed++;
         }
     }
-    screenLog('[DEBUG-LONGPLAY] OOM清理: 释放' + freed + '个缓存，当前' + bubbles.length + '条消息');
+    screenLog('[DEBUG-LONGPLAY] OOM: 共' + bubbles.length + '条，' + withCache + '条有缓存，释放' + freed + '个');
 }
 
 // ============================================
 // 优化2：长文本分句切片（不用零宽断言，iOS安全）
 // ============================================
 function splitLongText(text, maxLen) {
-    maxLen = maxLen || 100;
+    maxLen = maxLen || 20;
     if (text.length <= maxLen) return [text];
 
     // 普通字符遍历分割标点，不用零宽断言
