@@ -1026,6 +1026,7 @@ function openSettingsModal() {
             w.style.height = 'auto';
         }
     });
+    refreshAvatarPreviews(); // 刷新头像预览
     setTimeout(() => {
         if (document.activeElement && typeof document.activeElement.blur === 'function') {
             document.activeElement.blur();
@@ -1357,7 +1358,8 @@ function renderChatHistory() {
     for (const msg of chatHistory) {
         if (msg.role === 'user') {
             const div = document.createElement('div');
-            div.className = 'chat chat-end';
+            div.className = 'chat chat-end gap-2';
+            div.appendChild(createChatAvatar('我', true));
             const bubble = document.createElement('div');
             bubble.className = 'chat-bubble bg-primary text-primary-content';
             bubble.innerText = msg.content;
@@ -1379,11 +1381,12 @@ function renderChatHistory() {
                     if (idx >= 0) color = idx % 2 === 0 ? '#fb923c' : '#3b82f6';
                 }
                 const div = document.createElement('div');
-                div.className = 'chat chat-start relative msg-enter';
+                div.className = 'chat chat-start relative msg-enter gap-2';
                 const bubble = document.createElement('div');
                 bubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
                 bubble.innerHTML = '<span class="text-xs font-bold block mb-1" style="color:' + color + '">' + escapeHtml(speakerName) + '</span>' + formatChatText(content);
                 div.appendChild(bubble);
+                div.appendChild(createChatAvatar(speakerName, false));
                 const playBtn = document.createElement('button');
                 playBtn.className = 'play-voice-btn absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
                 playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
@@ -1419,12 +1422,22 @@ function stopAllAudio() {
 function appendChatMessage(text, type) {
     const container = document.getElementById('chat-messages');
     const div = document.createElement('div');
-    div.className = `chat chat-${type === 'user' ? 'end' : 'start'} relative msg-enter`;
+    div.className = `chat chat-${type === 'user' ? 'end' : 'start'} relative msg-enter gap-2`;
+    const isUser = type === 'user';
+    const role = getCurrentRole();
+    const avatarName = isUser ? '我' : (role ? role.name : 'AI');
+    // 微信风：用户头像在右，AI头像在左
+    if (isUser) {
+        div.appendChild(createChatAvatar(avatarName, true));
+    }
     const bubble = document.createElement('div');
     bubble.className = `chat-bubble ${type === 'user' ? 'bg-primary text-white' : 'bg-base-200 text-base-content'} relative pr-8`;
     // AI消息台词上色，用户消息保持原样
     bubble.innerHTML = type === 'ai' ? formatChatText(text) : escapeHtml(text);
     div.appendChild(bubble);
+    if (!isUser) {
+        div.appendChild(createChatAvatar(avatarName, false));
+    }
 
     // AI消息后面加播放按钮（放在右下角）
     if (type === 'ai') {
@@ -1959,11 +1972,13 @@ async function sendChatMessage() {
     // 创建思考中动画（三点跳动）
     const container = document.getElementById('chat-messages');
     const loadingDiv = document.createElement('div');
-    loadingDiv.className = 'chat chat-start relative msg-enter';
+    loadingDiv.className = 'chat chat-start relative msg-enter gap-2';
     const loadingBubble = document.createElement('div');
     loadingBubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
     loadingBubble.innerHTML = '乐正在思考 <span class="thinking-dots"><span></span><span></span><span></span></span>';
     loadingDiv.appendChild(loadingBubble);
+    const role = getCurrentRole();
+    loadingDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
     container.appendChild(loadingDiv);
     smartScroll(container);
     sfxStart();
@@ -2225,6 +2240,134 @@ function getAvatarGradient(name) {
     return gradients[Math.abs(hash) % gradients.length];
 }
 
+// ============================================
+// 微信风头像工具函数
+// ============================================
+// 获取头像：优先localStorage自定义头像，否则首字母+渐变色
+function getAvatarData(name, isUser) {
+    const key = isUser ? 'AVATAR_USER' : 'AVATAR_' + name;
+    const custom = localStorage.getItem(key);
+    if (custom) return { type: 'image', src: custom };
+    const firstChar = name ? name.charAt(0).toUpperCase() : '?';
+    return { type: 'text', char: firstChar, gradient: getAvatarGradient(name || '用户') };
+}
+
+// 创建聊天头像元素（DaisyUI chat-image 结构）
+function createChatAvatar(name, isUser) {
+    const avatarData = getAvatarData(name, isUser);
+    const wrap = document.createElement('div');
+    wrap.className = 'chat-image avatar flex-shrink-0';
+    const inner = document.createElement('div');
+    inner.className = 'w-9 h-9 rounded-full overflow-hidden flex items-center justify-center text-white text-sm font-bold shadow-md';
+    if (avatarData.type === 'image') {
+        const img = document.createElement('img');
+        img.src = avatarData.src;
+        img.className = 'w-full h-full object-cover';
+        inner.appendChild(img);
+    } else {
+        inner.style.background = avatarData.gradient;
+        inner.innerText = avatarData.char;
+    }
+    wrap.appendChild(inner);
+    return wrap;
+}
+
+// 上传头像处理
+function uploadAvatar(name, isUser, callback) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const base64 = ev.target.result;
+            const key = isUser ? 'AVATAR_USER' : 'AVATAR_' + name;
+            localStorage.setItem(key, base64);
+            if (callback) callback(base64);
+        };
+        reader.readAsDataURL(file);
+    };
+    input.click();
+}
+
+// 上传当前AI角色头像
+function uploadAvatarCurrentRole() {
+    const role = getCurrentRole();
+    if (!role) return;
+    uploadAvatar(role.name, false, () => {
+        refreshAvatarPreviews();
+        renderRoleCard();
+    });
+}
+
+// 上传双人模式角色A/B头像
+function uploadAvatarDual(role) {
+    const target = role === 'A' ? dualRoleA : dualRoleB;
+    if (!target) return;
+    uploadAvatar(target.name, false, () => {
+        refreshAvatarPreviews();
+    });
+}
+
+// 刷新设置页面的头像预览
+function refreshAvatarPreviews() {
+    // 用户头像
+    const userPreview = document.getElementById('avatar-user-preview');
+    if (userPreview) {
+        const data = getAvatarData('我', true);
+        if (data.type === 'image') {
+            userPreview.innerHTML = `<img src="${data.src}" class="w-full h-full object-cover">`;
+            userPreview.style.background = 'transparent';
+        } else {
+            userPreview.innerHTML = `<span>${data.char}</span>`;
+            userPreview.style.background = data.gradient;
+        }
+    }
+    // 当前AI角色头像
+    const aiPreview = document.getElementById('avatar-ai-preview');
+    if (aiPreview) {
+        const role = getCurrentRole();
+        const data = getAvatarData(role ? role.name : 'AI', false);
+        if (data.type === 'image') {
+            aiPreview.innerHTML = `<img src="${data.src}" class="w-full h-full object-cover">`;
+            aiPreview.style.background = 'transparent';
+        } else {
+            aiPreview.innerHTML = `<span>${data.char}</span>`;
+            aiPreview.style.background = data.gradient;
+        }
+    }
+    // 双人模式角色A/B头像
+    const dualA = document.getElementById('avatar-dual-a-preview');
+    const dualB = document.getElementById('avatar-dual-b-preview');
+    const dualAWrap = document.getElementById('avatar-dual-a-wrap');
+    const dualBWrap = document.getElementById('avatar-dual-b-wrap');
+    if (dualRoleA && dualRoleB) {
+        if (dualAWrap) dualAWrap.classList.remove('hidden');
+        if (dualBWrap) dualBWrap.classList.remove('hidden');
+        if (dualAWrap) dualAWrap.classList.add('flex');
+        if (dualBWrap) dualBWrap.classList.add('flex');
+        if (dualA) {
+            const dataA = getAvatarData(dualRoleA.name, false);
+            dualA.innerHTML = dataA.type === 'image'
+                ? `<img src="${dataA.src}" class="w-full h-full object-cover">`
+                : `<span>${dataA.char}</span>`;
+            dualA.style.background = dataA.type === 'image' ? 'transparent' : dataA.gradient;
+        }
+        if (dualB) {
+            const dataB = getAvatarData(dualRoleB.name, false);
+            dualB.innerHTML = dataB.type === 'image'
+                ? `<img src="${dataB.src}" class="w-full h-full object-cover">`
+                : `<span>${dataB.char}</span>`;
+            dualB.style.background = dataB.type === 'image' ? 'transparent' : dataB.gradient;
+        }
+    } else {
+        if (dualAWrap) { dualAWrap.classList.add('hidden'); dualAWrap.classList.remove('flex'); }
+        if (dualBWrap) { dualBWrap.classList.add('hidden'); dualBWrap.classList.remove('flex'); }
+    }
+}
+
 function toggleRoleCard() {
     const content = document.getElementById('role-card-content');
     const arrow = document.getElementById('role-card-arrow');
@@ -2318,11 +2461,12 @@ function switchRole(id) {
         const role = getCurrentRole();
         if (role.opening && chatContainer) {
             const aiDiv = document.createElement('div');
-            aiDiv.className = 'chat chat-start msg-enter relative';
+            aiDiv.className = 'chat chat-start msg-enter relative gap-2';
             const bubble = document.createElement('div');
             bubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
             bubble.innerHTML = formatChatText(role.opening);
             aiDiv.appendChild(bubble);
+            aiDiv.appendChild(createChatAvatar(role.name, false));
             // 加播放按钮
             const playBtn = document.createElement('button');
             playBtn.className = 'play-voice-btn absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
@@ -2740,11 +2884,12 @@ ${currentRole.desc}
     // 显示思考中
     const container = document.getElementById('chat-messages');
     const thinkingDiv = document.createElement('div');
-    thinkingDiv.className = 'chat chat-start relative msg-enter';
+    thinkingDiv.className = 'chat chat-start relative msg-enter gap-2';
     const thinkingBubble = document.createElement('div');
     thinkingBubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
     thinkingBubble.innerHTML = `${currentRole.name}正在思考 <span class="thinking-dots"><span></span><span></span><span></span></span>`;
     thinkingDiv.appendChild(thinkingBubble);
+    thinkingDiv.appendChild(createChatAvatar(currentRole.name, false));
     container.appendChild(thinkingDiv);
     smartScroll(container);
 
@@ -2779,13 +2924,14 @@ ${currentRole.desc}
         // 移除思考中，显示真实回复
         thinkingDiv.remove();
         const replyDiv = document.createElement('div');
-        replyDiv.className = 'chat chat-start relative msg-enter';
+        replyDiv.className = 'chat chat-start relative msg-enter gap-2';
         const replyBubble = document.createElement('div');
         // 角色A用橙色，角色B用蓝色，区分两个角色
         const color = dualCurrentSpeaker === 'A' ? '#fb923c' : '#3b82f6';
         replyBubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
         replyBubble.innerHTML = `<span class="text-xs font-bold block mb-1" style="color:${color}">${escapeHtml(currentRole.name)}</span>${formatChatText(reply)}`;
         replyDiv.appendChild(replyBubble);
+        replyDiv.appendChild(createChatAvatar(currentRole.name, false));
 
         // 加播放按钮
         const playBtn = document.createElement('button');
