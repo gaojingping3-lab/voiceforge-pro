@@ -1,6 +1,6 @@
-// Cloudflare Workers AI 生图接口
-// 支持三个模型：DreamShaper 8 LCM / Flux 1 Schnell / Stable Diffusion XL
-// 返回 PNG 图片二进制数据
+// 生图接口
+// 支持四个模型：DreamShaper / Flux(Cloudflare) / SDXL / Pollinations Flux
+// 返回图片二进制数据
 
 export async function onRequestPost(context) {
   try {
@@ -16,7 +16,30 @@ export async function onRequestPost(context) {
       });
     }
 
-    // 根据模型选择配置
+    // Pollinations.ai：第三方免费生图，几乎无内容审核，flux模型写实
+    if (model === 'pollinations') {
+      const encodedPrompt = encodeURIComponent(prompt);
+      const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?model=flux&width=1024&height=1024&nologo=true`;
+
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'VoiceForge-Pro/1.0' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Pollinations API 错误: ${response.status}`);
+      }
+
+      // 直接把第三方返回的图片流转发给前端
+      return new Response(response.body, {
+        status: 200,
+        headers: {
+          'Content-Type': response.headers.get('Content-Type') || 'image/jpeg',
+          'Cache-Control': 'no-cache'
+        }
+      });
+    }
+
+    // Cloudflare Workers AI 模型
     const modelConfigs = {
       dreamshaper: {
         id: '@cf/lykon/dreamshaper-8-lcm',
