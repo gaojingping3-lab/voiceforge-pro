@@ -538,6 +538,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h2 class="card-title text-lg"><i class="fa-solid fa-comments text-primary"></i> 与乐 语音对话</h2>
                     <div class="flex items-center gap-1">
                         <span id="total-tokens-display" class="text-xs text-gray-400 ml-2">0 tokens</span>
+                        <button class="btn btn-ghost btn-xs" onclick="switchTab('image')" title="AI生图">
+                            <i class="fa-solid fa-image"></i>
+                        </button>
                         <button id="autoplay-btn" class="btn btn-ghost btn-xs" onclick="toggleAutoPlay()" title="自动朗读">
                             <i class="fa-solid fa-volume-high"></i>
                         </button>
