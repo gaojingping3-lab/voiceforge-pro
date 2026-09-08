@@ -3521,7 +3521,7 @@ async function generateImageFromChat() {
                 messages: [
                     {
                         role: 'system',
-                        content: '你是一个专业的AI绘画提示词工程师。根据用户提供的对话内容，提取关键场景、人物、动作、环境、氛围等信息，生成一段适合Stable Diffusion/Flux模型的英文生图提示词。要求：1.只用英文输出 2.描述具体的视觉元素 3.包含光线、氛围、风格 4.不要输出任何解释或前缀，直接输出提示词本身 5.长度控制在50-100个单词'
+                        content: '你是一个专业的AI绘画提示词工程师。根据用户提供的对话内容，提取关键场景、人物、动作、环境、氛围等信息，生成一段适合Stable Diffusion/Flux模型的英文生图提示词。要求：1.只用英文输出 2.描述具体的视觉元素 3.包含光线、氛围、风格 4.不要输出任何解释或前缀，直接输出提示词本身 5.长度控制在50-100个单词 6.【重要】必须生成安全、适合公开场合的内容，绝对不能包含任何色情、裸露、暴力、血腥或敏感内容，如果对话中有敏感内容，请将其转换为安全的日常场景描述（例如亲密动作转换为温馨的拥抱或牵手）'
                     },
                     {
                         role: 'user',
@@ -3587,6 +3587,11 @@ async function generateImageFromChat() {
     } catch (error) {
         console.error('对话生图失败:', error);
         loadingDiv.remove();
-        alert('生成失败: ' + error.message + '\n\n可能原因：\n1. 大模型API Key未配置\n2. 生图免费额度已用完\n3. 网络问题，请重试');
+        const errMsg = error.message || '';
+        if (errMsg.includes('NSFW') || errMsg.includes('8007')) {
+            alert('生成失败：对话内容包含敏感元素，已被安全审核拦截。\n\n建议：聊一些日常、温馨的场景再试试。');
+        } else {
+            alert('生成失败: ' + errMsg + '\n\n可能原因：\n1. 生图免费额度已用完（每天重置）\n2. 网络问题，请重试');
+        }
     }
 }
