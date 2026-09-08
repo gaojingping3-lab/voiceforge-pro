@@ -62,7 +62,7 @@ export async function onRequestPost(context) {
     const modelConfigs = {
       dreamshaper: {
         id: '@cf/lykon/dreamshaper-8-lcm',
-        params: { prompt: prompt, num_steps: 6 }
+        params: { prompt: prompt, num_steps: 8 }
       },
       flux: {
         id: '@cf/black-forest-labs/flux-1-schnell',
