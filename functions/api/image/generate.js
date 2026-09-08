@@ -1,6 +1,6 @@
 // Cloudflare Workers AI 生图接口
 // 使用 Flux 1 Schnell 模型，免费额度每天约230张
-// 直接返回图片二进制数据，前端用 Blob URL 显示
+// 返回 JPEG 图片二进制数据
 
 export async function onRequestPost(context) {
   try {
@@ -16,17 +16,25 @@ export async function onRequestPost(context) {
     }
 
     // 调用 Cloudflare Workers AI 生图
-    // Flux 1 Schnell 只接受 prompt 参数
-    const imageBuffer = await env.AI.run(
+    // Flux 1 Schnell 返回 { image: "base64字符串" }，格式是 JPEG
+    const result = await env.AI.run(
       '@cf/black-forest-labs/flux-1-schnell',
       { prompt: prompt }
     );
 
-    // 直接返回图片二进制数据
-    return new Response(imageBuffer, {
+    // 从 base64 转换成二进制
+    const base64 = result.image;
+    const binaryString = atob(base64);
+    const imgBytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      imgBytes[i] = binaryString.charCodeAt(i);
+    }
+
+    // 直接返回 JPEG 图片二进制数据
+    return new Response(imgBytes, {
       status: 200,
       headers: {
-        'Content-Type': 'image/png',
+        'Content-Type': 'image/jpeg',
         'Cache-Control': 'no-cache'
       }
     });
