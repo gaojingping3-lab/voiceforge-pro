@@ -3739,10 +3739,17 @@ function pickModelByPrompt(prompt) {
 // 自动轮换队列（只使用Pollinations无审核系列，去掉不稳定的zimage）
 const AUTO_MODEL_QUEUE = ['pollinations-flux-realism', 'pollinations-seedream', 'pollinations-flux'];
 
-async function generateImageWithSafety(prompt, model, onStatusUpdate) {
-    // 第一步：用LLM把提示词优化成细节拉满的版本
-    if (onStatusUpdate) onStatusUpdate('正在优化提示词细节...');
-    const optimizedPrompt = await optimizeImagePrompt(prompt);
+async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimizedPrompt) {
+    // 第一步：优化提示词
+    // 如果传入了 preOptimizedPrompt（聊天里用角色AI生成的），直接用，不再单独调用DeepSeek
+    let optimizedPrompt;
+    if (preOptimizedPrompt) {
+        optimizedPrompt = preOptimizedPrompt;
+        if (onStatusUpdate) onStatusUpdate('角色AI已整理画面描述，正在生成图片...');
+    } else {
+        if (onStatusUpdate) onStatusUpdate('正在优化提示词细节...');
+        optimizedPrompt = await optimizeImagePrompt(prompt);
+    }
 
     // 第二步：确定使用的模型列表
     let modelsToTry;
@@ -3865,6 +3872,62 @@ async function generateImage() {
 // 根据对话生成图片
 // ============================================
 
+// 用当前聊天角色AI生成生图提示词（复用角色人设，不单独调用DeepSeek提示词大师）
+async function generatePromptWithRoleAI(conversationText) {
+    try {
+        const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+        const llmKey = localStorage.getItem('LLM_KEY') || '';
+        const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+        const currentRole = getCurrentRole();
+
+        // 构造角色人设（复用当前聊天的角色卡）
+        const roleDesc = currentRole ? currentRole.desc : '';
+        const roleName = currentRole ? currentRole.name : 'AI';
+
+        const messages = [
+            { role: 'system', content: `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，提取画面视觉信息，转换成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 包含人物外貌（严格按照角色设定）、服装、当前动作、表情、环境、光影\n3. 强制写实照片风格：photorealistic, shot on DSLR, natural skin texture\n4. 明确人物性别（man/woman/girl/boy）\n5. 不要输出任何中文，不要加引号，直接输出提示词本身` },
+            { role: 'user', content: `根据以下对话生成英文生图提示词：\n\n${conversationText}` }
+        ];
+
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${llmKey}`
+            },
+            body: JSON.stringify({
+                baseUrl: llmUrl,
+                model: llmModel,
+                messages: messages,
+                temperature: 0.7,
+                stream: false,
+                thinking: { type: 'disabled' }
+            })
+        });
+
+        if (!response.ok) {
+            console.warn('角色AI生成提示词失败，降级用原始文本:', response.status);
+            return conversationText;
+        }
+
+        const data = await response.json();
+        let prompt = data.choices?.[0]?.message?.content?.trim() || '';
+
+        // 清理：去掉可能的动作描写*(...)*和台词「...」
+        prompt = prompt.replace(/\*[^*]*\*/g, '').replace(/「[^」]*」/g, '').trim();
+
+        // 如果清理后太短，降级用原始文本
+        if (prompt.length < 20) {
+            return conversationText;
+        }
+
+        return prompt;
+    } catch (e) {
+        console.warn('角色AI生成提示词异常，降级用原始文本:', e.message);
+        return conversationText;
+    }
+}
+
 // 生图防重复触发标志
 let isGeneratingChatImage = false;
 
@@ -3928,10 +3991,14 @@ async function generateImageFromChat() {
             ).join('\n');
         }
 
-        // 调用生图函数（内部会自动优化提示词细节，不自动降级）
+        // 第一步：用当前聊天角色AI生成生图提示词（复用角色人设，不单独调用DeepSeek提示词大师）
+        loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理画面描述...</span></div>';
+        const rolePrompt = await generatePromptWithRoleAI(conversationText);
+
+        // 第二步：用角色AI生成的提示词直接生图（跳过独立的提示词优化）
         const result = await generateImageWithSafety(conversationText, getImageModel(), (msg) => {
             loadingBubble.innerHTML = `<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${msg}</span></div>`;
-        });
+        }, rolePrompt);
 
         // 3. 把图片插入聊天记录
         loadingDiv.remove();
