@@ -3868,12 +3868,25 @@ async function optimizePromptManual() {
             })
         });
 
-        // 10秒超时
+        // 20秒超时（DeepSeek偶尔会慢，给足时间）
         const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('优化超时')), 10000);
+            setTimeout(() => reject(new Error('优化超时')), 20000);
         });
 
-        const response = await Promise.race([fetchPromise, timeoutPromise]);
+        let response;
+        try {
+            response = await Promise.race([fetchPromise, timeoutPromise]);
+        } catch (timeoutErr) {
+            // 超时后不报错，自动用原始提示词，用户可以直接点生成
+            input.value = prompt;
+            isPromptOptimized = false;
+            btn.innerHTML = '<i class="fa-solid fa-clock"></i> 超时，用原词';
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> AI优化提示词';
+                btn.disabled = false;
+            }, 2000);
+            return;
+        }
 
         if (!response.ok) {
             throw new Error('API错误: ' + response.status);
