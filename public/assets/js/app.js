@@ -3872,6 +3872,9 @@ async function generateImage() {
 // 根据对话生成图片
 // ============================================
 
+// 固定风格前缀：每次生图都强制加上，锁死画风不漂移
+const FIXED_IMAGE_STYLE = 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, natural indoor lighting, soft window light, realistic skin texture, visible pores, low saturation, lifelike, candid photo, no makeup filter, no anime, no illustration, no overexposure';
+
 // 用当前聊天角色AI生成生图提示词（复用角色人设，不单独调用DeepSeek提示词大师）
 async function generatePromptWithRoleAI(conversationText) {
     try {
@@ -3885,7 +3888,7 @@ async function generatePromptWithRoleAI(conversationText) {
         const roleName = currentRole ? currentRole.name : 'AI';
 
         const messages = [
-            { role: 'system', content: `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，提取画面视觉信息，转换成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 包含人物外貌（严格按照角色设定）、服装、当前动作、表情、环境、光影\n3. 强制写实照片风格：photorealistic, shot on DSLR, natural skin texture\n4. 明确人物性别（man/woman/girl/boy）\n5. 不要输出任何中文，不要加引号，直接输出提示词本身` },
+            { role: 'system', content: `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，提取画面视觉信息，转换成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 包含人物外貌（严格按照角色设定，不要改写）、服装、当前动作、表情、环境\n3. 明确人物性别（man/woman/girl/boy）\n4. 不要输出任何中文，不要加引号，直接输出提示词本身\n5. 不要添加风格词，风格已由系统固定前缀处理` },
             { role: 'user', content: `根据以下对话生成英文生图提示词：\n\n${conversationText}` }
         ];
 
@@ -3899,7 +3902,7 @@ async function generatePromptWithRoleAI(conversationText) {
                 baseUrl: llmUrl,
                 model: llmModel,
                 messages: messages,
-                temperature: 0.7,
+                temperature: 0.3,
                 stream: false,
                 thinking: { type: 'disabled' }
             })
@@ -3907,7 +3910,7 @@ async function generatePromptWithRoleAI(conversationText) {
 
         if (!response.ok) {
             console.warn('角色AI生成提示词失败，降级用原始文本:', response.status);
-            return conversationText;
+            return FIXED_IMAGE_STYLE + ', ' + conversationText;
         }
 
         const data = await response.json();
@@ -3918,13 +3921,14 @@ async function generatePromptWithRoleAI(conversationText) {
 
         // 如果清理后太短，降级用原始文本
         if (prompt.length < 20) {
-            return conversationText;
+            return FIXED_IMAGE_STYLE + ', ' + conversationText;
         }
 
-        return prompt;
+        // 强制加上固定风格前缀，锁死画风
+        return FIXED_IMAGE_STYLE + ', ' + prompt;
     } catch (e) {
         console.warn('角色AI生成提示词异常，降级用原始文本:', e.message);
-        return conversationText;
+        return FIXED_IMAGE_STYLE + ', ' + conversationText;
     }
 }
 
