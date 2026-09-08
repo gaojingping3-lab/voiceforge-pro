@@ -19,16 +19,10 @@ export async function onRequestPost(context) {
     }
 
     // 调用 Cloudflare Workers AI 生图
+    // Flux 1 Schnell 只接受 prompt 参数，不支持 num_steps/width/height/negative_prompt
     const inputs = {
-      prompt: prompt,
-      num_steps: numSteps,
-      width: width,
-      height: height
+      prompt: prompt
     };
-
-    if (negativePrompt) {
-      inputs.negative_prompt = negativePrompt;
-    }
 
     const response = await env.AI.run(
       '@cf/black-forest-labs/flux-1-schnell',
