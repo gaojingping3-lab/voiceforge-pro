@@ -1719,15 +1719,15 @@ function updateReasoningBtn(level) {
     } else if (level === 'low') {
         btn.innerHTML = '<i class="fa-solid fa-brain text-base text-blue-400"></i>';
         btn.title = '思考程度：低';
-    } else if (level === 'medium') {
-        btn.innerHTML = '<i class="fa-solid fa-brain text-base text-yellow-400"></i>';
-        btn.title = '思考程度：中';
     } else if (level === 'high') {
         btn.innerHTML = '<i class="fa-solid fa-brain text-base text-red-400"></i>';
         btn.title = '思考程度：高';
+    } else if (level === 'max') {
+        btn.innerHTML = '<i class="fa-solid fa-brain text-base text-purple-400"></i>';
+        btn.title = '思考程度：Max（深度推理）';
     } else {
-        btn.innerHTML = '<i class="fa-solid fa-brain text-base"></i>';
-        btn.title = '思考程度：默认';
+        btn.innerHTML = '<i class="fa-solid fa-brain text-base text-gray-400"></i>';
+        btn.title = '思考程度：关闭（秒回）';
     }
     // 高亮当前选中的选项
     document.querySelectorAll('.reasoning-option').forEach(opt => {
@@ -1750,7 +1750,7 @@ document.addEventListener('click', (e) => {
 
 // 页面加载时恢复思考程度设置
 document.addEventListener('DOMContentLoaded', () => {
-    const level = localStorage.getItem('LLM_REASONING') || 'default';
+    const level = localStorage.getItem('LLM_REASONING') || 'off';
     updateReasoningBtn(level);
     initRoleCard();
     loadChatHistory(); // 恢复永久记忆
@@ -2149,7 +2149,7 @@ async function sendChatMessage() {
 
         // 通过 Cloudflare Pages Functions 同源中转，规避浏览器 CORS 预检挂起问题
         // 带自动重试的请求（失败时重试一次，应对网络波动和临时限流）
-        const reasoningLevel = localStorage.getItem('LLM_REASONING') || 'default';
+        const reasoningLevel = localStorage.getItem('LLM_REASONING') || 'off';
         const useSlideWindow = localStorage.getItem('CTX_MODE') === 'slide';
         const requestBody = {
             baseUrl: llmUrl,
@@ -2160,16 +2160,15 @@ async function sendChatMessage() {
             useSlideWindow: useSlideWindow
         };
         // 思考程度控制（支持 V4 系列和 reasoner 模型）
-        // 注意：DeepSeek V4 默认开启thinking(medium)，普通聊天必须显式关闭才能秒回
+        // 四档：off(关闭秒回) / low(低) / high(高) / max(深度推理)
         const isV4OrReasoner = llmModel.toLowerCase().includes('v4') || llmModel.toLowerCase().includes('reasoner');
         if (isV4OrReasoner) {
-            if (reasoningLevel === 'low' || reasoningLevel === 'medium' || reasoningLevel === 'high') {
-                // 用户主动开启思考：低/中/高（修正映射，中=medium）
-                const effortMap = { 'low': 'low', 'medium': 'medium', 'high': 'high' };
+            if (reasoningLevel === 'low' || reasoningLevel === 'high' || reasoningLevel === 'max') {
+                const effortMap = { 'low': 'low', 'high': 'high', 'max': 'max' };
                 requestBody.thinking = { type: 'enabled' };
                 requestBody.reasoning_effort = effortMap[reasoningLevel] || 'low';
             } else {
-                // default 和 off 都显式关闭思考，保证普通聊天秒回
+                // off 显式关闭思考，保证普通聊天秒回
                 requestBody.thinking = { type: 'disabled' };
             }
         }
@@ -3114,12 +3113,12 @@ ${currentRole.desc}
             stream_options: { include_usage: true },
             useSlideWindow: localStorage.getItem('CTX_MODE') === 'slide',
         };
-        // Thinking控制：V4默认开启思考，普通对话显式关闭以秒回（与单人模式一致）
-        const dualReasoningLevel = localStorage.getItem('LLM_REASONING') || 'default';
+        // Thinking控制：四档 off/low/high/max，与单人模式完全一致
+        const dualReasoningLevel = localStorage.getItem('LLM_REASONING') || 'off';
         const dualIsV4 = llmModel.toLowerCase().includes('v4') || llmModel.toLowerCase().includes('reasoner');
         if (dualIsV4) {
-            if (dualReasoningLevel === 'low' || dualReasoningLevel === 'medium' || dualReasoningLevel === 'high') {
-                const effortMap = { 'low': 'low', 'medium': 'medium', 'high': 'high' };
+            if (dualReasoningLevel === 'low' || dualReasoningLevel === 'high' || dualReasoningLevel === 'max') {
+                const effortMap = { 'low': 'low', 'high': 'high', 'max': 'max' };
                 dualRequestBody.thinking = { type: 'enabled' };
                 dualRequestBody.reasoning_effort = effortMap[dualReasoningLevel] || 'low';
             } else {
