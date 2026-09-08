@@ -164,6 +164,19 @@ function initPullToRefresh() {
 }
 
 // 聊天全屏模式切换
+// 更新全屏顶部导航栏的标题
+function updateFullscreenTitle() {
+    const titleEl = document.getElementById('fullscreen-title');
+    if (!titleEl) return;
+    const isDual = document.getElementById('dual-role-toggle')?.checked;
+    if (isDual) {
+        titleEl.innerText = '双角色互聊';
+    } else {
+        const role = getCurrentRole();
+        titleEl.innerText = role ? role.name : 'AI 语音对话';
+    }
+}
+
 function toggleChatFullscreen() {
     const isFull = document.body.classList.toggle('chat-fullscreen');
     document.documentElement.classList.toggle('chat-fullscreen-html', isFull);
@@ -188,6 +201,7 @@ function toggleChatFullscreen() {
         if (chatSection) chatSection.style.height = '';
     }
     localStorage.setItem('CHAT_FULLSCREEN', isFull ? '1' : '0');
+    updateFullscreenTitle();
     sfxClick();
 }
 
@@ -1443,8 +1457,13 @@ function appendChatMessage(text, type) {
     const avatarName = isUser ? '我' : (role ? role.name : 'AI');
     const bubble = document.createElement('div');
     bubble.className = `chat-bubble ${type === 'user' ? 'bg-primary text-white' : 'bg-base-200 text-base-content'} relative pr-8`;
-    // AI消息台词上色，用户消息保持原样
-    bubble.innerHTML = type === 'ai' ? formatChatText(text) : escapeHtml(text);
+    // AI消息台词上色，并在上方添加仿微信群聊的名称标记
+    if (type === 'ai') {
+        const roleColor = '#3b82f6';
+        bubble.innerHTML = `<span class="text-xs font-bold block mb-1 opacity-80" style="color:${roleColor}">${escapeHtml(avatarName)}</span>` + formatChatText(text);
+    } else {
+        bubble.innerHTML = escapeHtml(text);
+    }
 
     // 微信风正确顺序：
     // chat-start(AI左): 头像在前，气泡在后
@@ -2480,6 +2499,7 @@ function switchRole(id) {
                 // 用户选择取消，只切换角色不清空
                 localStorage.setItem('CURRENT_ROLE_ID', id);
                 renderRoleCard();
+                updateFullscreenTitle();
                 document.getElementById('role-list-modal').close();
                 sfxSuccess();
                 if (chatContainer) chatContainer.style.opacity = '1';
@@ -2492,6 +2512,7 @@ function switchRole(id) {
         }
         localStorage.setItem('CURRENT_ROLE_ID', id);
         renderRoleCard();
+        updateFullscreenTitle();
         document.getElementById('role-list-modal').close();
         // AI主动发送开场白
         const role = getCurrentRole();
@@ -2708,6 +2729,7 @@ function toggleDualRoleMode() {
         dualRoleB = null;
         document.getElementById('role-card').classList.remove('hidden');
     }
+    updateFullscreenTitle();
 }
 
 // 填充角色选择下拉框

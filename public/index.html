@@ -298,6 +298,19 @@
     opacity: 1 !important;
     pointer-events: auto !important;
   }
+  /* === 仿微信顶部导航栏 === */
+  body.chat-fullscreen #fullscreen-header {
+    display: flex !important;
+    padding-top: max(env(safe-area-inset-top), 12px) !important;
+    background: var(--fallback-b2,oklch(var(--b2)/1)) !important;
+  }
+  body.chat-fullscreen #chat-section .card-body {
+    padding-top: 0 !important;
+  }
+  body.chat-fullscreen #exit-fullscreen-btn,
+  body.chat-fullscreen #fullscreen-clear-btn {
+    display: none !important;
+  }
   /* 设置分组折叠动画 - JS动态高度方案 */
   .settings-group-wrapper {
     height: 0;
@@ -750,6 +763,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 </dialog>
 
                 <div class="relative flex-1 min-h-0 flex flex-col">
+                    <!-- 全屏模式原生顶部导航栏 (仿微信) -->
+                    <div id="fullscreen-header" class="hidden shrink-0 items-center justify-between px-4 py-3 z-50 border-b border-base-300 shadow-sm">
+                        <button class="btn btn-ghost btn-sm px-2 -ml-2" onclick="toggleChatFullscreen()">
+                            <i class="fa-solid fa-chevron-left text-lg"></i>
+                        </button>
+                        <span id="fullscreen-title" class="font-bold text-base truncate max-w-[60%]">聊天</span>
+                        <button class="btn btn-ghost btn-sm btn-circle" onclick="clearChat()">
+                            <i class="fa-solid fa-eraser"></i>
+                        </button>
+                    </div>
                     <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 mb-3"></div>
                     <button id="fullscreen-clear-btn" onclick="clearChat()" class="absolute top-2 right-12 z-20 btn btn-circle btn-sm bg-base-200/90 backdrop-blur shadow-lg opacity-0 pointer-events-none transition-all duration-200 hover:scale-110" title="清空聊天">
                         <i class="fa-solid fa-trash text-sm"></i>
@@ -1204,6 +1227,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </dialog>
 
-    <script src="assets/js/app.js?v=20260909b"></script>
+    <script src="assets/js/app.js?v=20260909c"></script>
 </body>
 </html>
