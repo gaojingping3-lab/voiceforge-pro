@@ -3435,6 +3435,90 @@ function loadImageModelSelect() {
     }
 }
 
+// 三级安全降级提示词（生图被NSFW拦截时自动用更严格的提示词重试）
+const IMAGE_SAFETY_LEVELS = [
+    '你是一个专业的AI绘画提示词工程师。根据用户提供的内容，生成一段适合Stable Diffusion/Flux模型的英文生图提示词。要求：1.只用英文输出 2.描述具体的视觉元素 3.包含光线、氛围、风格 4.不要输出任何解释或前缀，直接输出提示词本身 5.长度控制在50-100个单词 6.必须生成安全、适合公开场合的内容，不能包含色情、裸露、暴力、血腥内容，如果有亲密内容，请转换为温馨的拥抱或牵手',
+    '你是一个专业的AI绘画提示词工程师。根据用户提供的内容，生成一段非常安全、保守的英文生图提示词。要求：1.只用英文输出 2.只描述风景、物品、环境和整体氛围，不要描述人物的具体动作或身体部位 3.包含光线、色调、艺术风格 4.不要输出任何解释，直接输出提示词 5.长度30-60个单词 6.绝对不能有任何可能被认为是敏感的内容',
+    '你是一个AI绘画提示词工程师。根据用户提供的主题，生成一段纯风景/氛围的英文生图提示词。要求：1.只用英文输出 2.只描述自然风景、室内环境、光影氛围，完全不出现人物 3.艺术风格明确 4.直接输出提示词，不要解释 5.长度20-40个单词'
+];
+
+// 用LLM把提示词转换成指定安全级别的版本
+async function rewritePromptWithSafety(prompt, level) {
+    const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+    const llmKey = localStorage.getItem('LLM_KEY') || '';
+    const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+
+    const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${llmKey}`
+        },
+        body: JSON.stringify({
+            baseUrl: llmUrl,
+            model: llmModel,
+            messages: [
+                { role: 'system', content: IMAGE_SAFETY_LEVELS[level] },
+                { role: 'user', content: `根据以下内容生成生图提示词：\n\n${prompt}` }
+            ],
+            temperature: level === 0 ? 0.7 : 0.3,
+            stream: false
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error('提示词调整失败');
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content?.trim() || prompt;
+}
+
+// 带三级安全降级的生图核心函数
+async function generateImageWithSafety(prompt, model, onStatusUpdate) {
+    let currentPrompt = prompt;
+    let lastError = '';
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+            // 第2、3次：用LLM把提示词改成更安全的版本
+            if (onStatusUpdate) onStatusUpdate(`内容审核中，正在调整为安全版本（第${attempt + 1}次）...`);
+            currentPrompt = await rewritePromptWithSafety(prompt, attempt);
+        }
+
+        if (onStatusUpdate && attempt === 0) {
+            onStatusUpdate('正在生成图片...');
+        }
+
+        const response = await fetch('/api/image/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: currentPrompt, model: model })
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            return { blob: blob, prompt: currentPrompt };
+        }
+
+        // 读取错误信息
+        let errorMsg = '生成失败';
+        try {
+            const errData = await response.json();
+            errorMsg = errData.error || errorMsg;
+        } catch (e) {}
+        lastError = errorMsg;
+
+        // 如果不是NSFW错误，直接抛出，不重试
+        if (!errorMsg.includes('NSFW') && !errorMsg.includes('8007')) {
+            throw new Error(errorMsg);
+        }
+        // 如果是NSFW，继续下一次循环
+    }
+
+    throw new Error(lastError || '生成失败');
+}
+
 async function generateImage() {
     const prompt = document.getElementById('image-prompt').value.trim();
     const model = getImageModel();
@@ -3448,34 +3532,18 @@ async function generateImage() {
     const statusEl = document.getElementById('image-status');
     const resultEl = document.getElementById('image-result');
     const btn = document.getElementById('image-generate-btn');
+    const statusText = statusEl.querySelector('.text-xs.text-gray-500');
     statusEl.classList.remove('hidden');
     resultEl.classList.add('hidden');
     btn.disabled = true;
     btn.classList.add('btn-disabled');
 
     try {
-        const response = await fetch('/api/image/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                prompt: prompt,
-                model: model
-            })
+        const result = await generateImageWithSafety(prompt, model, (msg) => {
+            if (statusText) statusText.textContent = msg;
         });
 
-        if (!response.ok) {
-            // 尝试读取错误信息
-            let errorMsg = '生成失败';
-            try {
-                const errData = await response.json();
-                errorMsg = errData.error || errData.message || errorMsg;
-            } catch (e) {}
-            throw new Error(errorMsg);
-        }
-
-        // 直接获取图片 blob，用 Blob URL 显示（iOS 兼容更好）
-        const blob = await response.blob();
-        const imageUrl = URL.createObjectURL(blob);
+        const imageUrl = URL.createObjectURL(result.blob);
 
         // 释放之前的 Blob URL
         const img = document.getElementById('generated-image');
@@ -3491,7 +3559,12 @@ async function generateImage() {
 
     } catch (error) {
         console.error('生图失败:', error);
-        alert('生成失败: ' + error.message + '\n\n可能原因：\n1. 免费额度已用完（每天重置）\n2. 网络问题，请重试\n3. 提示词包含违规内容');
+        const errMsg = error.message || '';
+        if (errMsg.includes('NSFW') || errMsg.includes('8007')) {
+            alert('生成失败：提示词包含敏感元素，已被安全审核拦截。\n\n建议：描述一些日常、温馨的场景。');
+        } else {
+            alert('生成失败: ' + errMsg + '\n\n可能原因：\n1. 免费额度已用完（每天重置）\n2. 网络问题，请重试');
+        }
     } finally {
         statusEl.classList.add('hidden');
         btn.disabled = false;
@@ -3534,103 +3607,37 @@ async function generateImageFromChat() {
             `${m.role === 'user' ? '我' : 'AI'}: ${m.content}`
         ).join('\n');
 
-        // 三级安全提示词：第一次正常，第二次更严格，第三次最保守
-        const safetyLevels = [
-            '你是一个专业的AI绘画提示词工程师。根据用户提供的对话内容，提取关键场景、人物、动作、环境、氛围等信息，生成一段适合Stable Diffusion/Flux模型的英文生图提示词。要求：1.只用英文输出 2.描述具体的视觉元素 3.包含光线、氛围、风格 4.不要输出任何解释或前缀，直接输出提示词本身 5.长度控制在50-100个单词 6.必须生成安全、适合公开场合的内容，不能包含色情、裸露、暴力、血腥内容，如果对话中有亲密内容，请转换为温馨的拥抱或牵手',
-            '你是一个专业的AI绘画提示词工程师。根据用户提供的对话内容，生成一段非常安全、保守的英文生图提示词。要求：1.只用英文输出 2.只描述风景、物品、环境和整体氛围，不要描述人物的具体动作或身体部位 3.包含光线、色调、艺术风格 4.不要输出任何解释，直接输出提示词 5.长度30-60个单词 6.绝对不能有任何可能被认为是敏感的内容',
-            '你是一个AI绘画提示词工程师。根据用户提供的对话主题，生成一段纯风景/氛围的英文生图提示词。要求：1.只用英文输出 2.只描述自然风景、室内环境、光影氛围，完全不出现人物 3.艺术风格明确 4.直接输出提示词，不要解释 5.长度20-40个单词'
-        ];
+        // 第一次用正常级别生成提示词
+        const initialPrompt = await rewritePromptWithSafety(conversationText, 0);
 
-        let imagePrompt = '';
-        let lastError = '';
+        // 2. 调用带三级安全降级的生图函数
+        loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在绘制图片...</span></div>';
 
-        // 最多尝试3次：每次用更严格的安全级别
-        for (let attempt = 0; attempt < 3; attempt++) {
-            // 生成提示词
-            const promptResponse = await fetch('/api/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${llmKey}`
-                },
-                body: JSON.stringify({
-                    baseUrl: llmUrl,
-                    model: llmModel,
-                    messages: [
-                        { role: 'system', content: safetyLevels[attempt] },
-                        { role: 'user', content: `根据以下对话生成生图提示词：\n\n${conversationText}` }
-                    ],
-                    temperature: attempt === 0 ? 0.7 : 0.3, // 重试时更保守
-                    stream: false
-                })
-            });
+        const result = await generateImageWithSafety(initialPrompt, getImageModel(), (msg) => {
+            loadingBubble.innerHTML = `<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${msg}</span></div>`;
+        });
 
-            if (!promptResponse.ok) {
-                throw new Error('提示词生成失败');
-            }
+        // 3. 把图片插入聊天记录
+        loadingDiv.remove();
+        const imageUrl = URL.createObjectURL(result.blob);
 
-            const promptData = await promptResponse.json();
-            imagePrompt = promptData.choices?.[0]?.message?.content?.trim() || conversationText;
+        const imageDiv = document.createElement('div');
+        imageDiv.className = 'chat chat-start relative gap-2';
+        imageDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
 
-            // 更新加载状态
-            if (attempt === 0) {
-                loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在绘制图片...</span></div>';
-            } else {
-                loadingBubble.innerHTML = `<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">内容审核中，正在调整为安全版本（第${attempt + 1}次）...</span></div>`;
-            }
-
-            // 调用生图 API（使用用户选择的模型）
-            const imageResponse = await fetch('/api/image/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: imagePrompt, model: getImageModel() })
-            });
-
-            if (imageResponse.ok) {
-                // 成功！获取图片并跳出循环
-                const blob = await imageResponse.blob();
-                const imageUrl = URL.createObjectURL(blob);
-
-                // 把图片插入聊天记录
-                loadingDiv.remove();
-
-                const imageDiv = document.createElement('div');
-                imageDiv.className = 'chat chat-start relative gap-2';
-                imageDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
-
-                const imageBubble = document.createElement('div');
-                imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-2 max-w-[80%]';
-                imageBubble.innerHTML = `
-                    <div class="text-xs text-gray-500 mb-2">🎨 根据对话生成</div>
-                    <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
-                    <div class="text-xs text-gray-400 mt-2 break-all">${escapeHtml(imagePrompt.substring(0, 100))}${imagePrompt.length > 100 ? '...' : ''}</div>
-                    <div class="flex gap-2 mt-2">
-                        <a href="${imageUrl}" download="chat-generated.png" class="btn btn-primary btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
-                    </div>
-                `;
-                imageDiv.appendChild(imageBubble);
-                container.appendChild(imageDiv);
-                smartScroll(container);
-                return; // 成功，直接返回
-            }
-
-            // 生图失败，读取错误信息
-            let errorMsg = '图片生成失败';
-            try {
-                const errData = await imageResponse.json();
-                errorMsg = errData.error || errorMsg;
-            } catch (e) {}
-            lastError = errorMsg;
-
-            // 如果不是 NSFW 错误，直接抛出，不重试
-            if (!errorMsg.includes('NSFW') && !errorMsg.includes('8007')) {
-                throw new Error(errorMsg);
-            }
-            // 如果是 NSFW，继续下一次循环，用更严格的提示词
-        }
-
-        // 三次都失败了
-        throw new Error(lastError || '生成失败');
+        const imageBubble = document.createElement('div');
+        imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-2 max-w-[80%]';
+        imageBubble.innerHTML = `
+            <div class="text-xs text-gray-500 mb-2">🎨 根据对话生成</div>
+            <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
+            <div class="text-xs text-gray-400 mt-2 break-all">${escapeHtml(result.prompt.substring(0, 100))}${result.prompt.length > 100 ? '...' : ''}</div>
+            <div class="flex gap-2 mt-2">
+                <a href="${imageUrl}" download="chat-generated.png" class="btn btn-primary btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
+            </div>
+        `;
+        imageDiv.appendChild(imageBubble);
+        container.appendChild(imageDiv);
+        smartScroll(container);
 
     } catch (error) {
         console.error('对话生图失败:', error);
