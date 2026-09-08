@@ -1,6 +1,6 @@
 // Cloudflare Workers AI 生图接口
 // 使用 Stable Diffusion XL 模型（审核比 Flux 宽松），免费
-// 返回 JPEG 图片二进制数据
+// 返回 PNG 图片二进制数据
 
 export async function onRequestPost(context) {
   try {
@@ -16,7 +16,6 @@ export async function onRequestPost(context) {
     }
 
     // 调用 Cloudflare Workers AI 生图
-    // Stable Diffusion XL 返回 { image: "base64字符串" }，格式是 PNG
     const result = await env.AI.run(
       '@cf/stabilityai/stable-diffusion-xl-base-1.0',
       {
@@ -26,16 +25,39 @@ export async function onRequestPost(context) {
       }
     );
 
-    // 从 base64 转换成二进制
-    const base64 = result.image;
-    const binaryString = atob(base64);
-    const imgBytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      imgBytes[i] = binaryString.charCodeAt(i);
+    // 兼容两种返回格式：
+    // 1. { image: "base64字符串" }（Flux格式）
+    // 2. 直接返回二进制数据（SDXL格式，可能是 Uint8Array 或 ReadableStream）
+    let imageBytes;
+
+    if (result && typeof result === 'object' && result.image) {
+      // 格式1：base64 字符串
+      const base64 = result.image;
+      const binaryString = atob(base64);
+      imageBytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        imageBytes[i] = binaryString.charCodeAt(i);
+      }
+    } else if (result instanceof Uint8Array) {
+      // 格式2a：Uint8Array
+      imageBytes = result;
+    } else if (result && result.arrayBuffer) {
+      // 格式2b：ReadableStream 或 Blob
+      const buffer = await result.arrayBuffer();
+      imageBytes = new Uint8Array(buffer);
+    } else {
+      // 兜底：直接当二进制数据返回
+      return new Response(result, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'no-cache'
+        }
+      });
     }
 
-    // 直接返回 PNG 图片二进制数据
-    return new Response(imgBytes, {
+    // 返回 PNG 图片二进制数据
+    return new Response(imageBytes, {
       status: 200,
       headers: {
         'Content-Type': 'image/png',
