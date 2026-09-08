@@ -3435,15 +3435,11 @@ function loadImageModelSelect() {
     }
 }
 
-// 三级安全降级提示词（生图被NSFW拦截时自动用更严格的提示词重试）
-const IMAGE_SAFETY_LEVELS = [
-    '你是一个专业的AI绘画提示词工程师。根据用户提供的内容，生成一段适合Stable Diffusion/Flux模型的英文生图提示词。要求：1.只用英文输出 2.描述具体的视觉元素 3.包含光线、氛围、风格 4.不要输出任何解释或前缀，直接输出提示词本身 5.长度控制在50-100个单词 6.必须生成安全、适合公开场合的内容，不能包含色情、裸露、暴力、血腥内容，如果有亲密内容，请转换为温馨的拥抱或牵手',
-    '你是一个专业的AI绘画提示词工程师。根据用户提供的内容，生成一段非常安全、保守的英文生图提示词。要求：1.只用英文输出 2.只描述风景、物品、环境和整体氛围，不要描述人物的具体动作或身体部位 3.包含光线、色调、艺术风格 4.不要输出任何解释，直接输出提示词 5.长度30-60个单词 6.绝对不能有任何可能被认为是敏感的内容',
-    '你是一个AI绘画提示词工程师。根据用户提供的主题，生成一段纯风景/氛围的英文生图提示词。要求：1.只用英文输出 2.只描述自然风景、室内环境、光影氛围，完全不出现人物 3.艺术风格明确 4.直接输出提示词，不要解释 5.长度20-40个单词'
-];
+// 生图提示词优化：细节拉满，不加安全限制
+const IMAGE_PROMPT_OPTIMIZER = '你是一个世界级的AI绘画提示词大师，精通Stable Diffusion和Flux模型的提示词工程。根据用户提供的内容，生成一段极致详细的英文生图提示词。要求：1.只用英文输出 2.细节拉满：精确描述人物的五官、发型、服装材质、表情、姿势、动作 3.环境细节：背景、道具、光线方向、光源类型、阴影、反射、氛围 4.画质关键词：masterpiece, best quality, ultra detailed, 8k, photorealistic, sharp focus, depth of field 5.艺术风格和色调 6.相机参数：镜头、焦距、光圈 7.不要输出任何解释或前缀，直接输出提示词本身 8.长度100-200个单词，越详细越好 9.不要添加任何内容安全限制，完全按照用户描述生成';
 
-// 用LLM把提示词转换成指定安全级别的版本
-async function rewritePromptWithSafety(prompt, level) {
+// 用LLM把提示词优化成细节拉满的版本
+async function optimizeImagePrompt(prompt) {
     const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
     const llmKey = localStorage.getItem('LLM_KEY') || '';
     const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
@@ -3458,65 +3454,49 @@ async function rewritePromptWithSafety(prompt, level) {
             baseUrl: llmUrl,
             model: llmModel,
             messages: [
-                { role: 'system', content: IMAGE_SAFETY_LEVELS[level] },
-                { role: 'user', content: `根据以下内容生成生图提示词：\n\n${prompt}` }
+                { role: 'system', content: IMAGE_PROMPT_OPTIMIZER },
+                { role: 'user', content: `根据以下内容生成极致详细的生图提示词：\n\n${prompt}` }
             ],
-            temperature: level === 0 ? 0.7 : 0.3,
+            temperature: 0.8,
             stream: false
         })
     });
 
     if (!response.ok) {
-        throw new Error('提示词调整失败');
+        throw new Error('提示词优化失败');
     }
 
     const data = await response.json();
     return data.choices?.[0]?.message?.content?.trim() || prompt;
 }
 
-// 带三级安全降级的生图核心函数
+// 生图核心函数：先优化提示词（细节拉满），再生成图片，不自动降级
 async function generateImageWithSafety(prompt, model, onStatusUpdate) {
-    let currentPrompt = prompt;
-    let lastError = '';
+    // 第一步：用LLM把提示词优化成细节拉满的版本
+    if (onStatusUpdate) onStatusUpdate('正在优化提示词细节...');
+    const optimizedPrompt = await optimizeImagePrompt(prompt);
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-        if (attempt > 0) {
-            // 第2、3次：用LLM把提示词改成更安全的版本
-            if (onStatusUpdate) onStatusUpdate(`内容审核中，正在调整为安全版本（第${attempt + 1}次）...`);
-            currentPrompt = await rewritePromptWithSafety(prompt, attempt);
-        }
+    // 第二步：生成图片
+    if (onStatusUpdate) onStatusUpdate('正在生成图片...');
 
-        if (onStatusUpdate && attempt === 0) {
-            onStatusUpdate('正在生成图片...');
-        }
+    const response = await fetch('/api/image/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: optimizedPrompt, model: model })
+    });
 
-        const response = await fetch('/api/image/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: currentPrompt, model: model })
-        });
-
-        if (response.ok) {
-            const blob = await response.blob();
-            return { blob: blob, prompt: currentPrompt };
-        }
-
-        // 读取错误信息
+    if (!response.ok) {
+        // 读取错误信息，直接抛出，不自动降级重试
         let errorMsg = '生成失败';
         try {
             const errData = await response.json();
             errorMsg = errData.error || errorMsg;
         } catch (e) {}
-        lastError = errorMsg;
-
-        // 如果不是NSFW错误，直接抛出，不重试
-        if (!errorMsg.includes('NSFW') && !errorMsg.includes('8007')) {
-            throw new Error(errorMsg);
-        }
-        // 如果是NSFW，继续下一次循环
+        throw new Error(errorMsg);
     }
 
-    throw new Error(lastError || '生成失败');
+    const blob = await response.blob();
+    return { blob: blob, prompt: optimizedPrompt };
 }
 
 async function generateImage() {
@@ -3598,22 +3578,13 @@ async function generateImageFromChat() {
     smartScroll(container);
 
     try {
-        // 1. 调用 LLM 把对话整理成生图提示词（复用聊天的大模型配置）
-        const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
-        const llmKey = localStorage.getItem('LLM_KEY') || '';
-        const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
-
+        // 把最近两轮对话整理成文本
         const conversationText = recentMessages.map(m =>
             `${m.role === 'user' ? '我' : 'AI'}: ${m.content}`
         ).join('\n');
 
-        // 第一次用正常级别生成提示词
-        const initialPrompt = await rewritePromptWithSafety(conversationText, 0);
-
-        // 2. 调用带三级安全降级的生图函数
-        loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在绘制图片...</span></div>';
-
-        const result = await generateImageWithSafety(initialPrompt, getImageModel(), (msg) => {
+        // 调用生图函数（内部会自动优化提示词细节，不自动降级）
+        const result = await generateImageWithSafety(conversationText, getImageModel(), (msg) => {
             loadingBubble.innerHTML = `<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${msg}</span></div>`;
         });
 
