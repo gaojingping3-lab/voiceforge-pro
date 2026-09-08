@@ -406,8 +406,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="tabs tabs-boxed mb-4 bg-base-100/80 backdrop-blur p-1 rounded-xl shadow-sm">
             <a class="tab tab-active text-sm font-medium h-12 flex-1 rounded-lg whitespace-nowrap px-1" id="tab-tts" onclick="switchTab('tts')"><i class="fa-solid fa-keyboard mr-1 text-xs"></i>文本转语音</a>
             <a class="tab text-sm font-medium h-12 flex-1 rounded-lg whitespace-nowrap px-1" id="tab-chat" onclick="switchTab('chat')"><i class="fa-solid fa-comments mr-1 text-xs"></i>AI语音对话</a>
-            <a class="tab text-sm font-medium h-12 flex-1 rounded-lg whitespace-nowrap px-1" id="tab-clone" onclick="switchTab('clone')"><i class="fa-solid fa-dna mr-1 text-xs"></i>声音ID生成</a>
-            <a class="tab text-sm font-medium h-12 flex-1 rounded-lg whitespace-nowrap px-1" id="tab-history" onclick="switchTab('history')"><i class="fa-solid fa-clock-rotate-left mr-1 text-xs"></i>历史记录</a>
+            <a class="tab text-sm font-medium h-12 flex-1 rounded-lg whitespace-nowrap px-1" id="tab-image" onclick="switchTab('image')"><i class="fa-solid fa-image mr-1 text-xs"></i>AI生图</a>
+            <a class="tab text-sm font-medium h-12 flex-1 rounded-lg whitespace-nowrap px-1" id="tab-clone" onclick="switchTab('clone')"><i class="fa-solid fa-dna mr-1 text-xs"></i>声音ID</a>
+            <a class="tab text-sm font-medium h-12 flex-1 rounded-lg whitespace-nowrap px-1" id="tab-history" onclick="switchTab('history')"><i class="fa-solid fa-clock-rotate-left mr-1 text-xs"></i>历史</a>
         </div>
 
         <!-- TTS Section -->
@@ -783,6 +784,85 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             </div>
         </div>
+
+        <!-- AI Image Generation Section -->
+        <div id="image-section" class="card glass-panel shadow-xl hidden flex-1 min-h-0 overflow-y-auto tab-content-section">
+            <div class="card-body p-4 sm:p-6">
+                <h2 class="card-title text-lg mb-4"><i class="fa-solid fa-wand-magic-sparkles text-primary"></i> AI 生图</h2>
+
+                <!-- 提示词输入 -->
+                <div class="form-control w-full mb-3">
+                    <label class="label py-1"><span class="label-text font-bold">画面描述</span></label>
+                    <textarea id="image-prompt" class="textarea textarea-bordered w-full h-24 text-sm" placeholder="描述你想要生成的画面，例如：一只可爱的橘猫在阳光下看书，温馨的书房氛围"></textarea>
+                </div>
+
+                <!-- 负面提示词 -->
+                <div class="form-control w-full mb-3">
+                    <label class="label py-1"><span class="label-text font-bold">负面描述（可选）</span></label>
+                    <input type="text" id="image-negative-prompt" class="input input-bordered input-sm w-full text-sm" placeholder="不想要的元素，例如：模糊、低质量、变形" />
+                </div>
+
+                <!-- 参数设置 -->
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="form-control w-full">
+                        <label class="label py-1"><span class="label-text font-bold text-xs">比例</span></label>
+                        <select id="image-ratio" class="select select-bordered select-xs w-full" onchange="onImageRatioChange()">
+                            <option value="1:1">1:1 正方形</option>
+                            <option value="16:9">16:9 横屏</option>
+                            <option value="9:16">9:16 竖屏</option>
+                            <option value="3:2">3:2 横版</option>
+                            <option value="2:3">2:3 竖版</option>
+                        </select>
+                    </div>
+                    <div class="form-control w-full">
+                        <label class="label py-1"><span class="label-text font-bold text-xs">步数</span></label>
+                        <select id="image-steps" class="select select-bordered select-xs w-full">
+                            <option value="4">4步（快，推荐）</option>
+                            <option value="6">6步（更精细）</option>
+                            <option value="8">8步（最佳画质）</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 生成按钮 -->
+                <button id="image-generate-btn" class="btn btn-primary w-full mb-4" onclick="generateImage()">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> 生成图片
+                </button>
+
+                <!-- 生成状态 -->
+                <div id="image-status" class="hidden mb-4 p-3 bg-base-200/60 rounded-xl text-center">
+                    <div class="loading loading-spinner loading-md text-primary mb-2"></div>
+                    <div class="text-xs text-gray-500">正在生成图片，请稍候...</div>
+                    <div class="text-xs text-gray-400 mt-1">Flux 1 Schnell 模型，约 5-15 秒</div>
+                </div>
+
+                <!-- 结果展示 -->
+                <div id="image-result" class="hidden">
+                    <div class="rounded-xl overflow-hidden border border-base-300 mb-3">
+                        <img id="generated-image" class="w-full" alt="生成的图片" />
+                    </div>
+                    <div class="flex gap-2">
+                        <a id="image-download-btn" class="btn btn-primary btn-xs flex-1" download="ai-generated.png">
+                            <i class="fa-solid fa-download"></i> 下载
+                        </a>
+                        <button class="btn btn-ghost btn-xs flex-1" onclick="generateImage()">
+                            <i class="fa-solid fa-rotate"></i> 重新生成
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 免费额度提示 -->
+                <div class="mt-4 p-3 bg-success/10 border border-success/20 rounded-xl">
+                    <div class="flex items-center gap-2 text-success text-xs font-bold mb-1">
+                        <i class="fa-solid fa-circle-info"></i> 免费额度
+                    </div>
+                    <div class="text-xs text-gray-500">
+                        使用 Cloudflare Workers AI Flux 1 Schnell 模型，每天免费约 230 张，无需 API Key。
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Clone Section -->
         <div id="clone-section" class="card glass-panel shadow-xl hidden flex-1 min-h-0 overflow-y-auto tab-content-section">
             <div class="card-body p-6">
