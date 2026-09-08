@@ -25,7 +25,7 @@
         body { transition: background-color 0.3s ease; }
     </style>
 </head>
-<body class="bg-base-200 bg-[url('bg.jpg')] bg-cover bg-center bg-fixed text-base-content" style="overflow: hidden; height: 100dvh;">
+<body class="bg-base-200 text-base-content" style="overflow: hidden; height: 100dvh;">
 
 <!-- 高级主题切换 UI -->
 <style>
@@ -762,7 +762,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button id="scroll-to-bottom-btn" onclick="scrollToBottom()" class="absolute bottom-20 right-6 z-20 btn btn-circle btn-sm bg-base-200/90 backdrop-blur shadow-lg opacity-0 pointer-events-none transition-all duration-200 hover:scale-110" title="回到底部">
                     <i class="fa-solid fa-arrow-down text-sm"></i>
                 </button>
-                <div class="flex gap-2 items-end">
+                <div class="flex gap-2 items-end" style="padding-bottom: env(safe-area-inset-bottom);">
                     <textarea id="chat-input" placeholder="跟乐说点什么..." class="textarea textarea-bordered textarea-sm flex-1 resize-none" rows="1" style="max-height: 100px; min-height: 40px;" oninput="autoResizeInput(); updateEmotionIndicator();" onkeydown="handleChatKeydown(event)"></textarea>
                     <!-- 情绪指示器 -->
                     <span id="emotion-indicator" class="text-lg opacity-0 transition-opacity self-center" title="检测到的情绪">😊</span>
@@ -1204,6 +1204,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </dialog>
 
-    <script src="assets/js/app.js?v=20260909a"></script>
+    <script src="assets/js/app.js?v=20260909b"></script>
 </body>
 </html>

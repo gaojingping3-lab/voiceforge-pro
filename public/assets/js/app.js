@@ -1327,7 +1327,21 @@ function updateTotalTokensDisplay() {
 
 // 永久记忆：保存聊天历史到localStorage
 function saveChatHistory() {
-    localStorage.setItem('PERM_CHAT_HISTORY', JSON.stringify(chatHistory));
+    try {
+        localStorage.setItem('PERM_CHAT_HISTORY', JSON.stringify(chatHistory));
+    } catch (e) {
+        console.warn('LocalStorage存储空间不足，自动清理最早的历史记录:', e);
+        // 逐步清理最旧的记录，直到能存下
+        while (chatHistory.length > 20) {
+            chatHistory.shift();
+            try {
+                localStorage.setItem('PERM_CHAT_HISTORY', JSON.stringify(chatHistory));
+                return;
+            } catch (inner) {
+                // 继续清理
+            }
+        }
+    }
 }
 
 // 永久记忆：从localStorage恢复聊天历史
@@ -2111,7 +2125,7 @@ async function sendChatMessage() {
             if (done) break;
 
             buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
+            const lines = buffer.split(/\r?\n/);
             buffer = lines.pop() || '';
 
             for (const line of lines) {
