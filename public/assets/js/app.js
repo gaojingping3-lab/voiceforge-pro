@@ -3875,6 +3875,23 @@ async function generateImage() {
 // 固定风格前缀：每次生图都强制加上，锁死画风不漂移
 const FIXED_IMAGE_STYLE = 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, natural indoor lighting, soft window light, realistic skin texture, visible pores, low saturation, lifelike, candid photo, no makeup filter, no anime, no illustration, no overexposure';
 
+// 从角色卡描述中提取外貌部分（用【外貌】或"外貌："标记）
+function extractAppearanceFromRoleCard(roleDesc) {
+    if (!roleDesc) return '';
+    // 匹配【外貌】【外观】【长相】后面的内容，直到下一个【
+    const bracketMatch = roleDesc.match(/【(?:外貌|外观|长相|外形)】([\s\S]*?)(?=【|$)/);
+    if (bracketMatch && bracketMatch[1].trim()) {
+        return bracketMatch[1].trim();
+    }
+    // 匹配"外貌："或"外貌:"后面的内容，直到换行+下一个标签
+    const colonMatch = roleDesc.match(/(?:外貌|外观|长相|外形)[：:]\s*([\s\S]*?)(?=\n\s*[【\w]+[：:]|$)/);
+    if (colonMatch && colonMatch[1].trim()) {
+        return colonMatch[1].trim();
+    }
+    // 没有找到外貌标记，返回空（降级用整个desc）
+    return '';
+}
+
 // 用当前聊天角色AI生成生图提示词（复用角色人设，不单独调用DeepSeek提示词大师）
 async function generatePromptWithRoleAI(conversationText) {
     try {
@@ -3887,8 +3904,20 @@ async function generatePromptWithRoleAI(conversationText) {
         const roleDesc = currentRole ? currentRole.desc : '';
         const roleName = currentRole ? currentRole.name : 'AI';
 
+        // 尝试从角色卡提取外貌部分
+        const appearance = extractAppearanceFromRoleCard(roleDesc);
+
+        let systemContent;
+        if (appearance) {
+            // 提取到外貌：角色AI只负责翻译外貌+提取动作，外貌严格按原文翻译不改写
+            systemContent = `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，生成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 【外貌部分】严格按照以下原文翻译成英文，不要改写、不要添加、不要遗漏：${appearance}\n3. 【动作部分】从对话中提取人物当前的动作、表情、姿态，用英文描述\n4. 明确人物性别（man/woman/girl/boy）\n5. 不要输出任何中文，不要加引号，直接输出提示词本身\n6. 不要添加风格词，风格已由系统固定前缀处理`;
+        } else {
+            // 没提取到外貌：降级为原来的方式，整个desc传给角色AI
+            systemContent = `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，提取画面视觉信息，转换成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 包含人物外貌（严格按照角色设定，不要改写）、服装、当前动作、表情、环境\n3. 明确人物性别（man/woman/girl/boy）\n4. 不要输出任何中文，不要加引号，直接输出提示词本身\n5. 不要添加风格词，风格已由系统固定前缀处理`;
+        }
+
         const messages = [
-            { role: 'system', content: `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，提取画面视觉信息，转换成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 包含人物外貌（严格按照角色设定，不要改写）、服装、当前动作、表情、环境\n3. 明确人物性别（man/woman/girl/boy）\n4. 不要输出任何中文，不要加引号，直接输出提示词本身\n5. 不要添加风格词，风格已由系统固定前缀处理` },
+            { role: 'system', content: systemContent },
             { role: 'user', content: `根据以下对话生成英文生图提示词：\n\n${conversationText}` }
         ];
 
