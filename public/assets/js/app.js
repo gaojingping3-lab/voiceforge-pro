@@ -471,6 +471,161 @@ document.addEventListener('visibilitychange', () => {
         audioCtx.resume().catch(() => {});
     }
 });
+
+// ============================================
+// TTS 播放队列管理器（抗并发/抗连点/抗iOS静默）
+// ============================================
+const ttsQueueManager = {
+    queue: [],
+    isPlaying: false,
+    currentSource: null,
+    taskToken: 0, // 任务令牌，切断已被丢弃的异步任务
+
+    // 安全唤醒，带超时，返回是否成功
+    async safeResume(ctx) {
+        if (!ctx) return false;
+        if (ctx.state === 'running') return true;
+        try {
+            await Promise.race([
+                ctx.resume(),
+                new Promise(resolve => setTimeout(resolve, 300))
+            ]);
+        } catch (e) {
+            console.warn('Resume 被浏览器中断');
+        }
+        return ctx.state === 'running';
+    },
+
+    enqueue(item) {
+        this.queue.push(item);
+        if (!this.isPlaying) {
+            this.processNext();
+        }
+    },
+
+    stopCurrent() {
+        if (this.currentSource) {
+            try { this.currentSource.onended = null; } catch (e) {}
+            try { this.currentSource.stop(0); } catch (e) {}
+            try { this.currentSource.disconnect(); } catch (e) {}
+            this.currentSource = null;
+        }
+        this.isPlaying = false;
+    },
+
+    clearQueue() {
+        this.taskToken++; // 作废所有正在await的旧任务
+        this.stopCurrent();
+        this.queue = [];
+    },
+
+    async processNext() {
+        if (this.queue.length === 0) {
+            this.isPlaying = false;
+            return;
+        }
+
+        this.isPlaying = true;
+        const task = this.queue.shift();
+        const currentToken = ++this.taskToken;
+
+        try {
+            if (!audioCtx) {
+                await initTTSAudio();
+            }
+
+            // 严格等待唤醒
+            const isAwake = await this.safeResume(audioCtx);
+            if (!isAwake) {
+                throw new Error('由于iOS限制，自动播放失败，请手动点击');
+            }
+            if (this.taskToken !== currentToken) return;
+
+            const bubble = task.bubble;
+            // 提取朗读文本
+            let text = bubble.innerText.replace(/\n?\d+\s*tokens\s*$/, '').trim();
+            const hasNameSpan = bubble.querySelector('.text-xs.font-bold');
+            if (hasNameSpan) {
+                const lines = text.split('\n');
+                if (lines.length > 1) text = lines.slice(1).join('\n').trim();
+            }
+            const speakText = text
+                .replace(/【[^】]*】/g, '').replace(/\[[^\]]*\]/g, '')
+                .replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '')
+                .replace(/\*[^*]*\*/g, '').trim();
+
+            if (this.taskToken !== currentToken) return;
+
+            // 获取音频blob
+            let audioBlob;
+            if (task.blob instanceof Blob) {
+                audioBlob = task.blob;
+            } else if (bubble.cachedAudioUrl) {
+                const res = await fetch(bubble.cachedAudioUrl);
+                audioBlob = await res.blob();
+            } else {
+                const engine = document.getElementById('tts-engine').value;
+                let voiceId = document.getElementById('voice-id').value.trim();
+                const nameSpan = bubble.querySelector('.text-xs.font-bold');
+                if (nameSpan && dualRoleA && dualRoleB) {
+                    const speakerName = nameSpan.innerText.trim();
+                    const isEdge = engine === 'edge';
+                    const vAS = document.getElementById('dual-voice-a');
+                    const vAI = document.getElementById('dual-voice-a-input');
+                    const vBS = document.getElementById('dual-voice-b');
+                    const vBI = document.getElementById('dual-voice-b-input');
+                    if (speakerName === dualRoleA.name) {
+                        voiceId = isEdge ? (vAS?.value || 'shimmer') : (vAI?.value.trim() || voiceId);
+                    } else if (speakerName === dualRoleB.name) {
+                        voiceId = isEdge ? (vBS?.value || 'onyx') : (vBI?.value.trim() || voiceId);
+                    }
+                }
+                const apiKey = document.getElementById('main-api-key').value.trim();
+                const format = document.getElementById('tts-format').value;
+                const speed = parseFloat(document.getElementById('tts-speed').value);
+                if (!apiKey && engine !== 'edge') throw new Error('请先配置API密钥');
+
+                const res = await callTTS(speakText, engine, voiceId, apiKey, format, speed);
+                if (!res.ok) throw new Error('TTS请求失败');
+                audioBlob = await res.blob();
+                bubble.cachedAudioUrl = URL.createObjectURL(audioBlob);
+            }
+
+            if (this.taskToken !== currentToken) return;
+
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            if (this.taskToken !== currentToken) return;
+            if (!arrayBuffer || arrayBuffer.byteLength < 10) throw new Error('音频数据为空');
+
+            const audioBuffer = await new Promise((resolve, reject) => {
+                audioCtx.decodeAudioData(
+                    arrayBuffer.slice(0),
+                    (decoded) => resolve(decoded),
+                    (err) => reject(err || new Error('音频解码失败'))
+                );
+            });
+
+            if (this.taskToken !== currentToken) return;
+
+            const source = audioCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(audioCtx.destination);
+            this.currentSource = source;
+
+            source.onended = () => {
+                try { source.disconnect(); } catch (e) {}
+                if (this.currentSource === source) this.currentSource = null;
+                if (this.taskToken === currentToken) this.processNext();
+            };
+
+            source.start(0);
+
+        } catch (err) {
+            console.error('[TTS播放错误]:', err);
+            if (this.taskToken === currentToken) this.processNext();
+        }
+    }
+};
 function playTone(freq, duration, type, volume, delay = 0) {
     try {
         const ctx = getAudioCtx();
@@ -1169,15 +1324,15 @@ function renderChatHistory() {
 
 // 停止所有音频播放（聊天音频 + TTS页面播放器）
 function stopAllAudio() {
-    // 停止 TTS 播放（Web Audio API）
-    stopTTSCurrent();
+    // 停止 TTS 播放队列
+    if (typeof ttsQueueManager !== 'undefined') {
+        ttsQueueManager.clearQueue();
+    }
     // 停止TTS页面的播放器
     const audioPlayer = document.getElementById('audio-playback');
     if (audioPlayer) {
         audioPlayer.pause();
     }
-    // 释放播放锁
-    isChatAudioPlaying = false;
     // 恢复AudioContext，防止播放完语音后音效不响
     if (audioCtx && audioCtx.state === 'suspended') {
         audioCtx.resume().catch(() => {});
@@ -1232,88 +1387,12 @@ function updateAutoPlayBtn() {
 }
 
 // 播放指定文本的语音（聊天消息用）
-let isChatAudioPlaying = false; // 播放锁，防止重复点击
-
-async function playChatMessage(bubble) {
-    // 读取文字时过滤掉底部的token显示，避免朗读数字
-    let text = bubble.innerText.replace(/\n?\d+\s*tokens\s*$/, '').trim();
-    // 如果有角色名span（AI消息），去掉第一行的名字，不朗读
-    const hasNameSpan = bubble.querySelector('.text-xs.font-bold');
-    if (hasNameSpan) {
-        const lines = text.split('\n');
-        if (lines.length > 1) {
-            text = lines.slice(1).join('\n').trim();
-        }
+// isAuto=true 时直接入队（自动朗读），isAuto=false 时清空队列再入队（手动点击）
+function playChatMessage(bubble, isAuto = false) {
+    if (!isAuto) {
+        ttsQueueManager.clearQueue(); // 手动点击：打断当前播放，清空队列
     }
-    // 朗读时去掉括号里的内容（中英文括号、方括号、星号都处理），显示不变
-    const speakText = text
-        .replace(/【[^】]*】/g, '')
-        .replace(/\[[^\]]*\]/g, '')
-        .replace(/（[^）]*）/g, '')
-        .replace(/\([^)]*\)/g, '')
-        .replace(/\*[^*]*\*/g, '')
-        .trim();
-
-    // 播放锁：正在播放中，忽略新的点击
-    if (isChatAudioPlaying) return;
-    stopAllAudio(); // 先停止之前的播放
-    isChatAudioPlaying = true; // 然后设置新锁（不会被stopAllAudio重置）
-
-    // 如果有缓存的音频，直接播放，不用再调用API
-    if (bubble.cachedAudioUrl) {
-        try {
-            const res = await fetch(bubble.cachedAudioUrl);
-            const arrayBuffer = await res.arrayBuffer();
-            const audioBuffer = await decodeTTSAudio(arrayBuffer);
-            await playTTSBuffer(audioBuffer, () => { isChatAudioPlaying = false; });
-        } catch (err) {
-            console.error('缓存播放失败:', err);
-            isChatAudioPlaying = false;
-        }
-        return;
-    }
-
-    const engine = document.getElementById('tts-engine').value;
-    let voiceId = document.getElementById('voice-id').value.trim();
-    // 双角色模式：根据消息角色使用不同声音
-    const nameSpan = bubble.querySelector('.text-xs.font-bold');
-    if (nameSpan && dualRoleA && dualRoleB) {
-        const speakerName = nameSpan.innerText.trim();
-        const isEdge = engine === 'edge';
-        const voiceASelect = document.getElementById('dual-voice-a');
-        const voiceAInput = document.getElementById('dual-voice-a-input');
-        const voiceBSelect = document.getElementById('dual-voice-b');
-        const voiceBInput = document.getElementById('dual-voice-b-input');
-        if (speakerName === dualRoleA.name) {
-            voiceId = isEdge ? (voiceASelect?.value || 'shimmer') : (voiceAInput?.value.trim() || voiceId);
-        } else if (speakerName === dualRoleB.name) {
-            voiceId = isEdge ? (voiceBSelect?.value || 'onyx') : (voiceBInput?.value.trim() || voiceId);
-        }
-    }
-    const apiKey = document.getElementById('main-api-key').value.trim();
-    const format = document.getElementById('tts-format').value;
-    const speed = parseFloat(document.getElementById('tts-speed').value);
-
-    if (!apiKey && engine !== 'edge') {
-        alert('请先配置 Fish API 密钥');
-        isChatAudioPlaying = false;
-        return;
-    }
-
-    try {
-        const res = await callTTS(speakText, engine, voiceId, apiKey, format, speed);
-        if (!res.ok) throw new Error('TTS请求失败');
-        const audioBlob = await res.blob();
-        // 缓存 blob URL 供手动播放/下载使用
-        bubble.cachedAudioUrl = URL.createObjectURL(audioBlob);
-        // 直接用 blob.arrayBuffer()，不走 fetch 避免 iOS WebKit 伪协议层问题
-        const arrayBuffer = await audioBlob.arrayBuffer();
-        const audioBuffer = await decodeTTSAudio(arrayBuffer);
-        await playTTSBuffer(audioBuffer, () => { isChatAudioPlaying = false; });
-    } catch (err) {
-        console.error('播放失败:', err);
-        isChatAudioPlaying = false;
-    }
+    ttsQueueManager.enqueue({ bubble });
 }
 
 // ============================================
@@ -1902,7 +1981,7 @@ async function sendChatMessage() {
 
         // 自动朗读
         if (autoPlayTTS) {
-            setTimeout(() => playChatMessage(loadingBubble), 300);
+            setTimeout(() => playChatMessage(loadingBubble, true), 300);
         }
 
     } catch (err) {
@@ -2579,7 +2658,7 @@ ${currentRole.desc}
 
         // 自动朗读（如果开启了自动朗读）
         if (autoPlayTTS) {
-            setTimeout(() => playChatMessage(replyBubble), 300);
+            setTimeout(() => playChatMessage(replyBubble, true), 300);
         }
 
         sfxReceive();
@@ -2722,7 +2801,6 @@ function clearChat() {
     localStorage.removeItem('TOTAL_TOKENS_USED');
     updateTotalTokensDisplay();
     stopAllAudio(); // 停止正在播放的语音
-    isChatAudioPlaying = false; // 释放播放锁
     sfxSuccess();
 }
 
