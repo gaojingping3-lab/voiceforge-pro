@@ -2048,7 +2048,8 @@ async function sendChatMessage() {
     const defaultSystem = '你是乐。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。';
     const customSystem = localStorage.getItem('LLM_SYSTEM');
     const currentRole = getCurrentRole();
-    const roleCardDesc = currentRole.desc;
+    // 正常聊天去掉外貌部分，减少system prompt长度加快回复；生图时才用完整角色卡
+    const roleCardDesc = stripAppearanceFromRoleCard(currentRole.desc);
     const systemRules = customSystem || defaultSystem;
     const hasRoleCard = roleCardDesc && roleCardDesc !== DEFAULT_ROLE_DESC;
 
@@ -3036,9 +3037,9 @@ ${userRoleDesc || '用户没有填写特别设定，请把用户当作这个场�
 - 绝对不能把用户当成角色A或角色B，也不能假装不知道用户是谁` });
     }
 
-    // 当前角色人设
+    // 当前角色人设（正常聊天去掉外貌部分，减少system prompt长度加快回复）
     messages.push({ role: 'system', content: `你扮演的角色人设：
-${currentRole.desc}
+${stripAppearanceFromRoleCard(currentRole.desc)}
 请严格按照这个人设说话，保持角色的性格、语气和说话风格。` });
 
     // 加入当前角色的记忆便签
@@ -3984,6 +3985,16 @@ function extractAppearanceFromRoleCard(roleDesc) {
     }
     // 没有找到外貌标记，返回空（降级用整个desc）
     return '';
+}
+
+// 从角色卡描述中去掉外貌部分（正常聊天用，减少system prompt长度，加快回复）
+function stripAppearanceFromRoleCard(roleDesc) {
+    if (!roleDesc) return '';
+    // 去掉【外貌】【外观】【长相】整个段落
+    let result = roleDesc.replace(/【(?:外貌|外观|长相|外形)】[\s\S]*?(?=【|$)/g, '');
+    // 去掉"外貌："开头的段落（直到换行+下一个标签）
+    result = result.replace(/(?:外貌|外观|长相|外形)[：:]\s*[\s\S]*?(?=\n\s*[【\w]+[：:]|$)/g, '');
+    return result.trim();
 }
 
 // 用当前聊天角色AI生成生图提示词（复用角色人设，不单独调用DeepSeek提示词大师）
