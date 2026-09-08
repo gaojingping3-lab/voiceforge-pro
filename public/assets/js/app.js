@@ -3436,7 +3436,8 @@ function saveImageModel() {
 
 function getImageModel() {
     const model = localStorage.getItem('IMAGE_MODEL') || 'auto';
-    // 兼容旧版本：pollinations -> pollinations-flux
+    // 兼容旧版本：已删除的模型自动转成auto
+    if (model === 'dreamshaper' || model === 'flux' || model === 'sdxl') return 'auto';
     if (model === 'pollinations') return 'pollinations-flux';
     return model;
 }
