@@ -3509,7 +3509,7 @@ async function optimizeImagePrompt(prompt) {
         });
 
         const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('优化超时')), 8000);
+            setTimeout(() => reject(new Error('优化超时')), 4000);
         });
 
         const response = await Promise.race([fetchPromise, timeoutPromise]);
