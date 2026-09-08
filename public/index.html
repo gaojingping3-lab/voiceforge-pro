@@ -325,7 +325,7 @@
   #chat-messages .chat {
     display: flex !important;
     align-items: flex-start !important;
-    gap: 8px !important;
+    gap: 6px !important;
   }
   #chat-messages .chat-start {
     justify-content: flex-start !important;
@@ -346,10 +346,19 @@
     line-height: 1 !important;
   }
   #chat-messages .chat-bubble {
-    max-width: calc(100% - 52px) !important;
+    max-width: calc(100% - 50px) !important;
     word-break: break-word !important;
     margin: 0 !important;
     align-self: flex-start !important;
+    min-height: 36px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+  }
+  #chat-messages .chat-bubble::before {
+    display: none !important;
   }
 </style>
 
