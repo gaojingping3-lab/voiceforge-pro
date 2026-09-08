@@ -686,14 +686,20 @@ const ttsQueueManager = {
             source.onended = () => {
                 try { source.disconnect(); } catch (e) {}
                 if (this.currentSource === source) this.currentSource = null;
-                if (this.taskToken === currentToken) this.processNext();
+                if (this.taskToken === currentToken) {
+                    // 安全延迟300ms，防止TTS连续请求触发429限流
+                    setTimeout(() => this.processNext(), 300);
+                }
             };
 
             source.start(0);
 
         } catch (err) {
             // screenLog('[DEBUG-LONGPLAY] TTS播放错误: ' + err.message);
-            if (this.taskToken === currentToken) this.processNext();
+            if (this.taskToken === currentToken) {
+                // 安全延迟300ms，防止TTS连续请求触发429限流
+                setTimeout(() => this.processNext(), 300);
+            }
         }
     }
 };
@@ -1467,7 +1473,7 @@ function playChatMessage(bubble, isAuto = false) {
 }
 
 // ============================================
-// 优化1：防止OOM - 只保留最近10条消息的音频缓存
+// 优化1：防止OOM + DOM裁剪 - 只保留最近10条音频缓存，最近60条DOM节点
 // ============================================
 function cleanupOldAudioCache() {
     const container = document.getElementById('chat-messages');
@@ -1492,6 +1498,17 @@ function cleanupOldAudioCache() {
         if (bubble.cachedAudioBlob) {
             bubble.cachedAudioBlob = null;
             freed++;
+        }
+    }
+
+    // DOM裁剪：超过60条消息时，移除最旧的.chat节点（保留最近60条）
+    const chatItems = container.querySelectorAll('.chat');
+    if (chatItems.length > 60) {
+        const removeCount = chatItems.length - 60;
+        for (let i = 0; i < removeCount; i++) {
+            if (chatItems[i] && chatItems[i].parentNode === container) {
+                container.removeChild(chatItems[i]);
+            }
         }
     }
     // screenLog('[DEBUG-LONGPLAY] OOM: 共' + bubbles.length + '条，' + withCache + '条有缓存，释放' + freed + '个');
