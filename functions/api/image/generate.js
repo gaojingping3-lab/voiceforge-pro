@@ -21,22 +21,41 @@ export async function onRequestPost(context) {
       const encodedPrompt = encodeURIComponent(prompt);
       const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?model=flux&width=1024&height=1024&nologo=true`;
 
-      const response = await fetch(url, {
-        headers: { 'User-Agent': 'VoiceForge-Pro/1.0' }
-      });
+      // 最多重试3次，遇到429限流时等待后重试
+      let lastError = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const response = await fetch(url, {
+            headers: { 'User-Agent': 'VoiceForge-Pro/1.0' }
+          });
 
-      if (!response.ok) {
-        throw new Error(`Pollinations API 错误: ${response.status}`);
-      }
+          if (response.status === 429) {
+            // 被限流，等待2-4秒后重试
+            const waitTime = 2000 + attempt * 1000;
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            continue;
+          }
 
-      // 直接把第三方返回的图片流转发给前端
-      return new Response(response.body, {
-        status: 200,
-        headers: {
-          'Content-Type': response.headers.get('Content-Type') || 'image/jpeg',
-          'Cache-Control': 'no-cache'
+          if (!response.ok) {
+            throw new Error(`Pollinations API 错误: ${response.status}`);
+          }
+
+          // 直接把第三方返回的图片流转发给前端
+          return new Response(response.body, {
+            status: 200,
+            headers: {
+              'Content-Type': response.headers.get('Content-Type') || 'image/jpeg',
+              'Cache-Control': 'no-cache'
+            }
+          });
+        } catch (e) {
+          lastError = e;
+          if (attempt < 2) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
         }
-      });
+      }
+      throw lastError || new Error('Pollinations API 请求失败');
     }
 
     // Cloudflare Workers AI 模型

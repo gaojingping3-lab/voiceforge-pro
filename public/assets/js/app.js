@@ -3552,8 +3552,10 @@ async function generateImage() {
         const errMsg = error.message || '';
         if (errMsg.includes('NSFW') || errMsg.includes('8007')) {
             alert('生成失败：提示词包含敏感元素，已被安全审核拦截。\n\n建议：描述一些日常、温馨的场景。');
+        } else if (errMsg.includes('429')) {
+            alert('生成失败：请求太频繁被限流了。\n\n建议：等10-20秒再试，或者换成 DreamShaper 模型。');
         } else {
-            alert('生成失败: ' + errMsg + '\n\n可能原因：\n1. 免费额度已用完（每天重置）\n2. 网络问题，请重试');
+            alert('生成失败: ' + errMsg + '\n\n可能原因：\n1. 免费额度已用完（每天重置）\n2. 网络问题，请重试\n3. 请求太频繁，稍后再试');
         }
     } finally {
         statusEl.classList.add('hidden');
@@ -3624,8 +3626,10 @@ async function generateImageFromChat() {
         const errMsg = error.message || '';
         if (errMsg.includes('NSFW') || errMsg.includes('8007')) {
             alert('生成失败：对话内容包含敏感元素，已被安全审核拦截。\n\n建议：聊一些日常、温馨的场景再试试。');
+        } else if (errMsg.includes('429')) {
+            alert('生成失败：请求太频繁被限流了。\n\n建议：等10-20秒再试，或者换成 DreamShaper 模型。');
         } else {
-            alert('生成失败: ' + errMsg + '\n\n可能原因：\n1. 生图免费额度已用完（每天重置）\n2. 网络问题，请重试');
+            alert('生成失败: ' + errMsg + '\n\n可能原因：\n1. 生图免费额度已用完（每天重置）\n2. 网络问题，请重试\n3. 请求太频繁，稍后再试');
         }
     }
 }
