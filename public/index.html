@@ -794,37 +794,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h2 class="card-title text-lg mb-4"><i class="fa-solid fa-wand-magic-sparkles text-primary"></i> AI 生图</h2>
 
                 <!-- 提示词输入 -->
-                <div class="form-control w-full mb-3">
+                <div class="form-control w-full mb-4">
                     <label class="label py-1"><span class="label-text font-bold">画面描述</span></label>
-                    <textarea id="image-prompt" class="textarea textarea-bordered w-full h-24 text-sm" placeholder="描述你想要生成的画面，例如：一只可爱的橘猫在阳光下看书，温馨的书房氛围"></textarea>
-                </div>
-
-                <!-- 负面提示词 -->
-                <div class="form-control w-full mb-3">
-                    <label class="label py-1"><span class="label-text font-bold">负面描述（可选）</span></label>
-                    <input type="text" id="image-negative-prompt" class="input input-bordered input-sm w-full text-sm" placeholder="不想要的元素，例如：模糊、低质量、变形" />
-                </div>
-
-                <!-- 参数设置 -->
-                <div class="grid grid-cols-2 gap-3 mb-4">
-                    <div class="form-control w-full">
-                        <label class="label py-1"><span class="label-text font-bold text-xs">比例</span></label>
-                        <select id="image-ratio" class="select select-bordered select-xs w-full" onchange="onImageRatioChange()">
-                            <option value="1:1">1:1 正方形</option>
-                            <option value="16:9">16:9 横屏</option>
-                            <option value="9:16">9:16 竖屏</option>
-                            <option value="3:2">3:2 横版</option>
-                            <option value="2:3">2:3 竖版</option>
-                        </select>
-                    </div>
-                    <div class="form-control w-full">
-                        <label class="label py-1"><span class="label-text font-bold text-xs">步数</span></label>
-                        <select id="image-steps" class="select select-bordered select-xs w-full">
-                            <option value="4">4步（快，推荐）</option>
-                            <option value="6">6步（更精细）</option>
-                            <option value="8">8步（最佳画质）</option>
-                        </select>
-                    </div>
+                    <textarea id="image-prompt" class="textarea textarea-bordered w-full h-28 text-sm" placeholder="描述你想要生成的画面，例如：一只可爱的橘猫在阳光下看书，温馨的书房氛围"></textarea>
                 </div>
 
                 <!-- 生成按钮 -->

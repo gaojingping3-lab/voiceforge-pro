@@ -3411,33 +3411,14 @@ function msgpackEncode(value) {
 // AI 生图功能（Cloudflare Workers AI Flux 1 Schnell）
 // ============================================
 
-// 比例对应的分辨率
-const IMAGE_RATIO_MAP = {
-    '1:1': { width: 1024, height: 1024 },
-    '16:9': { width: 1360, height: 768 },
-    '9:16': { width: 768, height: 1360 },
-    '3:2': { width: 1216, height: 832 },
-    '2:3': { width: 832, height: 1216 }
-};
-
-// 比例变化时不需要额外处理，生成时读取即可
-function onImageRatioChange() {
-    // 预留函数，可扩展
-}
-
 // 生成图片
 async function generateImage() {
     const prompt = document.getElementById('image-prompt').value.trim();
-    const negativePrompt = document.getElementById('image-negative-prompt').value.trim();
-    const ratio = document.getElementById('image-ratio').value;
-    const steps = parseInt(document.getElementById('image-steps').value);
 
     if (!prompt) {
         alert('请输入画面描述');
         return;
     }
-
-    const { width, height } = IMAGE_RATIO_MAP[ratio] || IMAGE_RATIO_MAP['1:1'];
 
     // 显示加载状态
     const statusEl = document.getElementById('image-status');
@@ -3453,11 +3434,7 @@ async function generateImage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                prompt: prompt,
-                negative_prompt: negativePrompt,
-                num_steps: steps,
-                width: width,
-                height: height
+                prompt: prompt
             })
         });
 
