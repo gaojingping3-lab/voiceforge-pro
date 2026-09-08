@@ -3821,7 +3821,7 @@ async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimiz
 // 生图页面：提示词是否已被AI优化（优化后生成时不再重复优化）
 let isPromptOptimized = false;
 
-// 手动点击"AI优化提示词"按钮
+// 手动点击"AI优化提示词"按钮（普通生图页面专用，超时10秒）
 async function optimizePromptManual() {
     const input = document.getElementById('image-prompt');
     const btn = document.getElementById('btn-optimize-prompt');
@@ -3836,7 +3836,47 @@ async function optimizePromptManual() {
     btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 优化中...';
 
     try {
-        const optimized = await optimizeImagePrompt(prompt);
+        const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+        const llmKey = localStorage.getItem('LLM_KEY') || '';
+        const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+
+        const fetchPromise = fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${llmKey}`
+            },
+            body: JSON.stringify({
+                baseUrl: llmUrl,
+                model: llmModel,
+                messages: [
+                    { role: 'system', content: '你是AI绘画提示词大师。把用户输入的简单描述扩展成细节丰富的英文生图提示词。要求：1.只用英文输出 2.包含人物外貌、服装、动作、表情、环境、光线、氛围 3.写实照片风格：photorealistic, shot on DSLR, natural skin texture, detailed background 4.不要输出任何解释或前缀，直接输出提示词 5.长度100-180个单词' },
+                    { role: 'user', content: `优化这个生图提示词：${prompt}` }
+                ],
+                temperature: 0.7,
+                stream: false,
+                thinking: { type: 'disabled' }
+            })
+        });
+
+        // 10秒超时
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('优化超时')), 10000);
+        });
+
+        const response = await Promise.race([fetchPromise, timeoutPromise]);
+
+        if (!response.ok) {
+            throw new Error('API错误: ' + response.status);
+        }
+
+        const data = await response.json();
+        const optimized = data.choices?.[0]?.message?.content?.trim();
+
+        if (!optimized || optimized.length < 20) {
+            throw new Error('优化结果为空');
+        }
+
         input.value = optimized;
         isPromptOptimized = true;
         btn.innerHTML = '<i class="fa-solid fa-check"></i> 已优化';
@@ -3845,7 +3885,7 @@ async function optimizePromptManual() {
             btn.disabled = false;
         }, 1500);
     } catch (e) {
-        alert('提示词优化失败: ' + (e.message || e));
+        alert('提示词优化失败: ' + (e.message || e) + '\n\n请检查：\n1. 大模型API Key是否配置\n2. 网络是否正常\n3. 稍后再试');
         btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> AI优化提示词';
         btn.disabled = false;
     }
