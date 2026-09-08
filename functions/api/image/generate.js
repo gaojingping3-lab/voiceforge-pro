@@ -1,15 +1,12 @@
 // Cloudflare Workers AI 生图接口
 // 使用 Flux 1 Schnell 模型，免费额度每天约230张
+// 直接返回图片二进制数据，前端用 Blob URL 显示
 
 export async function onRequestPost(context) {
   try {
     const { request, env } = context;
     const body = await request.json();
     const prompt = body.prompt || '';
-    const negativePrompt = body.negative_prompt || '';
-    const numSteps = body.num_steps || 4;
-    const width = body.width || 1024;
-    const height = body.height || 1024;
 
     if (!prompt.trim()) {
       return new Response(JSON.stringify({ error: '提示词不能为空' }), {
@@ -19,33 +16,19 @@ export async function onRequestPost(context) {
     }
 
     // 调用 Cloudflare Workers AI 生图
-    // Flux 1 Schnell 只接受 prompt 参数，不支持 num_steps/width/height/negative_prompt
-    const inputs = {
-      prompt: prompt
-    };
-
-    const response = await env.AI.run(
+    // Flux 1 Schnell 只接受 prompt 参数
+    const imageBuffer = await env.AI.run(
       '@cf/black-forest-labs/flux-1-schnell',
-      inputs
+      { prompt: prompt }
     );
 
-    // response 是 ArrayBuffer，转成 base64 返回
-    const base64 = btoa(
-      new Uint8Array(response).reduce(
-        (data, byte) => data + String.fromCharCode(byte),
-        ''
-      )
-    );
-
-    return new Response(JSON.stringify({
-      success: true,
-      image: `data:image/png;base64,${base64}`,
-      prompt: prompt,
-      width: width,
-      height: height
-    }), {
+    // 直接返回图片二进制数据
+    return new Response(imageBuffer, {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'no-cache'
+      }
     });
 
   } catch (error) {

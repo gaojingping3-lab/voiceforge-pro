@@ -3438,17 +3438,30 @@ async function generateImage() {
             })
         });
 
-        const data = await response.json();
+        if (!response.ok) {
+            // 尝试读取错误信息
+            let errorMsg = '生成失败';
+            try {
+                const errData = await response.json();
+                errorMsg = errData.error || errData.message || errorMsg;
+            } catch (e) {}
+            throw new Error(errorMsg);
+        }
 
-        if (!response.ok || !data.success) {
-            throw new Error(data.error || '生成失败');
+        // 直接获取图片 blob，用 Blob URL 显示（iOS 兼容更好）
+        const blob = await response.blob();
+        const imageUrl = URL.createObjectURL(blob);
+
+        // 释放之前的 Blob URL
+        const img = document.getElementById('generated-image');
+        if (img.src && img.src.startsWith('blob:')) {
+            URL.revokeObjectURL(img.src);
         }
 
         // 显示结果
-        const img = document.getElementById('generated-image');
-        img.src = data.image;
+        img.src = imageUrl;
         const downloadBtn = document.getElementById('image-download-btn');
-        downloadBtn.href = data.image;
+        downloadBtn.href = imageUrl;
         resultEl.classList.remove('hidden');
 
     } catch (error) {
