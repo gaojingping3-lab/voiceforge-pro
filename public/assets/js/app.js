@@ -1188,6 +1188,7 @@ async function playChatMessage(bubble, force = false) {
         currentChatAudio = new Audio(bubble.cachedAudioUrl);
         currentChatAudio.onended = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
         currentChatAudio.onerror = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
+        getAudioCtx().resume().catch(() => {}); // iOS自动播放解锁
         await currentChatAudio.play().catch(() => { isChatAudioPlaying = false; });
         return;
     }
@@ -1230,6 +1231,7 @@ async function playChatMessage(bubble, force = false) {
         // 播放结束后释放锁
         currentChatAudio.onended = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
         currentChatAudio.onerror = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
+        getAudioCtx().resume().catch(() => {}); // iOS自动播放解锁
         await currentChatAudio.play().catch(() => { isChatAudioPlaying = false; });
     } catch (err) {
         console.error('播放失败:', err);
@@ -2197,6 +2199,13 @@ function startDualChat() {
     document.getElementById('dual-start-btn').classList.add('hidden');
     document.getElementById('dual-pause-btn').classList.remove('hidden');
     sfxSuccess();
+
+    // iOS自动播放解锁：用户点击开始时播放一个静音音频，保持播放权限
+    try {
+        const unlockAudio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
+        unlockAudio.volume = 0;
+        unlockAudio.play().catch(() => {});
+    } catch (e) {}
 
     // 判断是否是第一次开始（没有对话历史）
     const isFirstStart = chatHistory.length === 0;
