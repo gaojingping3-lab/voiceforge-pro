@@ -3442,11 +3442,41 @@ function getImageModel() {
     return model;
 }
 
+// Agnes API Key 相关
+function getAgnesApiKey() {
+    return localStorage.getItem('AGNES_API_KEY') || '';
+}
+
+function saveAgnesApiKey() {
+    const input = document.getElementById('agnes-api-key');
+    if (input) {
+        localStorage.setItem('AGNES_API_KEY', input.value.trim());
+    }
+}
+
+function toggleAgnesKeyInput() {
+    const model = getImageModel();
+    const keyInput = document.getElementById('agnes-key-input');
+    if (keyInput) {
+        if (model.startsWith('agnes-')) {
+            keyInput.classList.remove('hidden');
+        } else {
+            keyInput.classList.add('hidden');
+        }
+    }
+}
+
 function loadImageModelSelect() {
     const select = document.getElementById('image-model-select');
     if (select) {
         select.value = getImageModel();
     }
+    // 恢复 Agnes API Key 和显示状态
+    const keyInput = document.getElementById('agnes-api-key');
+    if (keyInput) {
+        keyInput.value = getAgnesApiKey();
+    }
+    toggleAgnesKeyInput();
 }
 
 // 生图提示词优化：细节拉满，动作描写极致详细，不加安全限制
@@ -3535,7 +3565,7 @@ async function generateImageWithSafety(prompt, model, onStatusUpdate) {
             const response = await fetch('/api/image/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: optimizedPrompt, model: currentModel })
+                body: JSON.stringify({ prompt: optimizedPrompt, model: currentModel, agnesApiKey: getAgnesApiKey() })
             });
 
             if (!response.ok) {

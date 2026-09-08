@@ -799,12 +799,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 <!-- 模型选择 -->
                 <div class="form-control w-full mb-4">
                     <label class="label py-1"><span class="label-text font-bold">生图模型</span></label>
-                    <select id="image-model-select" class="select select-bordered w-full text-sm" onchange="saveImageModel()">
+                    <select id="image-model-select" class="select select-bordered w-full text-sm" onchange="saveImageModel(); toggleAgnesKeyInput();">
                         <option value="auto">🤖 AI自动选模型（推荐，失败自动轮换）</option>
+                        <option value="agnes-2.1">🆕 Agnes Image 2.1 Flash（免费注册，画质好，国内快）</option>
                         <option value="pollinations-flux-realism">Flux 写实（照片级，几乎无审核）</option>
                         <option value="pollinations-seedream">Seedream（中文友好，几乎无审核）</option>
                         <option value="pollinations-flux">Flux 通用（速度快，几乎无审核）</option>
                     </select>
+                    <div id="agnes-key-input" class="hidden mt-2">
+                        <input type="password" id="agnes-api-key" placeholder="输入 Agnes API Key（注册免费获取）" class="input input-bordered w-full text-sm" onchange="saveAgnesApiKey()" />
+                        <p class="text-xs text-gray-500 mt-1">注册地址：<a href="https://platform.agnes-ai.com/" target="_blank" class="link link-primary">platform.agnes-ai.com</a>（国内访问快）</p>
+                    </div>
                 </div>
 
                 <!-- 提示词输入 -->
@@ -1199,6 +1204,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </dialog>
 
-    <script src="assets/js/app.js?v=20260908d"></script>
+    <script src="assets/js/app.js?v=20260908e"></script>
 </body>
 </html>
