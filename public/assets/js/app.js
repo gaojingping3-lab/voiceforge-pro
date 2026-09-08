@@ -1886,6 +1886,16 @@ async function sendChatMessage() {
     const text = input.value.trim();
     if (!text) return;
 
+    // 检测生图关键词：发送"拍张照片"等消息时直接触发生图，不走普通对话
+    const photoKeywords = ['拍张照片', '拍张照', '拍照看看', '拍个照', '发张照片', '发张图', '画张图', '生成图片', '拍照片', '看看照片', '什么样子'];
+    const isPhotoRequest = photoKeywords.some(kw => text.includes(kw));
+    if (isPhotoRequest) {
+        input.value = '';
+        input.style.height = 'auto';
+        await generateImageFromChat();
+        return;
+    }
+
     // 双角色模式下用户发消息：清除等待定时器，暂停自动对话，AI直接回复
     if (isDualRunning && dualTimeoutId) {
         clearTimeout(dualTimeoutId);
