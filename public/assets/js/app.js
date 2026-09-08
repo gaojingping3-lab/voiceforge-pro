@@ -1157,7 +1157,27 @@ function updateAutoPlayBtn() {
 // 播放指定文本的语音（聊天消息用）
 let isChatAudioPlaying = false; // 播放锁，防止重复点击
 
-async function playChatMessage(bubble) {
+// 自动播放队列：双角色模式下消息排队一个接一个播，不会互相打断
+let autoPlayQueue = [];
+
+function enqueueAutoPlay(bubble) {
+    autoPlayQueue.push(bubble);
+    tryPlayNextFromQueue();
+}
+
+function tryPlayNextFromQueue() {
+    if (isChatAudioPlaying) return; // 正在播放中，等结束后onended会触发
+    if (autoPlayQueue.length === 0) return;
+    const bubble = autoPlayQueue.shift();
+    isChatAudioPlaying = false; // 强制释放锁
+    playChatMessage(bubble, true);
+}
+
+async function playChatMessage(bubble, fromQueue = false) {
+    // 手动播放时清空自动播放队列
+    if (!fromQueue) {
+        autoPlayQueue = [];
+    }
     // 读取文字时过滤掉底部的token显示，避免朗读数字
     let text = bubble.innerText.replace(/\n?\d+\s*tokens\s*$/, '').trim();
     // 如果有角色名span（AI消息），去掉第一行的名字，不朗读
@@ -1185,9 +1205,9 @@ async function playChatMessage(bubble) {
     // 如果有缓存的音频，直接播放，不用再调用API
     if (bubble.cachedAudioUrl) {
         currentChatAudio = new Audio(bubble.cachedAudioUrl);
-        currentChatAudio.onended = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
-        currentChatAudio.onerror = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
-        await currentChatAudio.play().catch(() => { isChatAudioPlaying = false; });
+        currentChatAudio.onended = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); tryPlayNextFromQueue(); };
+        currentChatAudio.onerror = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); tryPlayNextFromQueue(); };
+        await currentChatAudio.play().catch(() => { isChatAudioPlaying = false; tryPlayNextFromQueue(); });
         return;
     }
 
@@ -1226,10 +1246,10 @@ async function playChatMessage(bubble) {
         // 缓存到bubble上，下次播放直接用
         bubble.cachedAudioUrl = audioUrl;
         currentChatAudio = new Audio(audioUrl);
-        // 播放结束后释放锁
-        currentChatAudio.onended = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
-        currentChatAudio.onerror = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
-        await currentChatAudio.play().catch(() => { isChatAudioPlaying = false; });
+        // 播放结束后释放锁，并播放队列里的下一个
+        currentChatAudio.onended = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); tryPlayNextFromQueue(); };
+        currentChatAudio.onerror = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); tryPlayNextFromQueue(); };
+        await currentChatAudio.play().catch(() => { isChatAudioPlaying = false; tryPlayNextFromQueue(); });
     } catch (err) {
         console.error('播放失败:', err);
         isChatAudioPlaying = false;
@@ -1821,7 +1841,7 @@ async function sendChatMessage() {
 
         // 自动朗读
         if (autoPlayTTS) {
-            setTimeout(() => { isChatAudioPlaying = false; playChatMessage(loadingBubble); }, 300);
+            setTimeout(() => enqueueAutoPlay(loadingBubble), 300);
         }
 
     } catch (err) {
@@ -2497,7 +2517,7 @@ ${currentRole.desc}
 
         // 自动朗读（如果开启了自动朗读）
         if (autoPlayTTS) {
-            setTimeout(() => { isChatAudioPlaying = false; playChatMessage(replyBubble); }, 300);
+            setTimeout(() => enqueueAutoPlay(replyBubble), 300);
         }
 
         sfxReceive();
