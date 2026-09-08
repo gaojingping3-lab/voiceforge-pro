@@ -3484,35 +3484,6 @@ async function optimizeImagePrompt(prompt) {
     return data.choices?.[0]?.message?.content?.trim() || prompt;
 }
 
-// Puter.js 模型映射
-const PUTER_MODEL_MAP = {
-    'puter-imagen4': 'google/imagen-4.0',
-    'puter-flux2pro': 'black-forest-labs/flux-2-pro',
-    'puter-gptimage2': 'openai/gpt-image-2'
-};
-
-// Puter.js 生图：返回Blob
-async function generateImageWithPuter(prompt, model) {
-    const puterModel = PUTER_MODEL_MAP[model] || 'google/imagen-4.0';
-    const imgElement = await puter.ai.txt2img(prompt, { model: puterModel });
-
-    // 把Image元素转成Blob
-    return new Promise((resolve, reject) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = imgElement.naturalWidth || imgElement.width || 1024;
-        canvas.height = imgElement.naturalHeight || imgElement.height || 1024;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob((blob) => {
-            if (blob) {
-                resolve(blob);
-            } else {
-                reject(new Error('Puter.js 图片转换失败'));
-            }
-        }, 'image/png');
-    });
-}
-
 // 生图核心函数：先优化提示词（细节拉满），再生成图片，不自动降级
 // 根据提示词关键词自动挑选最合适的Pollinations模型
 function pickModelByPrompt(prompt) {
@@ -3554,36 +3525,29 @@ async function generateImageWithSafety(prompt, model, onStatusUpdate) {
     let lastError = null;
     for (let attempt = 0; attempt < modelsToTry.length; attempt++) {
         const currentModel = modelsToTry[attempt];
-        let modelName = currentModel.replace('pollinations-', '').replace('puter-', 'Puter ');
+        const modelName = currentModel.replace('pollinations-', '');
 
         if (attempt > 0 && onStatusUpdate) {
             onStatusUpdate(`上一个模型失败，自动更换为 ${modelName}（第${attempt + 1}/3次）`);
         }
 
         try {
-            let blob;
-            if (currentModel.startsWith('puter-')) {
-                // Puter.js 模型：前端直接生成，不走后端
-                if (onStatusUpdate) onStatusUpdate(`正在使用 Puter ${modelName} 生成...`);
-                blob = await generateImageWithPuter(optimizedPrompt, currentModel);
-            } else {
-                // Pollinations 模型：走后端代理
-                const response = await fetch('/api/image/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: optimizedPrompt, model: currentModel })
-                });
+            const response = await fetch('/api/image/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: optimizedPrompt, model: currentModel })
+            });
 
-                if (!response.ok) {
-                    let errorMsg = '生成失败';
-                    try {
-                        const errData = await response.json();
-                        errorMsg = errData.error || errorMsg;
-                    } catch (e) {}
-                    throw new Error(errorMsg);
-                }
-                blob = await response.blob();
+            if (!response.ok) {
+                let errorMsg = '生成失败';
+                try {
+                    const errData = await response.json();
+                    errorMsg = errData.error || errorMsg;
+                } catch (e) {}
+                throw new Error(errorMsg);
             }
+
+            const blob = await response.blob();
             return { blob: blob, prompt: optimizedPrompt, model: currentModel };
         } catch (err) {
             lastError = err;
