@@ -1157,7 +1157,7 @@ function updateAutoPlayBtn() {
 // 播放指定文本的语音（聊天消息用）
 let isChatAudioPlaying = false; // 播放锁，防止重复点击
 
-async function playChatMessage(bubble, force = false) {
+async function playChatMessage(bubble) {
     // 读取文字时过滤掉底部的token显示，避免朗读数字
     let text = bubble.innerText.replace(/\n?\d+\s*tokens\s*$/, '').trim();
     // 如果有角色名span（AI消息），去掉第一行的名字，不朗读
@@ -1177,18 +1177,16 @@ async function playChatMessage(bubble, force = false) {
         .replace(/\*[^*]*\*/g, '')
         .trim();
 
-    // 播放锁：正在播放中，忽略新的点击（force模式除外）
-    if (isChatAudioPlaying && !force) return;
-
-    stopAllAudio(); // 先停止之前的音频（会释放锁）
-    isChatAudioPlaying = true; // 然后设置新的锁
+    // 播放锁：正在播放中，忽略新的点击
+    if (isChatAudioPlaying) return;
+    isChatAudioPlaying = true;
+    stopAllAudio();
 
     // 如果有缓存的音频，直接播放，不用再调用API
     if (bubble.cachedAudioUrl) {
         currentChatAudio = new Audio(bubble.cachedAudioUrl);
         currentChatAudio.onended = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
         currentChatAudio.onerror = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
-        getAudioCtx().resume().catch(() => {}); // iOS自动播放解锁
         await currentChatAudio.play().catch(() => { isChatAudioPlaying = false; });
         return;
     }
@@ -1231,7 +1229,6 @@ async function playChatMessage(bubble, force = false) {
         // 播放结束后释放锁
         currentChatAudio.onended = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
         currentChatAudio.onerror = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
-        getAudioCtx().resume().catch(() => {}); // iOS自动播放解锁
         await currentChatAudio.play().catch(() => { isChatAudioPlaying = false; });
     } catch (err) {
         console.error('播放失败:', err);
@@ -1824,7 +1821,7 @@ async function sendChatMessage() {
 
         // 自动朗读
         if (autoPlayTTS) {
-            setTimeout(() => playChatMessage(loadingBubble, true), 300);
+            setTimeout(() => { isChatAudioPlaying = false; playChatMessage(loadingBubble); }, 300);
         }
 
     } catch (err) {
@@ -2200,13 +2197,6 @@ function startDualChat() {
     document.getElementById('dual-pause-btn').classList.remove('hidden');
     sfxSuccess();
 
-    // iOS自动播放解锁：用户点击开始时播放一个静音音频，保持播放权限
-    try {
-        const unlockAudio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
-        unlockAudio.volume = 0;
-        unlockAudio.play().catch(() => {});
-    } catch (e) {}
-
     // 判断是否是第一次开始（没有对话历史）
     const isFirstStart = chatHistory.length === 0;
 
@@ -2507,7 +2497,7 @@ ${currentRole.desc}
 
         // 自动朗读（如果开启了自动朗读）
         if (autoPlayTTS) {
-            setTimeout(() => playChatMessage(replyBubble, true), 300);
+            setTimeout(() => { isChatAudioPlaying = false; playChatMessage(replyBubble); }, 300);
         }
 
         sfxReceive();
