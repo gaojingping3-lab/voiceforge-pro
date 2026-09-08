@@ -3489,7 +3489,8 @@ async function optimizeImagePrompt(prompt) {
         const llmKey = localStorage.getItem('LLM_KEY') || '';
         const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
 
-        const response = await fetch('/api/chat', {
+        // 8秒超时降级：优化太慢就用原始提示词，不让用户一直等
+        const fetchPromise = fetch('/api/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -3507,6 +3508,12 @@ async function optimizeImagePrompt(prompt) {
             })
         });
 
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('优化超时')), 8000);
+        });
+
+        const response = await Promise.race([fetchPromise, timeoutPromise]);
+
         if (!response.ok) {
             console.warn('提示词优化失败，使用原始提示词:', response.status);
             return prompt;
@@ -3516,7 +3523,7 @@ async function optimizeImagePrompt(prompt) {
         const optimized = data.choices?.[0]?.message?.content?.trim();
         return optimized || prompt;
     } catch (e) {
-        console.warn('提示词优化异常，使用原始提示词:', e);
+        console.warn('提示词优化异常/超时，使用原始提示词:', e.message || e);
         return prompt;
     }
 }
