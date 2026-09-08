@@ -796,6 +796,16 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="card-body p-4 sm:p-6">
                 <h2 class="card-title text-lg mb-4"><i class="fa-solid fa-wand-magic-sparkles text-primary"></i> AI 生图</h2>
 
+                <!-- 模型选择 -->
+                <div class="form-control w-full mb-4">
+                    <label class="label py-1"><span class="label-text font-bold">生图模型</span></label>
+                    <select id="image-model-select" class="select select-bordered w-full text-sm" onchange="saveImageModel()">
+                        <option value="dreamshaper">DreamShaper 8 LCM（推荐，审核宽松，速度快）</option>
+                        <option value="flux">Flux 1 Schnell（画质好，审核严，每天1000张）</option>
+                        <option value="sdxl">Stable Diffusion XL（写实，不稳定）</option>
+                    </select>
+                </div>
+
                 <!-- 提示词输入 -->
                 <div class="form-control w-full mb-4">
                     <label class="label py-1"><span class="label-text font-bold">画面描述</span></label>

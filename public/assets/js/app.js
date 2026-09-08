@@ -1651,6 +1651,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     initDualRoleBarCollapse(); // 恢复双角色控制面板折叠状态
     initSingleVoiceSelect(); // 恢复单人模式AI声音选择
+    loadImageModelSelect(); // 恢复生图模型选择
 
     // 第一次用户交互时强制恢复 AudioContext（解决移动端音效不生效）
     const unlockAudio = () => {
@@ -3412,8 +3413,31 @@ function msgpackEncode(value) {
 // ============================================
 
 // 生成图片
+// ============================================
+// 生图模型管理
+// ============================================
+
+function saveImageModel() {
+    const select = document.getElementById('image-model-select');
+    if (select) {
+        localStorage.setItem('IMAGE_MODEL', select.value);
+    }
+}
+
+function getImageModel() {
+    return localStorage.getItem('IMAGE_MODEL') || 'dreamshaper';
+}
+
+function loadImageModelSelect() {
+    const select = document.getElementById('image-model-select');
+    if (select) {
+        select.value = getImageModel();
+    }
+}
+
 async function generateImage() {
     const prompt = document.getElementById('image-prompt').value.trim();
+    const model = getImageModel();
 
     if (!prompt) {
         alert('请输入画面描述');
@@ -3434,7 +3458,8 @@ async function generateImage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                prompt: prompt
+                prompt: prompt,
+                model: model
             })
         });
 
@@ -3554,11 +3579,11 @@ async function generateImageFromChat() {
                 loadingBubble.innerHTML = `<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">内容审核中，正在调整为安全版本（第${attempt + 1}次）...</span></div>`;
             }
 
-            // 调用生图 API
+            // 调用生图 API（使用用户选择的模型）
             const imageResponse = await fetch('/api/image/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: imagePrompt })
+                body: JSON.stringify({ prompt: imagePrompt, model: getImageModel() })
             });
 
             if (imageResponse.ok) {

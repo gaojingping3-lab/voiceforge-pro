@@ -1,5 +1,5 @@
 // Cloudflare Workers AI 生图接口
-// 使用 DreamShaper 8 LCM 模型（SD微调，偏写实，审核宽松，生成快），免费
+// 支持三个模型：DreamShaper 8 LCM / Flux 1 Schnell / Stable Diffusion XL
 // 返回 PNG 图片二进制数据
 
 export async function onRequestPost(context) {
@@ -7,6 +7,7 @@ export async function onRequestPost(context) {
     const { request, env } = context;
     const body = await request.json();
     const prompt = body.prompt || '';
+    const model = body.model || 'dreamshaper';
 
     if (!prompt.trim()) {
       return new Response(JSON.stringify({ error: '提示词不能为空' }), {
@@ -15,19 +16,30 @@ export async function onRequestPost(context) {
       });
     }
 
-    // 调用 Cloudflare Workers AI 生图
-    // DreamShaper 8 LCM 是 SD 1.5 的微调模型，LCM版本生成速度快
-    const result = await env.AI.run(
-      '@cf/lykon/dreamshaper-8-lcm',
-      {
-        prompt: prompt,
-        num_steps: 6
+    // 根据模型选择配置
+    const modelConfigs = {
+      dreamshaper: {
+        id: '@cf/lykon/dreamshaper-8-lcm',
+        params: { prompt: prompt, num_steps: 6 }
+      },
+      flux: {
+        id: '@cf/black-forest-labs/flux-1-schnell',
+        params: { prompt: prompt }
+      },
+      sdxl: {
+        id: '@cf/stabilityai/stable-diffusion-xl-base-1.0',
+        params: { prompt: prompt, num_steps: 20, guidance: 7.5 }
       }
-    );
+    };
 
-    // 兼容两种返回格式：
+    const config = modelConfigs[model] || modelConfigs.dreamshaper;
+
+    // 调用 Cloudflare Workers AI 生图
+    const result = await env.AI.run(config.id, config.params);
+
+    // 兼容多种返回格式：
     // 1. { image: "base64字符串" }（Flux格式）
-    // 2. 直接返回二进制数据（SDXL格式，可能是 Uint8Array 或 ReadableStream）
+    // 2. 直接返回二进制数据（Uint8Array 或 ReadableStream）
     let imageBytes;
 
     if (result && typeof result === 'object' && result.image) {
