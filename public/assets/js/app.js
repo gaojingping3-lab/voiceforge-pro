@@ -3657,8 +3657,8 @@ async function generateImage() {
 // ============================================
 
 async function generateImageFromChat() {
-    // 取最近两轮对话（4条消息：2用户+2AI）
-    const recentMessages = chatHistory.slice(-4);
+    // 取最近两条消息（1用户+1AI）
+    const recentMessages = chatHistory.slice(-2);
     if (recentMessages.length < 2) {
         alert('至少需要一轮对话才能生成图片');
         return;
