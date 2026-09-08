@@ -321,6 +321,26 @@
   body:not(.theme-obsidian):not(.theme-dark) .chat-bubble {
     box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
   }
+  /* 微信风头像布局：确保左右并排不重叠 */
+  #chat-messages .chat {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+  #chat-messages .chat-start {
+    justify-content: flex-start !important;
+  }
+  #chat-messages .chat-end {
+    justify-content: flex-end !important;
+  }
+  #chat-messages .chat-image {
+    flex-shrink: 0 !important;
+    margin-top: 2px !important;
+  }
+  #chat-messages .chat-bubble {
+    max-width: calc(100% - 52px) !important;
+    word-break: break-word !important;
+  }
 </style>
 
 <div id="premium-bg-layer"></div>
@@ -606,6 +626,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 <dialog id="role-card-modal" class="modal">
                     <div class="modal-box bg-base-100">
                         <h3 class="font-bold text-lg mb-4">编辑角色卡</h3>
+                        <!-- 角色头像上传 -->
+                        <div class="flex items-center gap-4 mb-4">
+                            <div id="role-edit-avatar-preview" class="w-16 h-16 rounded-lg overflow-hidden flex items-center justify-center text-white text-2xl font-bold shadow-md cursor-pointer hover:ring-2 hover:ring-primary transition" onclick="uploadRoleEditAvatar()">
+                                <span>?</span>
+                            </div>
+                            <div>
+                                <div class="text-sm font-bold">角色头像</div>
+                                <div class="text-xs text-base-content/50 mt-1">点击从相册上传图片</div>
+                                <button class="btn btn-ghost btn-xs text-error mt-1" onclick="clearRoleEditAvatar()">清除头像</button>
+                            </div>
+                        </div>
                         <label class="label py-1"><span class="label-text text-sm">角色名称</span></label>
                         <input type="text" id="role-name-input" class="input input-bordered input-sm w-full mb-3" placeholder="例如：乐" />
                         <div class="flex items-center justify-between">
@@ -871,26 +902,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                             <span class="text-xs text-base-content/50">我的头像</span>
                         </div>
-                        <div class="flex flex-col items-center gap-1">
-                            <div id="avatar-ai-preview" class="w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center text-white font-bold shadow-md cursor-pointer hover:ring-2 hover:ring-primary transition" onclick="uploadAvatarCurrentRole()">
-                                <span>AI</span>
-                            </div>
-                            <span class="text-xs text-base-content/50">当前角色</span>
-                        </div>
-                        <div id="avatar-dual-a-wrap" class="flex-col items-center gap-1 hidden">
-                            <div id="avatar-dual-a-preview" class="w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center text-white font-bold shadow-md cursor-pointer hover:ring-2 hover:ring-primary transition" onclick="uploadAvatarDual('A')">
-                                <span>A</span>
-                            </div>
-                            <span class="text-xs text-base-content/50">角色A</span>
-                        </div>
-                        <div id="avatar-dual-b-wrap" class="flex-col items-center gap-1 hidden">
-                            <div id="avatar-dual-b-preview" class="w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center text-white font-bold shadow-md cursor-pointer hover:ring-2 hover:ring-primary transition" onclick="uploadAvatarDual('B')">
-                                <span>B</span>
-                            </div>
-                            <span class="text-xs text-base-content/50">角色B</span>
-                        </div>
                     </div>
-                    <div class="text-xs text-base-content/40 mt-2">点击头像可从相册上传图片，自动保存到本地</div>
+                    <div class="text-xs text-base-content/40 mt-2">点击头像可从相册上传图片；AI角色头像请在「编辑角色卡」中设置</div>
                 </div>
                 <div class="form-control mb-4">
                     <label class="label py-1 cursor-pointer" onclick="toggleRoleConstraint()">

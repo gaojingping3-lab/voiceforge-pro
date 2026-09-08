@@ -2246,13 +2246,26 @@ function getAvatarGradient(name) {
 // ============================================
 // 微信风头像工具函数
 // ============================================
-// 获取头像：优先localStorage自定义头像，否则首字母+渐变色
+// 获取头像：优先角色配置里的avatar，其次localStorage自定义头像，否则首字母+渐变色
 function getAvatarData(name, isUser) {
-    const key = isUser ? 'AVATAR_USER' : 'AVATAR_' + name;
-    const custom = localStorage.getItem(key);
+    // 用户头像
+    if (isUser) {
+        const custom = localStorage.getItem('AVATAR_USER');
+        if (custom) return { type: 'image', src: custom };
+        const firstChar = '我';
+        return { type: 'text', char: firstChar, gradient: getAvatarGradient('用户') };
+    }
+    // AI角色头像：先从角色配置里找
+    const roleList = getRoleList();
+    const role = roleList.find(r => r.name === name);
+    if (role && role.avatar) {
+        return { type: 'image', src: role.avatar };
+    }
+    // 兼容旧版：从localStorage找
+    const custom = localStorage.getItem('AVATAR_' + name);
     if (custom) return { type: 'image', src: custom };
     const firstChar = name ? name.charAt(0).toUpperCase() : '?';
-    return { type: 'text', char: firstChar, gradient: getAvatarGradient(name || '用户') };
+    return { type: 'text', char: firstChar, gradient: getAvatarGradient(name || 'AI') };
 }
 
 // 创建聊天头像元素（DaisyUI chat-image 结构）
@@ -2261,8 +2274,8 @@ function createChatAvatar(name, isUser) {
     const wrap = document.createElement('div');
     wrap.className = 'chat-image avatar flex-shrink-0';
     const inner = document.createElement('div');
-    // 微信风格：圆角矩形（8px圆角），40px固定宽高
-    inner.className = 'w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center text-white text-sm font-bold shadow-md';
+    // 微信风格：圆角矩形，36px精致尺寸
+    inner.className = 'w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center text-white text-xs font-bold shadow-sm';
     if (avatarData.type === 'image') {
         const img = document.createElement('img');
         img.src = avatarData.src;
@@ -2296,23 +2309,47 @@ function uploadAvatar(name, isUser, callback) {
     input.click();
 }
 
-// 上传当前AI角色头像
-function uploadAvatarCurrentRole() {
-    const role = getCurrentRole();
-    if (!role) return;
-    uploadAvatar(role.name, false, () => {
-        refreshAvatarPreviews();
-        renderRoleCard();
-    });
+// 角色卡编辑中的临时头像
+let editingRoleAvatar = null;
+
+// 上传角色卡编辑弹窗里的头像
+function uploadRoleEditAvatar() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            editingRoleAvatar = ev.target.result;
+            updateRoleEditAvatarPreview(editingRoleAvatar);
+        };
+        reader.readAsDataURL(file);
+    };
+    input.click();
 }
 
-// 上传双人模式角色A/B头像
-function uploadAvatarDual(role) {
-    const target = role === 'A' ? dualRoleA : dualRoleB;
-    if (!target) return;
-    uploadAvatar(target.name, false, () => {
-        refreshAvatarPreviews();
-    });
+// 清除角色卡编辑里的头像
+function clearRoleEditAvatar() {
+    editingRoleAvatar = ''; // 空字符串表示清除
+    updateRoleEditAvatarPreview(null);
+}
+
+// 更新角色卡编辑头像预览
+function updateRoleEditAvatarPreview(avatarSrc) {
+    const preview = document.getElementById('role-edit-avatar-preview');
+    if (!preview) return;
+    if (avatarSrc) {
+        preview.innerHTML = `<img src="${avatarSrc}" class="w-full h-full object-cover">`;
+        preview.style.background = 'transparent';
+    } else {
+        const role = getCurrentRole();
+        const name = role ? role.name : '?';
+        const firstChar = name.charAt(0).toUpperCase();
+        preview.innerHTML = `<span>${firstChar}</span>`;
+        preview.style.background = getAvatarGradient(name);
+    }
 }
 
 // 刷新设置页面的头像预览
@@ -2328,47 +2365,6 @@ function refreshAvatarPreviews() {
             userPreview.innerHTML = `<span>${data.char}</span>`;
             userPreview.style.background = data.gradient;
         }
-    }
-    // 当前AI角色头像
-    const aiPreview = document.getElementById('avatar-ai-preview');
-    if (aiPreview) {
-        const role = getCurrentRole();
-        const data = getAvatarData(role ? role.name : 'AI', false);
-        if (data.type === 'image') {
-            aiPreview.innerHTML = `<img src="${data.src}" class="w-full h-full object-cover">`;
-            aiPreview.style.background = 'transparent';
-        } else {
-            aiPreview.innerHTML = `<span>${data.char}</span>`;
-            aiPreview.style.background = data.gradient;
-        }
-    }
-    // 双人模式角色A/B头像
-    const dualA = document.getElementById('avatar-dual-a-preview');
-    const dualB = document.getElementById('avatar-dual-b-preview');
-    const dualAWrap = document.getElementById('avatar-dual-a-wrap');
-    const dualBWrap = document.getElementById('avatar-dual-b-wrap');
-    if (dualRoleA && dualRoleB) {
-        if (dualAWrap) dualAWrap.classList.remove('hidden');
-        if (dualBWrap) dualBWrap.classList.remove('hidden');
-        if (dualAWrap) dualAWrap.classList.add('flex');
-        if (dualBWrap) dualBWrap.classList.add('flex');
-        if (dualA) {
-            const dataA = getAvatarData(dualRoleA.name, false);
-            dualA.innerHTML = dataA.type === 'image'
-                ? `<img src="${dataA.src}" class="w-full h-full object-cover">`
-                : `<span>${dataA.char}</span>`;
-            dualA.style.background = dataA.type === 'image' ? 'transparent' : dataA.gradient;
-        }
-        if (dualB) {
-            const dataB = getAvatarData(dualRoleB.name, false);
-            dualB.innerHTML = dataB.type === 'image'
-                ? `<img src="${dataB.src}" class="w-full h-full object-cover">`
-                : `<span>${dataB.char}</span>`;
-            dualB.style.background = dataB.type === 'image' ? 'transparent' : dataB.gradient;
-        }
-    } else {
-        if (dualAWrap) { dualAWrap.classList.add('hidden'); dualAWrap.classList.remove('flex'); }
-        if (dualBWrap) { dualBWrap.classList.add('hidden'); dualBWrap.classList.remove('flex'); }
     }
 }
 
@@ -3029,6 +3025,9 @@ function editRoleCard() {
     document.getElementById('role-desc-input').value = role.desc;
     document.getElementById('role-opening-input').value = role.opening || '';
     renderMemoList();
+    // 加载头像预览
+    editingRoleAvatar = role.avatar || null;
+    updateRoleEditAvatarPreview(role.avatar || null);
     document.getElementById('role-card-modal').showModal();
 }
 
@@ -3048,8 +3047,13 @@ function saveRoleCard() {
         role.name = name;
         role.desc = desc;
         role.opening = opening;
+        // 保存头像（null表示不修改，''表示清除）
+        if (editingRoleAvatar !== null) {
+            role.avatar = editingRoleAvatar || undefined;
+        }
         saveRoleList(list);
     }
+    editingRoleAvatar = null;
     renderRoleCard();
     document.getElementById('role-card-modal').close();
     sfxSuccess();
