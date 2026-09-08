@@ -4001,6 +4001,9 @@ async function generatePromptWithRoleAI(conversationText) {
         // 尝试从角色卡提取外貌部分
         const appearance = extractAppearanceFromRoleCard(roleDesc);
 
+        // 读取用户设置里的System Prompt，让生图提示词也遵守
+        const customSystem = localStorage.getItem('LLM_SYSTEM') || '';
+
         let systemContent;
         if (appearance) {
             // 提取到外貌：角色AI只负责翻译外貌+提取动作，外貌严格按原文翻译不改写
@@ -4010,10 +4013,14 @@ async function generatePromptWithRoleAI(conversationText) {
             systemContent = `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，提取画面视觉信息，转换成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 包含人物外貌（严格按照角色设定，不要改写）、服装、当前动作、表情、环境\n3. 明确人物性别（man/woman/girl/boy）\n4. 不要输出任何中文，不要加引号，直接输出提示词本身\n5. 不要添加风格词，风格已由系统固定前缀处理`;
         }
 
-        const messages = [
-            { role: 'system', content: systemContent },
-            { role: 'user', content: `根据以下对话生成英文生图提示词：\n\n${conversationText}` }
-        ];
+        const messages = [];
+        // 先加用户的System Prompt（如果有设置）
+        if (customSystem) {
+            messages.push({ role: 'system', content: customSystem });
+        }
+        // 再加角色卡和生图指令
+        messages.push({ role: 'system', content: systemContent });
+        messages.push({ role: 'user', content: `根据以下对话生成英文生图提示词：\n\n${conversationText}` });
 
         const response = await fetch('/api/chat', {
             method: 'POST',
