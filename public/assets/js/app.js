@@ -3846,6 +3846,9 @@ async function generateImage() {
         const errMsg = error.message || '';
         if (errMsg.includes('NSFW') || errMsg.includes('8007')) {
             alert('生成失败：提示词包含敏感元素，已被安全审核拦截。\n\n建议：描述一些日常、温馨的场景。');
+        } else if (errMsg.includes('Agnes')) {
+            // Agnes错误：显示完整信息，方便诊断
+            alert('Agnes 生图失败：\n\n' + errMsg + '\n\n建议：\n1. 检查 API Key 是否正确\n2. 确认 Key 是在 .cn 还是 .com 注册的\n3. 稍后再试或切换 Pollinations 模型');
         } else if (errMsg.includes('429')) {
             alert('生成失败：请求太频繁被限流了。\n\n建议：等10-20秒再试，或者切换其他生图模型。');
         } else {
@@ -3989,11 +3992,17 @@ async function generateImageFromChat() {
 
     } catch (error) {
         console.error('对话生图失败:', error);
-        loadingDiv.remove();
+        // 确保loading气泡被清除
+        if (loadingDiv && loadingDiv.parentNode) {
+            loadingDiv.remove();
+        }
         isGeneratingChatImage = false;
         const errMsg = error.message || '';
         if (errMsg.includes('NSFW') || errMsg.includes('8007')) {
             alert('生成失败：对话内容包含敏感元素，已被安全审核拦截。\n\n建议：聊一些日常、温馨的场景再试试。');
+        } else if (errMsg.includes('Agnes')) {
+            // Agnes错误：显示完整信息，方便诊断
+            alert('Agnes 生图失败：\n\n' + errMsg + '\n\n建议：\n1. 检查 API Key 是否正确\n2. 确认 Key 是在 .cn 还是 .com 注册的\n3. 稍后再试或切换 Pollinations 模型');
         } else if (errMsg.includes('429')) {
             alert('生成失败：请求太频繁被限流了。\n\n建议：等10-20秒再试，或者切换其他生图模型。');
         } else {
