@@ -3678,14 +3678,32 @@ async function generateImageFromChat() {
     smartScroll(container);
 
     try {
-        // 获取当前角色卡信息，用于保持人物外貌一致
-        const currentRole = getCurrentRole();
-        const roleInfo = currentRole ? `角色名：${currentRole.name}\n角色设定（包含外貌特征）：${currentRole.desc}\n\n` : '';
+        // 获取角色卡信息，用于保持人物外貌一致
+        let roleInfo = '';
+        const isDualMode = localStorage.getItem('DUAL_ROLE_MODE') === '1';
+        if (isDualMode && dualRoleA && dualRoleB) {
+            // 双角色模式：把两个角色的外貌信息都传进去
+            roleInfo = `角色A：${dualRoleA.name}\n角色A设定（包含外貌特征）：${dualRoleA.desc}\n\n角色B：${dualRoleB.name}\n角色B设定（包含外貌特征）：${dualRoleB.desc}\n\n`;
+        } else {
+            // 单人模式：当前角色卡
+            const currentRole = getCurrentRole();
+            roleInfo = currentRole ? `角色名：${currentRole.name}\n角色设定（包含外貌特征）：${currentRole.desc}\n\n` : '';
+        }
 
         // 把最近两轮对话整理成文本，前面加上角色外貌信息
-        const conversationText = roleInfo + recentMessages.map(m =>
-            `${m.role === 'user' ? '我' : currentRole?.name || 'AI'}: ${m.content}`
-        ).join('\n');
+        let conversationText;
+        if (isDualMode) {
+            // 双角色：消息本身已包含[角色名]，直接用
+            conversationText = roleInfo + recentMessages.map(m =>
+                `${m.role === 'user' ? '我' : ''}: ${m.content}`
+            ).join('\n');
+        } else {
+            // 单人：加上当前角色名
+            const currentRole = getCurrentRole();
+            conversationText = roleInfo + recentMessages.map(m =>
+                `${m.role === 'user' ? '我' : currentRole?.name || 'AI'}: ${m.content}`
+            ).join('\n');
+        }
 
         // 调用生图函数（内部会自动优化提示词细节，不自动降级）
         const result = await generateImageWithSafety(conversationText, getImageModel(), (msg) => {
