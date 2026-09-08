@@ -32,16 +32,16 @@ export async function onRequestPost(context) {
 
       // 尝试两个 endpoint：.cn（国内）和 .com（国际）
       const endpoints = [
-        'https://apihub.agnes-ai.cn/v1/images/generations',
-        'https://apihub.agnes-ai.com/v1/images/generations'
+        { url: 'https://apihub.agnes-ai.cn/v1/images/generations', name: '.cn' },
+        { url: 'https://apihub.agnes-ai.com/v1/images/generations', name: '.com' }
       ];
 
-      let lastError = null;
+      let allErrors = [];
       let imageBytes = null;
       let imageContentType = 'image/png';
 
       for (let epIdx = 0; epIdx < endpoints.length; epIdx++) {
-        const endpoint = endpoints[epIdx];
+        const { url: endpoint, name: epName } = endpoints[epIdx];
         console.log('[Agnes] trying endpoint:', endpoint);
 
         try {
@@ -67,24 +67,31 @@ export async function onRequestPost(context) {
           console.log('[Agnes] status:', response.status);
 
           if (!response.ok) {
-            // 收集完整错误信息返回给前端
+            // 收集完整错误信息
             let errDetail = '';
+            let rawBody = '';
             try {
-              const errData = await response.json();
-              console.log('[Agnes] error response:', JSON.stringify(errData));
-              errDetail = [
-                errData.error?.message,
-                errData.error?.code ? `(code: ${errData.error.code})` : '',
-                errData.message,
-                errData.code ? `(code: ${errData.code})` : ''
-              ].filter(Boolean).join(' ');
-            } catch (e) {
-              try { errDetail = await response.text(); } catch (e2) {}
-            }
-            const fullErr = `Agnes API ${response.status}: ${errDetail || '未知错误'} [endpoint: ${epIdx === 0 ? '.cn' : '.com'}]`;
-            lastError = new Error(fullErr);
-            // 401/403 是Key问题，不重试下一个endpoint
-            if (response.status === 401 || response.status === 403) break;
+              rawBody = await response.text();
+              console.log('[Agnes] error raw body:', rawBody.substring(0, 500));
+              try {
+                const errData = JSON.parse(rawBody);
+                errDetail = [
+                  errData.error?.message,
+                  errData.error?.code ? `(code: ${errData.error.code})` : '',
+                  errData.error?.type ? `(type: ${errData.error.type})` : '',
+                  errData.message,
+                  errData.code ? `(code: ${errData.code})` : '',
+                  errData.detail
+                ].filter(Boolean).join(' ');
+              } catch (jsonErr) {
+                // 不是JSON，直接用原始文本
+                errDetail = rawBody.substring(0, 200);
+              }
+            } catch (e) {}
+            const fullErr = `[${epName}] HTTP ${response.status}: ${errDetail || '无错误详情'}`;
+            allErrors.push(fullErr);
+            // 401/403 是Key问题，429是限流（账号级别，换域名没用），都不重试
+            if (response.status === 401 || response.status === 403 || response.status === 429) break;
             continue; // 试下一个endpoint
           }
 
@@ -94,7 +101,7 @@ export async function onRequestPost(context) {
 
           const item = data.data?.[0];
           if (!item) {
-            lastError = new Error('Agnes 返回数据为空: ' + JSON.stringify(data).substring(0, 200));
+            allErrors.push(`[${epName}] 返回数据为空: ` + JSON.stringify(data).substring(0, 200));
             continue;
           }
 
@@ -122,7 +129,7 @@ export async function onRequestPost(context) {
             console.log('[Agnes] got url, downloading:', item.url.substring(0, 80) + '...');
             const imgRes = await fetch(item.url);
             if (!imgRes.ok) {
-              lastError = new Error(`Agnes 图片下载失败: ${imgRes.status}`);
+              allErrors.push(`[${epName}] 图片下载失败: ${imgRes.status}`);
               continue;
             }
             imageContentType = imgRes.headers.get('Content-Type') || 'image/png';
@@ -131,18 +138,19 @@ export async function onRequestPost(context) {
             console.log('[Agnes] downloaded image, bytes:', imageBytes.length, 'type:', imageContentType);
             break; // 成功
           } else {
-            lastError = new Error('Agnes 返回格式不支持，data[0]字段: ' + Object.keys(item).join(',') + ' 原始: ' + JSON.stringify(data).substring(0, 300));
+            allErrors.push(`[${epName}] 返回格式不支持，data[0]字段: ` + Object.keys(item).join(',') + ' 原始: ' + JSON.stringify(data).substring(0, 200));
             continue;
           }
         } catch (e) {
           console.log('[Agnes] fetch error:', e.message);
-          lastError = e;
+          allErrors.push(`[${epName}] 网络异常: ${e.message}`);
           continue;
         }
       }
 
       if (!imageBytes) {
-        throw lastError || new Error('Agnes 生图失败，所有endpoint均不可用');
+        const summary = allErrors.length > 0 ? allErrors.join(' | ') : '未知错误';
+        throw new Error(summary);
       }
 
       return new Response(imageBytes, {
