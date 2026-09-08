@@ -2160,16 +2160,17 @@ async function sendChatMessage() {
             useSlideWindow: useSlideWindow
         };
         // 思考程度控制（支持 V4 系列和 reasoner 模型）
+        // 注意：DeepSeek V4 默认开启thinking(medium)，普通聊天必须显式关闭才能秒回
         const isV4OrReasoner = llmModel.toLowerCase().includes('v4') || llmModel.toLowerCase().includes('reasoner');
-        if (isV4OrReasoner && reasoningLevel !== 'default') {
-            if (reasoningLevel === 'off') {
-                // 关闭思考：不思考，秒回，省token
-                requestBody.thinking = { type: 'disabled' };
-            } else {
-                // 开启思考：低/中/高
-                const effortMap = { 'low': 'low', 'medium': 'high', 'high': 'max' };
+        if (isV4OrReasoner) {
+            if (reasoningLevel === 'low' || reasoningLevel === 'medium' || reasoningLevel === 'high') {
+                // 用户主动开启思考：低/中/高（修正映射，中=medium）
+                const effortMap = { 'low': 'low', 'medium': 'medium', 'high': 'max' };
                 requestBody.thinking = { type: 'enabled' };
                 requestBody.reasoning_effort = effortMap[reasoningLevel] || 'low';
+            } else {
+                // default 和 off 都显式关闭思考，保证普通聊天秒回
+                requestBody.thinking = { type: 'disabled' };
             }
         }
         // 开启流式输出，并要求返回 usage（用于 token 统计）
@@ -2216,6 +2217,7 @@ async function sendChatMessage() {
         let fullReply = '';
         let buffer = '';
         let totalTokens = 0;
+        let streamRafId = null; // requestAnimationFrame节流，避免每个delta都重渲染
         loadingBubble.innerText = '';
 
         while (true) {
@@ -2237,10 +2239,15 @@ async function sendChatMessage() {
                     const delta = chunk.choices?.[0]?.delta?.content;
                     if (delta) {
                         fullReply += delta;
-                        loadingBubble.innerHTML = formatChatText(fullReply);
-                        // 智能滚动：用户在底部才自动滚
-                        const chatContainer = document.getElementById('chat-messages');
-                        smartScroll(chatContainer);
+                        // 流式过程中只用innerText显示纯文本（快），用rAF节流避免频繁重排
+                        if (!streamRafId) {
+                            streamRafId = requestAnimationFrame(() => {
+                                streamRafId = null;
+                                loadingBubble.innerText = fullReply;
+                                const chatContainer = document.getElementById('chat-messages');
+                                smartScroll(chatContainer);
+                            });
+                        }
                     }
                     // 捕获token使用量
                     if (chunk.usage?.total_tokens) {
@@ -2251,11 +2258,16 @@ async function sendChatMessage() {
                 }
             }
         }
+        // 取消未执行的节流，确保最终内容完整
+        if (streamRafId) { cancelAnimationFrame(streamRafId); streamRafId = null; }
 
         // 如果流式返回为空，尝试用非流式方式兜底
         if (!fullReply) {
             throw new Error('流式响应为空，请重试');
         }
+
+        // 流式结束后，只做一次完整的格式化（动作描写上色），避免过程中重复解析
+        loadingBubble.innerHTML = formatChatText(fullReply);
 
         // 在AI消息气泡下面单独显示token（独立元素，不影响气泡）
         const chatDiv = loadingBubble.parentElement;
@@ -3089,39 +3101,97 @@ ${currentRole.desc}
         const llmKey = localStorage.getItem('LLM_KEY') || '';
         const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
 
+        // 构建请求体（流式输出，首字更快）
+        const dualRequestBody = {
+            baseUrl: llmUrl,
+            model: llmModel,
+            messages: messages,
+            temperature: parseFloat(localStorage.getItem('LLM_TEMPERATURE') || '0.8'),
+            top_p: parseFloat(localStorage.getItem('LLM_TOPP') || '0.9'),
+            stream: true,
+            stream_options: { include_usage: true },
+            useSlideWindow: localStorage.getItem('CTX_MODE') === 'slide',
+        };
+        // Thinking控制：V4默认开启思考，普通对话显式关闭以秒回（与单人模式一致）
+        const dualReasoningLevel = localStorage.getItem('LLM_REASONING') || 'default';
+        const dualIsV4 = llmModel.toLowerCase().includes('v4') || llmModel.toLowerCase().includes('reasoner');
+        if (dualIsV4) {
+            if (dualReasoningLevel === 'low' || dualReasoningLevel === 'medium' || dualReasoningLevel === 'high') {
+                const effortMap = { 'low': 'low', 'medium': 'medium', 'high': 'max' };
+                dualRequestBody.thinking = { type: 'enabled' };
+                dualRequestBody.reasoning_effort = effortMap[dualReasoningLevel] || 'low';
+            } else {
+                dualRequestBody.thinking = { type: 'disabled' };
+            }
+        }
+
         const res = await fetch('/api/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${llmKey}`
             },
-            body: JSON.stringify({
-                baseUrl: llmUrl,
-                model: llmModel,
-                messages: messages,
-                temperature: parseFloat(localStorage.getItem('LLM_TEMPERATURE') || '0.8'),
-                top_p: parseFloat(localStorage.getItem('LLM_TOPP') || '0.9'),
-                stream: false,
-                useSlideWindow: localStorage.getItem('CTX_MODE') === 'slide',
-            }),
+            body: JSON.stringify(dualRequestBody),
             signal: dualAbortController.signal,
         });
 
-        if (!res.ok) throw new Error(`请求失败: ${res.status}`);
-        const data = await res.json();
-        const reply = data.choices?.[0]?.message?.content || '';
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`请求失败: ${res.status} ${errText.substring(0,80)}`);
+        }
 
-        // 移除思考中，显示真实回复
-        thinkingDiv.remove();
-        const replyDiv = document.createElement('div');
-        replyDiv.className = 'chat chat-start relative msg-enter gap-2';
-        replyDiv.appendChild(createChatAvatar(currentRole.name, false));
-        const replyBubble = document.createElement('div');
-        // 角色A用橙色，角色B用蓝色，区分两个角色
-        const color = dualCurrentSpeaker === 'A' ? '#fb923c' : '#3b82f6';
-        replyBubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
-        replyBubble.innerHTML = `<span class="text-xs font-bold block mb-1" style="color:${color}">${escapeHtml(currentRole.name)}</span>${formatChatText(reply)}`;
-        replyDiv.appendChild(replyBubble);
+        // 流式读取，复用思考气泡逐字显示（避免remove再create造成闪烁）
+        const dualReader = res.body.getReader();
+        const dualDecoder = new TextDecoder();
+        let reply = '';
+        let dualBuffer = '';
+        let dualTokens = 0;
+        let dualFirstChunk = true;
+        let dualRafId = null;
+        const dualColor = dualCurrentSpeaker === 'A' ? '#fb923c' : '#3b82f6';
+        const dualNameHtml = `<span class="text-xs font-bold block mb-1" style="color:${dualColor}">${escapeHtml(currentRole.name)}</span>`;
+
+        while (true) {
+            const { done, value } = await dualReader.read();
+            if (done) break;
+            dualBuffer += dualDecoder.decode(value, { stream: true });
+            const dLines = dualBuffer.split(/\r?\n/);
+            dualBuffer = dLines.pop() || '';
+            for (const dLine of dLines) {
+                const dTrimmed = dLine.trim();
+                if (!dTrimmed.startsWith('data:')) continue;
+                const dDataStr = dTrimmed.slice(5).trim();
+                if (dDataStr === '[DONE]') continue;
+                try {
+                    const dChunk = JSON.parse(dDataStr);
+                    const dDelta = dChunk.choices?.[0]?.delta?.content;
+                    if (dDelta) {
+                        if (dualFirstChunk) {
+                            dualFirstChunk = false;
+                            thinkingBubble.innerHTML = dualNameHtml + '<span class="dual-stream-text"></span>';
+                        }
+                        reply += dDelta;
+                        // rAF节流，流式过程用纯文本，结束后再统一格式化
+                        if (!dualRafId) {
+                            dualRafId = requestAnimationFrame(() => {
+                                dualRafId = null;
+                                const textEl = thinkingBubble.querySelector('.dual-stream-text');
+                                if (textEl) textEl.innerText = reply;
+                                smartScroll(container);
+                            });
+                        }
+                    }
+                    if (dChunk.usage?.total_tokens) dualTokens = dChunk.usage.total_tokens;
+                } catch (e) {}
+            }
+        }
+        if (dualRafId) { cancelAnimationFrame(dualRafId); dualRafId = null; }
+        if (!reply) throw new Error('回复为空，请重试');
+
+        // 流式结束：只做一次完整格式化，复用思考气泡作为最终回复气泡
+        thinkingBubble.innerHTML = dualNameHtml + formatChatText(reply);
+        const replyDiv = thinkingDiv;
+        const replyBubble = thinkingBubble;
 
         // 加播放按钮
         const playBtn = document.createElement('button');
@@ -3131,7 +3201,6 @@ ${currentRole.desc}
         playBtn.onclick = () => playChatMessage(replyBubble);
         replyDiv.appendChild(playBtn);
 
-        container.appendChild(replyDiv);
         smartScroll(container);
         cleanupOldAudioCache(); // 优化1：清理旧消息音频缓存防OOM
 
@@ -3140,7 +3209,6 @@ ${currentRole.desc}
         saveChatHistory();
 
         // 累加总tokens
-        const dualTokens = data.usage?.total_tokens || 0;
         if (dualTokens > 0) {
             totalTokensUsed += dualTokens;
             localStorage.setItem('TOTAL_TOKENS_USED', totalTokensUsed.toString());
