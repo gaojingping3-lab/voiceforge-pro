@@ -3500,16 +3500,10 @@ async function generateImageFromChat() {
     smartScroll(container);
 
     try {
-        // 1. 调用 LLM 把对话整理成生图提示词
+        // 1. 调用 LLM 把对话整理成生图提示词（复用聊天的大模型配置）
         const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
         const llmKey = localStorage.getItem('LLM_KEY') || '';
         const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
-
-        if (!llmKey) {
-            alert('请先在设置里配置大模型 API Key');
-            loadingDiv.remove();
-            return;
-        }
 
         const conversationText = recentMessages.map(m =>
             `${m.role === 'user' ? '我' : 'AI'}: ${m.content}`
