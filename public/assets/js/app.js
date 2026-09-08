@@ -390,6 +390,83 @@ function getAudioCtx() {
     }
     return audioCtx;
 }
+
+// ============================================
+// TTS 语音播放（Web Audio API，iOS 自动播放优化）
+// ============================================
+let ttsCurrentSource = null; // 当前正在播放的 TTS AudioBufferSourceNode
+let ttsKeepAliveOsc = null; // 静音振荡器，保持 iOS 音频会话活跃
+let ttsKeepAliveGain = null;
+let ttsAudioInited = false;
+
+// 用户点击时调用：激活 AudioContext 并启动静音振荡器保活
+function initTTSAudio() {
+    if (ttsAudioInited) return;
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+    }
+    // 静音振荡器，gain 几乎为 0，保持音频会话活跃
+    ttsKeepAliveOsc = ctx.createOscillator();
+    ttsKeepAliveGain = ctx.createGain();
+    ttsKeepAliveGain.gain.value = 0.00001;
+    ttsKeepAliveOsc.connect(ttsKeepAliveGain);
+    ttsKeepAliveGain.connect(ctx.destination);
+    ttsKeepAliveOsc.start();
+    ttsAudioInited = true;
+}
+
+// 解码音频（兼容回调方式，防止 Safari detach buffer）
+function decodeTTSAudio(arrayBuffer) {
+    return new Promise((resolve, reject) => {
+        const ctx = getAudioCtx();
+        ctx.decodeAudioData(
+            arrayBuffer.slice(0), // 传入副本，防止 Safari 清空原 buffer
+            (buffer) => resolve(buffer),
+            (err) => reject(err)
+        );
+    });
+}
+
+// 停止当前 TTS 播放
+function stopTTSCurrent() {
+    if (ttsCurrentSource) {
+        ttsCurrentSource.onended = null; // 解绑回调，防止连锁反应
+        try {
+            ttsCurrentSource.stop(0);
+        } catch (e) {}
+        ttsCurrentSource.disconnect();
+        ttsCurrentSource = null;
+    }
+}
+
+// 播放 AudioBuffer
+function playTTSBuffer(audioBuffer, onEnded) {
+    stopTTSCurrent();
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(ctx.destination);
+    source.onended = () => {
+        source.disconnect();
+        if (ttsCurrentSource === source) {
+            ttsCurrentSource = null;
+        }
+        if (onEnded) onEnded();
+    };
+    ttsCurrentSource = source;
+    source.start(0);
+}
+
+// 切回前台时恢复 AudioContext
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+    }
+});
 function playTone(freq, duration, type, volume, delay = 0) {
     try {
         const ctx = getAudioCtx();
@@ -991,8 +1068,8 @@ async function generateAndPlayAudio(text) {
         const audioBlob = await res.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
         stopAllAudio(); // 先停止之前的播放
-        currentChatAudio = new Audio(audioUrl);
-        await currentChatAudio.play().catch(() => {});
+        const audio = new Audio(audioUrl);
+        await audio.play().catch(() => {});
     } catch (err) {
         console.error('语音播放失败:', err);
     }
@@ -1000,7 +1077,6 @@ async function generateAndPlayAudio(text) {
 
 // 添加聊天气泡
 let chatHistory = []; // 对话历史记忆（永久保存，只有清空才删除）
-let currentChatAudio = null; // 当前正在播放的聊天音频
 let totalTokensUsed = 0; // 总消耗tokens量
 
 // 更新总tokens显示
@@ -1089,11 +1165,8 @@ function renderChatHistory() {
 
 // 停止所有音频播放（聊天音频 + TTS页面播放器）
 function stopAllAudio() {
-    // 停止聊天音频
-    if (currentChatAudio) {
-        currentChatAudio.pause();
-        currentChatAudio = null;
-    }
+    // 停止 TTS 播放（Web Audio API）
+    stopTTSCurrent();
     // 停止TTS页面的播放器
     const audioPlayer = document.getElementById('audio-playback');
     if (audioPlayer) {
@@ -1184,10 +1257,15 @@ async function playChatMessage(bubble) {
 
     // 如果有缓存的音频，直接播放，不用再调用API
     if (bubble.cachedAudioUrl) {
-        currentChatAudio = new Audio(bubble.cachedAudioUrl);
-        currentChatAudio.onended = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
-        currentChatAudio.onerror = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
-        await currentChatAudio.play().catch(() => { isChatAudioPlaying = false; });
+        try {
+            const res = await fetch(bubble.cachedAudioUrl);
+            const arrayBuffer = await res.arrayBuffer();
+            const audioBuffer = await decodeTTSAudio(arrayBuffer);
+            playTTSBuffer(audioBuffer, () => { isChatAudioPlaying = false; });
+        } catch (err) {
+            console.error('缓存播放失败:', err);
+            isChatAudioPlaying = false;
+        }
         return;
     }
 
@@ -1225,11 +1303,9 @@ async function playChatMessage(bubble) {
         const audioUrl = URL.createObjectURL(audioBlob);
         // 缓存到bubble上，下次播放直接用
         bubble.cachedAudioUrl = audioUrl;
-        currentChatAudio = new Audio(audioUrl);
-        // 播放结束后释放锁，并播放队列里的下一个
-        currentChatAudio.onended = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
-        currentChatAudio.onerror = () => { isChatAudioPlaying = false; getAudioCtx().resume().catch(() => {}); };
-        await currentChatAudio.play().catch(() => { isChatAudioPlaying = false; });
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        const audioBuffer = await decodeTTSAudio(arrayBuffer);
+        playTTSBuffer(audioBuffer, () => { isChatAudioPlaying = false; });
     } catch (err) {
         console.error('播放失败:', err);
         isChatAudioPlaying = false;
@@ -1546,6 +1622,7 @@ function toggleVoiceInput() {
 
 // 发送聊天消息
 async function sendChatMessage() {
+    initTTSAudio(); // 激活 iOS 音频会话，保持自动播放权限
     const input = document.getElementById('chat-input');
     const text = input.value.trim();
     if (!text) return;
@@ -2176,6 +2253,7 @@ function fillDualRoleSelects() {
 
 // 开始双角色对话
 function startDualChat() {
+    initTTSAudio(); // 激活 iOS 音频会话，保持自动播放权限
     const roleAId = document.getElementById('dual-role-a').value;
     const roleBId = document.getElementById('dual-role-b').value;
     if (!roleAId || !roleBId) {
