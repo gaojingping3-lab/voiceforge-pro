@@ -3866,9 +3866,8 @@ async function generateImage() {
 let isGeneratingChatImage = false;
 
 async function generateImageFromChat() {
-    // 防重复：正在生成时直接返回
+    // 防重复：正在生成时静默返回，不弹alert打扰用户
     if (isGeneratingChatImage) {
-        alert('图片正在生成中，请稍候...');
         return;
     }
     // 取最近两条消息（1用户+1AI）
