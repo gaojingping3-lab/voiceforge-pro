@@ -1179,8 +1179,8 @@ async function playChatMessage(bubble) {
 
     // 播放锁：正在播放中，忽略新的点击
     if (isChatAudioPlaying) return;
-    isChatAudioPlaying = true;
-    stopAllAudio();
+    stopAllAudio(); // 先停止之前的音频（会释放锁）
+    isChatAudioPlaying = true; // 然后设置新锁
 
     // 如果有缓存的音频，直接播放，不用再调用API
     if (bubble.cachedAudioUrl) {
@@ -1821,7 +1821,7 @@ async function sendChatMessage() {
 
         // 自动朗读
         if (autoPlayTTS) {
-            setTimeout(() => playChatMessage(loadingBubble), 300);
+            setTimeout(() => { isChatAudioPlaying = false; playChatMessage(loadingBubble); }, 300);
         }
 
     } catch (err) {
@@ -2497,7 +2497,7 @@ ${currentRole.desc}
 
         // 自动朗读（如果开启了自动朗读）
         if (autoPlayTTS) {
-            setTimeout(() => playChatMessage(replyBubble), 300);
+            setTimeout(() => { isChatAudioPlaying = false; playChatMessage(replyBubble); }, 300);
         }
 
         sfxReceive();
