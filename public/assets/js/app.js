@@ -1649,6 +1649,7 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleDualRoleMode();
     }
     initDualRoleBarCollapse(); // 恢复双角色控制面板折叠状态
+    initSingleVoiceSelect(); // 恢复单人模式AI声音选择
 
     // 第一次用户交互时强制恢复 AudioContext（解决移动端音效不生效）
     const unlockAudio = () => {
@@ -2636,18 +2637,37 @@ function initDualRoleBarCollapse() {
     }
 }
 
+// 单人模式AI声音选择
+function onSingleVoiceChange(voice) {
+    const voiceInput = document.getElementById('voice-id');
+    if (voiceInput) voiceInput.value = voice;
+    localStorage.setItem('SINGLE_CHAT_VOICE', voice);
+}
+
+// 初始化单人模式声音选择
+function initSingleVoiceSelect() {
+    const saved = localStorage.getItem('SINGLE_CHAT_VOICE') || 'shimmer';
+    const select = document.getElementById('single-voice-select');
+    const voiceInput = document.getElementById('voice-id');
+    if (select) select.value = saved;
+    if (voiceInput && !voiceInput.value) voiceInput.value = saved;
+}
+
 // 切换双角色模式
 function toggleDualRoleMode() {
     const toggle = document.getElementById('dual-role-toggle');
     const bar = document.getElementById('dual-role-bar');
+    const singleVoiceBar = document.getElementById('single-voice-bar');
     isDualMode = toggle.checked;
     if (isDualMode) {
         bar.classList.remove('hidden');
+        if (singleVoiceBar) singleVoiceBar.classList.add('hidden');
         fillDualRoleSelects();
         // 隐藏单角色卡，避免混淆
         document.getElementById('role-card').classList.add('hidden');
     } else {
         bar.classList.add('hidden');
+        if (singleVoiceBar) singleVoiceBar.classList.remove('hidden');
         stopDualChat();
         // 关键：清空角色引用，防止关闭后 sendChatMessage 仍走双角色逻辑
         dualRoleA = null;

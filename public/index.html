@@ -551,6 +551,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span id="mode-hint-text">当前模式：滑动窗口</span>
                 </div>
 
+                <!-- 单人模式AI声音选择（双角色模式下隐藏） -->
+                <div id="single-voice-bar" class="mb-3 p-2 bg-base-200/60 rounded-xl flex items-center gap-2">
+                    <span class="text-xs font-bold whitespace-nowrap"><i class="fa-solid fa-microphone-lines text-primary"></i> AI声音</span>
+                    <select id="single-voice-select" class="select select-bordered select-xs flex-1" onchange="onSingleVoiceChange(this.value)">
+                        <option value="shimmer">晓晓 - 温柔女声（推荐）</option>
+                        <option value="onyx">晓伊 - 活泼女声</option>
+                        <option value="echo">小北 - 东北女声</option>
+                        <option value="xiaohan">晓涵 - 知性女声</option>
+                        <option value="xiaomeng">晓梦 - 温柔女声</option>
+                        <option value="xiaomo">晓墨 - 沉稳女声</option>
+                        <option value="xiaoxuan">晓萱 - 活泼女声</option>
+                        <option value="xiaoyan">晓颜 - 甜美女声</option>
+                        <option value="xiaozhen">晓珍 - 成熟女声</option>
+                    </select>
+                </div>
+
                 <!-- 双角色互聊控制栏（默认隐藏） -->
                 <div id="dual-role-bar" class="hidden mb-3 bg-base-200 rounded-xl overflow-hidden">
                     <!-- 标题栏：常驻，含折叠按钮 -->
