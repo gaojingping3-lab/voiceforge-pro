@@ -70,7 +70,7 @@ export async function onRequestPost(context) {
       },
       sdxl: {
         id: '@cf/stabilityai/stable-diffusion-xl-base-1.0',
-        params: { prompt: prompt, num_steps: 20, guidance: 7.5 }
+        params: { prompt: prompt, num_steps: 15, guidance: 5.0 }
       }
     };
 
