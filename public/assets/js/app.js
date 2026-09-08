@@ -3701,9 +3701,33 @@ async function generateImageFromChat() {
         imageBubble.innerHTML = `
             <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
             <div class="flex gap-2 mt-2 px-1 pb-1">
-                <a href="${imageUrl}" download="chat-generated.png" class="btn btn-primary btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
+                <button class="btn btn-primary btn-xs flex-1 regenerate-btn"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
+                <a href="${imageUrl}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
             </div>
         `;
+        // 保存对话上下文，用于重新生成
+        imageBubble.dataset.conversationText = conversationText;
+        // 重新生成按钮事件
+        imageBubble.querySelector('.regenerate-btn').onclick = async function() {
+            const btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中...';
+            try {
+                const newResult = await generateImageWithSafety(conversationText, getImageModel(), (msg) => {
+                    btn.innerHTML = `<span class="loading loading-spinner loading-xs"></span> ${msg.substring(0, 10)}`;
+                });
+                const newImageUrl = URL.createObjectURL(newResult.blob);
+                imageBubble.querySelector('img').src = newImageUrl;
+                imageBubble.querySelector('a[download]').href = newImageUrl;
+                // 更新保存的上下文
+                imageBubble.dataset.conversationText = conversationText;
+            } catch (err) {
+                alert('重新生成失败: ' + (err.message || err));
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> 重新生成';
+            }
+        };
         imageDiv.appendChild(imageBubble);
         container.appendChild(imageDiv);
         smartScroll(container);
