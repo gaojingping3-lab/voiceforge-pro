@@ -495,10 +495,10 @@ document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible') return;
     if (!audioCtx) return;
 
-    screenLog('[DEBUG-LONGPLAY] 切回前台，状态: ' + audioCtx.state);
+    // screenLog('[DEBUG-LONGPLAY] 切回前台，状态: ' + audioCtx.state);
 
     if (audioCtx.state === 'interrupted' || audioCtx.state === 'closed') {
-        screenLog('[DEBUG-LONGPLAY] AudioContext已挂，尝试重建...');
+        // screenLog('[DEBUG-LONGPLAY] AudioContext已挂，尝试重建...');
         try {
             if (ttsKeepAliveOsc) {
                 try { ttsKeepAliveOsc.stop(); } catch (e) {}
@@ -512,16 +512,16 @@ document.addEventListener('visibilitychange', async () => {
             audioCtx = null;
             ttsAudioInited = false;
             await initTTSAudio();
-            screenLog('[DEBUG-LONGPLAY] AudioContext重建成功');
+            // screenLog('[DEBUG-LONGPLAY] AudioContext重建成功');
         } catch (e) {
-            screenLog('[DEBUG-LONGPLAY] 重建失败: ' + e.message);
+            // screenLog('[DEBUG-LONGPLAY] 重建失败: ' + e.message);
         }
     } else if (audioCtx.state === 'suspended') {
         try {
             await audioCtx.resume();
-            screenLog('[DEBUG-LONGPLAY] 已resume，状态: ' + audioCtx.state);
+            // screenLog('[DEBUG-LONGPLAY] 已resume，状态: ' + audioCtx.state);
         } catch (e) {
-            screenLog('[DEBUG-LONGPLAY] resume失败: ' + e.message);
+            // screenLog('[DEBUG-LONGPLAY] resume失败: ' + e.message);
         }
     }
 });
@@ -612,8 +612,8 @@ const ttsQueueManager = {
 
             // 优化2：长文本切片 - 超过20字拆成多句，剩余插入队列前面连续播放
             let playText = task.text || speakText;
-            screenLog('[DEBUG-LONGPLAY] 准备朗读，当前字数: ' + playText.length + (task.text ? ' (切片段)' : ' (完整消息)'));
-            if (!task.text && playText.length > 20) {
+            // screenLog('[DEBUG-LONGPLAY] 准备朗读，当前字数: ' + playText.length + (task.text ? ' (切片段)' : ' (完整消息)'));
+            if (!task.text && playText.length > 100) {
                 const segments = splitLongText(playText);
                 if (segments.length > 1) {
                     playText = segments[0];
@@ -692,7 +692,7 @@ const ttsQueueManager = {
             source.start(0);
 
         } catch (err) {
-            screenLog('[DEBUG-LONGPLAY] TTS播放错误: ' + err.message);
+            // screenLog('[DEBUG-LONGPLAY] TTS播放错误: ' + err.message);
             if (this.taskToken === currentToken) this.processNext();
         }
     }
@@ -1494,14 +1494,14 @@ function cleanupOldAudioCache() {
             freed++;
         }
     }
-    screenLog('[DEBUG-LONGPLAY] OOM: 共' + bubbles.length + '条，' + withCache + '条有缓存，释放' + freed + '个');
+    // screenLog('[DEBUG-LONGPLAY] OOM: 共' + bubbles.length + '条，' + withCache + '条有缓存，释放' + freed + '个');
 }
 
 // ============================================
 // 优化2：长文本分句切片（不用零宽断言，iOS安全）
 // ============================================
 function splitLongText(text, maxLen) {
-    maxLen = maxLen || 20;
+    maxLen = maxLen || 100;
     if (text.length <= maxLen) return [text];
 
     // 普通字符遍历分割标点，不用零宽断言
@@ -1530,7 +1530,7 @@ function splitLongText(text, maxLen) {
     }
     if (buf) result.push(buf);
 
-    screenLog('[DEBUG-LONGPLAY] 长文本切片: ' + text.length + '字 → ' + result.length + '段');
+    // screenLog('[DEBUG-LONGPLAY] 长文本切片: ' + text.length + '字 → ' + result.length + '段');
     return result;
 }
 
