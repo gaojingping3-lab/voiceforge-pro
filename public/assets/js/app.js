@@ -4551,7 +4551,7 @@ async function translateUserActionToEnglish(userInput) {
 }
 
 // 用当前聊天角色AI生成生图提示词（复用角色人设，不单独调用DeepSeek提示词大师）
-async function generatePromptWithRoleAI(conversationText, isDualMode = false, dualRoles = null) {
+async function generatePromptWithRoleAI(conversationText, isDualMode = false, dualRoles = null, isBackView = false) {
     try {
         const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
         const llmKey = localStorage.getItem('LLM_KEY') || '';
@@ -4589,6 +4589,11 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
             } else {
                 systemContent = `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，提取画面视觉信息，转换成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 包含人物外貌（严格按照角色设定，不要改写）、服装、当前动作、表情、环境\n3. 明确人物性别（man/woman/girl/boy）\n4. 不要输出任何中文，不要加引号，直接输出提示词本身\n5. 不要添加风格词，风格已由系统固定前缀处理\n6. 提示词必须达到250-350个英文单词，尽可能详细地描写：五官细节、发丝质感、服装细节、动作神态、环境氛围、光线方向、景别、画质细节，把每个能画出来的细节都写清楚，让画面更精致丰富\n7. 【景别最高优先级】如果用户消息中有【用户拍摄要求】，其中提到的景别（如全身/full body、半身/half body、特写/close-up）、角度、动作必须100%严格遵守并放在提示词最前面，绝对不得擅自改成其他景别。用户明确要求全身(full body)时，禁止写half body、bust、portrait、close-up等任何非全身描述\n8. 【动作部分-最高约束】必须严格按照对话原文提取人物当前的动作、表情、姿态，用英文描述。对话中出现的核心动作（站/坐/走/跑/拥抱/牵手/亲吻/抚摸/看/微笑/哭泣等）绝对不允许改变、替换、省略或加戏，也不得添加对话中没有的动作。你只能把动作写得更详细（如补充动作的姿势细节、力度、神态、手部位置），但动作本身必须和对话完全一致\n9. 【动作权重】核心动作描述必须放在提示词最前面（紧跟景别之后），并且核心动作在提示词开头和结尾各出现一次，确保动作不被稀释`;
             }
+        }
+
+        // 【背面拍摄强制指令】只要用户输入包含"背"字（背影/背面/背后/背对），进入背面模式
+        if (isBackView) {
+            systemContent += `\n\n【背面拍摄强制指令-最高优先级】用户要求拍摄背影/背面视角。必须严格遵守：\n- 提示词最前面（第一位）写上：view from behind, character seen from the back, back view, rear view, facing away from camera\n- 外貌部分只能描写背影相关内容：发型、发色、发丝质感、身形体态、肩背线条、服装背面的样式和材质、鞋、整体轮廓\n- 严禁出现任何正面描述词：face, eyes, facial features, expression, smile, gaze, look at camera 等一律禁止\n- 画面必须是人物背面视角，镜头在人物身后`;
         }
 
         const messages = [];
@@ -4712,7 +4717,9 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
 
         // 第一步：用当前聊天角色AI生成生图提示词（复用角色人设，不单独调用DeepSeek提示词大师）
         loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理画面描述...</span></div>';
-        let rolePrompt = await generatePromptWithRoleAI(conversationText, isDualMode, { roleA, roleB });
+        // 检测背面拍摄：用户输入包含"背"字（背影/背面/背后/背对）就进入背面模式
+        const isBackView = /背/.test(userInput || '');
+        let rolePrompt = await generatePromptWithRoleAI(conversationText, isDualMode, { roleA, roleB }, isBackView);
 
         // 【严格执行】用AI把用户的动作/景别要求翻译成英文，强制加到提示词开头（权重最高）+ 末尾（重复强调）
         const strictKeywords = await translateUserActionToEnglish(userInput);
