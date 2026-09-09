@@ -2491,8 +2491,8 @@ async function sendChatMessage() {
     const defaultSystem = '你是乐。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。';
     const customSystem = localStorage.getItem('LLM_SYSTEM');
     const currentRole = getCurrentRole();
-    // 正常聊天去掉外貌部分，减少system prompt长度加快回复；生图时才用完整角色卡
-    const roleCardDesc = stripAppearanceFromRoleCard(currentRole.desc);
+    // 正常聊天也保留完整角色卡（含外貌），让AI知道自己长什么样，演得更入戏
+    const roleCardDesc = currentRole.desc;
     const systemRules = customSystem || defaultSystem;
     const hasRoleCard = roleCardDesc && roleCardDesc !== DEFAULT_ROLE_DESC;
 
@@ -2574,9 +2574,10 @@ async function sendChatMessage() {
     try {
         // 构建消息：两条system（规则+角色） + 角色强约束（可选） + 历史对话，标准messages数组格式
         const roleConstraints = `【第一人称】只写角色反应，不替用户说话/行动，写完即停。
-【格式】*(动作神态)*「台词」，必须带动作描写，禁止纯对白。
-【去AI腔】不用客服话术/客套/总结，完全代入角色。
-范例：*(攥紧衣角，垂眸轻声)*「你怎么才来。」`;
+【格式】通常用*(动作神态)*「台词」，但简短回应可以只有台词，不用硬凑动作。
+【去AI腔】不用客服话术/客套/总结，完全代入角色，像真人一样自然说话。
+范例：*(攥紧衣角，垂眸轻声)*「你怎么才来。」
+范例：「嗯，知道了。」`;
         const useConstraint = localStorage.getItem('ROLE_CONSTRAINT') !== '0';
         const messages = [
             { role: 'system', content: systemRules },
@@ -3466,11 +3467,9 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
 
     // 加入角色强约束（如果开启了）
     if (localStorage.getItem('ROLE_CONSTRAINT') !== '0') {
-        messages.push({ role: 'system', content: `【严格第一人称，禁止越权代打】严禁描写${otherRole.name}和角色C（用户）的动作、语言、内心想法，绝对禁止替对方或用户做任何推进或决定。每轮回复只写你自己（${currentRole.name}）的反应，说完/做完动作后必须停下，等待对方或用户交互。
-
-【强制神态与动作描写】输出格式严格统一为"*（具体的神态、微表情、肢体动作或与环境互动）* + 「对话台词」"，严禁干瘪的纯对白输出。
-
-【彻底剥离AI味】严禁出现任何助手腔、客服客套话或旁白式总结，必须完全融入角色的语气、性格缺陷与动机中。` });
+        messages.push({ role: 'system', content: `【第一人称】只写你自己（${currentRole.name}）的反应和台词，不要替${otherRole.name}或用户说话/行动，说完即停。
+【格式】通常用*（神态、动作）* + 「台词」，简短回应可以只有台词，不用每句都硬凑动作。
+【自然】像真人聊天一样，不要太刻意，不要总结，不要AI腔。` });
     }
 
     // 对话规则
