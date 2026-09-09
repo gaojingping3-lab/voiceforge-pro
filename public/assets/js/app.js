@@ -4723,9 +4723,15 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
 
         // 【严格执行】用AI把用户的动作/景别要求翻译成英文，强制加到提示词开头（权重最高）+ 末尾（重复强调）
         const strictKeywords = await translateUserActionToEnglish(userInput);
-        if (strictKeywords) {
-            rolePrompt = strictKeywords + ', ' + rolePrompt + ', ' + strictKeywords;
-            console.log('[严格执行] 已强制加入用户动作要求:', strictKeywords);
+        // 默认全身照：用户没明确指定景别（全身/半身/特写/背影/正面/侧脸等）时，默认 full body
+        const hasShotType = /全身|半身|特写|背影|背面|背后|背对|正面|侧脸|侧身|近景|远景|大头/.test(userInput || '');
+        let finalKeywords = strictKeywords;
+        if (!hasShotType) {
+            finalKeywords = (finalKeywords ? finalKeywords + ', ' : '') + 'full body shot, full body, standing full figure, entire body visible from head to toe';
+        }
+        if (finalKeywords) {
+            rolePrompt = finalKeywords + ', ' + rolePrompt + ', ' + finalKeywords;
+            console.log('[严格执行] 已强制加入拍摄要求:', finalKeywords);
         }
 
         // 第二步：用角色AI生成的提示词直接生图（跳过独立的提示词优化）
