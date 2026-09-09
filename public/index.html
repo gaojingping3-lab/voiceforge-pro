@@ -554,7 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h2 class="card-title text-lg"><i class="fa-solid fa-comments text-primary"></i> 与乐 语音对话</h2>
                     <div class="flex items-center gap-1">
                         <span id="total-tokens-display" class="text-xs text-gray-400 ml-2">0 tokens</span>
-                        <button class="btn btn-ghost btn-xs" onclick="generateImageFromChat()" title="根据对话生成图片">
+                        <button class="btn btn-ghost btn-xs" onclick="generateImageFromChat('', 4)" title="根据最近4条对话生成图片">
                             <i class="fa-solid fa-wand-magic-sparkles"></i>
                         </button>
                         <button id="autoplay-btn" class="btn btn-ghost btn-xs" onclick="toggleAutoPlay()" title="自动朗读">
@@ -1210,6 +1210,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </dialog>
 
-    <script src="assets/js/app.js?v=20260910h"></script>
+    <script src="assets/js/app.js?v=20260910i"></script>
 </body>
 </html>

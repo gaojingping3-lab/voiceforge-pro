@@ -4083,13 +4083,13 @@ async function generatePromptWithRoleAI(conversationText) {
 // 生图防重复触发标志
 let isGeneratingChatImage = false;
 
-async function generateImageFromChat(userInput = '') {
+async function generateImageFromChat(userInput = '', messageCount = 2) {
     // 防重复：正在生成时静默返回，不弹alert打扰用户
     if (isGeneratingChatImage) {
         return;
     }
-    // 取最近两条消息（1用户+1AI）
-    const recentMessages = chatHistory.slice(-2);
+    // 取最近N条消息
+    const recentMessages = chatHistory.slice(-messageCount);
     if (recentMessages.length < 2) {
         alert('至少需要一轮对话才能生成图片');
         return;
