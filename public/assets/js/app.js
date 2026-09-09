@@ -3742,7 +3742,7 @@ function pickModelByPrompt(prompt) {
 // 自动轮换队列（只使用Pollinations无审核系列，去掉不稳定的zimage）
 const AUTO_MODEL_QUEUE = ['pollinations-flux-realism', 'pollinations-seedream', 'pollinations-flux'];
 
-async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimizedPrompt) {
+async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimizedPrompt, inputImage = null) {
     // 第一步：优化提示词
     // 如果传入了 preOptimizedPrompt（聊天里用角色AI生成的），直接用，不再单独调用DeepSeek
     let optimizedPrompt;
@@ -3778,10 +3778,14 @@ async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimiz
         }
 
         try {
+            const requestBody = { prompt: optimizedPrompt, model: currentModel, agnesApiKey: getAgnesApiKey() };
+            if (inputImage) {
+                requestBody.inputImage = inputImage;
+            }
             const response = await fetch('/api/image/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: optimizedPrompt, model: currentModel, agnesApiKey: getAgnesApiKey() })
+                body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
@@ -3907,6 +3911,47 @@ async function optimizePromptManual() {
     }
 }
 
+// 全局变量：保存上传的图片base64
+let uploadedImageBase64 = null;
+
+// 处理图片上传
+function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+        alert('请选择图片文件');
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        uploadedImageBase64 = e.target.result;
+        // 显示预览
+        const preview = document.getElementById('uploaded-image-preview');
+        const img = document.getElementById('uploaded-image');
+        const removeBtn = document.getElementById('remove-uploaded-img-btn');
+        if (preview && img && removeBtn) {
+            img.src = uploadedImageBase64;
+            preview.classList.remove('hidden');
+            removeBtn.classList.remove('hidden');
+        }
+        sfxSuccess();
+    };
+    reader.readAsDataURL(file);
+}
+
+// 移除上传的图片
+function removeUploadedImage() {
+    uploadedImageBase64 = null;
+    const preview = document.getElementById('uploaded-image-preview');
+    const img = document.getElementById('uploaded-image');
+    const removeBtn = document.getElementById('remove-uploaded-img-btn');
+    const input = document.getElementById('image-upload-input');
+    if (preview) preview.classList.add('hidden');
+    if (img) img.src = '';
+    if (removeBtn) removeBtn.classList.add('hidden');
+    if (input) input.value = '';
+}
+
 async function generateImage() {
     const prompt = document.getElementById('image-prompt').value.trim();
     const model = getImageModel();
@@ -3931,7 +3976,7 @@ async function generateImage() {
         const preOptimized = isPromptOptimized ? prompt : null;
         const result = await generateImageWithSafety(prompt, model, (msg) => {
             if (statusText) statusText.textContent = msg;
-        }, preOptimized);
+        }, preOptimized, uploadedImageBase64);
 
         // 生成完成后重置优化标记，下次输入新提示词时重新优化
         isPromptOptimized = false;

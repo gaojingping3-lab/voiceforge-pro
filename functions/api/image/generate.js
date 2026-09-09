@@ -9,6 +9,7 @@ export async function onRequestPost(context) {
     const prompt = body.prompt || '';
     const model = body.model || 'pollinations-flux';
     const agnesApiKey = body.agnesApiKey || '';
+    const inputImage = body.inputImage || ''; // 图生图：上传的参考图base64
 
     if (!prompt.trim()) {
       return new Response(JSON.stringify({ error: '提示词不能为空' }), {
@@ -17,8 +18,15 @@ export async function onRequestPost(context) {
       });
     }
 
+    // 图生图模式：只支持Agnes，自动切换到agnes-2.1
+    let actualModel = model;
+    if (inputImage && !model.startsWith('agnes-')) {
+      actualModel = 'agnes-2.1';
+      console.log('[Img2Img] 自动切换到Agnes模型进行图生图');
+    }
+
     // ========== Agnes Image 2.1 Flash ==========
-    if (model.startsWith('agnes-')) {
+    if (actualModel.startsWith('agnes-')) {
       if (!agnesApiKey) {
         return new Response(JSON.stringify({ error: 'Agnes API Key 未配置，请在生图页面输入' }), {
           status: 400,
@@ -54,6 +62,14 @@ export async function onRequestPost(context) {
             response_format: 'b64_json',
             extra_body: { response_format: 'b64_json' }
           };
+
+          // 图生图模式：传入参考图（去掉data URI前缀）
+          if (inputImage) {
+            const cleanBase64 = inputImage.replace(/^data:image\/\w+;base64,/, '');
+            requestBody.image = cleanBase64;
+            requestBody.extra_body.image = cleanBase64;
+            console.log('[Img2Img] 已传入参考图，base64长度:', cleanBase64.length);
+          }
 
           const response = await fetch(endpoint, {
             method: 'POST',

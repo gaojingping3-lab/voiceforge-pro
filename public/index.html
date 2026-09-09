@@ -823,10 +823,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
 
+                <!-- 上传图片（图生图/P图） -->
+                <div class="form-control w-full mb-4">
+                    <label class="label py-1"><span class="label-text font-bold">上传参考图（可选，上传后为图生图模式）</span></label>
+                    <div class="flex items-center gap-3">
+                        <label class="btn btn-secondary btn-sm flex-1 cursor-pointer">
+                            <i class="fa-solid fa-upload mr-2"></i> 选择图片
+                            <input type="file" id="image-upload-input" accept="image/*" class="hidden" onchange="handleImageUpload(event)" />
+                        </label>
+                        <button id="remove-uploaded-img-btn" class="btn btn-ghost btn-sm hidden" onclick="removeUploadedImage()">
+                            <i class="fa-solid fa-xmark"></i> 移除
+                        </button>
+                    </div>
+                    <div id="uploaded-image-preview" class="hidden mt-2 rounded-xl overflow-hidden border border-base-300">
+                        <img id="uploaded-image" class="w-full max-h-48 object-contain" alt="上传的参考图" />
+                    </div>
+                </div>
+
                 <!-- 提示词输入 -->
                 <div class="form-control w-full mb-4">
                     <label class="label py-1"><span class="label-text font-bold">画面描述</span></label>
-                    <textarea id="image-prompt" class="textarea textarea-bordered w-full h-28 text-sm" placeholder="描述你想要生成的画面，例如：一只可爱的橘猫在阳光下看书，温馨的书房氛围"></textarea>
+                    <textarea id="image-prompt" class="textarea textarea-bordered w-full h-28 text-sm" placeholder="描述你想要生成的画面，例如：一只可爱的橘猫在阳光下看书，温馨的书房氛围&#10;上传图片后，这里填写修改要求，例如：把背景改成海边，让人物笑起来"></textarea>
                 </div>
 
                 <!-- 按钮区：AI优化提示词 + 生成图片 -->
@@ -1210,6 +1227,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </dialog>
 
-    <script src="assets/js/app.js?v=20260910i"></script>
+    <script src="assets/js/app.js?v=20260910j"></script>
 </body>
 </html>
