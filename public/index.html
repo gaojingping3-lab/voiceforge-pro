@@ -803,9 +803,11 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
 
         <!-- AI Image Generation Section -->
-        <div id="image-section" class="card glass-panel shadow-xl hidden flex-1 min-h-0 overflow-y-auto tab-content-section">
-            <div class="card-body p-4 sm:p-6">
-                <h2 class="card-title text-lg mb-4"><i class="fa-solid fa-wand-magic-sparkles text-primary"></i> AI 生图</h2>
+        <div id="image-section" class="card glass-panel shadow-xl hidden flex-1 min-h-0 tab-content-section">
+            <div class="card-body p-4 sm:p-6 flex flex-col h-full">
+                <h2 class="card-title text-lg mb-4 shrink-0"><i class="fa-solid fa-wand-magic-sparkles text-primary"></i> AI 生图</h2>
+
+                <div class="flex-1 min-h-0 overflow-y-auto">
 
                 <!-- 模型选择 -->
                 <div class="form-control w-full mb-4">
@@ -877,6 +879,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </button>
                     </div>
                 </div>
+                </div> <!-- 关闭滚动容器 -->
             </div>
         </div>
 
@@ -1236,6 +1239,6 @@ document.addEventListener('DOMContentLoaded', () => {
         <p class="absolute bottom-6 left-0 right-0 text-center text-white/60 text-xs">长按图片可保存到相册</p>
     </div>
 
-    <script src="assets/js/app.js?v=20260910l"></script>
+    <script src="assets/js/app.js?v=20260910m"></script>
 </body>
 </html>
