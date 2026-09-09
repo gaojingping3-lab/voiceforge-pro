@@ -63,12 +63,10 @@ export async function onRequestPost(context) {
             extra_body: { response_format: 'b64_json' }
           };
 
-          // 图生图模式：传入参考图（去掉data URI前缀）
+          // 图生图模式：传入参考图（Agnes 2.1要求放在extra_body.image，是数组，保留Data URI前缀）
           if (inputImage) {
-            const cleanBase64 = inputImage.replace(/^data:image\/\w+;base64,/, '');
-            requestBody.image = cleanBase64;
-            requestBody.extra_body.image = cleanBase64;
-            console.log('[Img2Img] 已传入参考图，base64长度:', cleanBase64.length);
+            requestBody.extra_body.image = [inputImage]; // 数组，保留 data:image/png;base64, 前缀
+            console.log('[Img2Img] 已传入参考图，Data URI长度:', inputImage.length);
           }
 
           const response = await fetch(endpoint, {
