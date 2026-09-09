@@ -2395,7 +2395,6 @@ function getRoleCard() {
 function renderRoleCard() {
     const role = getCurrentRole();
     document.getElementById('role-card-name').innerText = role.name;
-    document.getElementById('role-card-desc').innerText = role.desc;
     // 生成首字母+渐变色头像
     const avatar = document.getElementById('role-avatar');
     if (avatar) {
@@ -2549,25 +2548,6 @@ function refreshAvatarPreviews() {
             userPreview.style.background = data.gradient;
         }
     }
-}
-
-function toggleRoleCard() {
-    const content = document.getElementById('role-card-content');
-    const arrow = document.getElementById('role-card-arrow');
-    const status = document.getElementById('role-card-status');
-    const isHidden = content.style.display === 'none';
-    if (isHidden) {
-        content.style.display = 'block';
-        arrow.className = 'fa-solid fa-chevron-up text-xs text-gray-400';
-        status.innerText = '已展开';
-        localStorage.setItem('ROLE_CARD_COLLAPSED', '0');
-    } else {
-        content.style.display = 'none';
-        arrow.className = 'fa-solid fa-chevron-down text-xs text-gray-400';
-        status.innerText = '已收起';
-        localStorage.setItem('ROLE_CARD_COLLAPSED', '1');
-    }
-    sfxClick();
 }
 
 // 显示角色列表弹窗
@@ -3365,12 +3345,6 @@ function resetRoleCard() {
 function initRoleCard() {
     getRoleList(); // 初始化/迁移
     renderRoleCard();
-    const collapsed = localStorage.getItem('ROLE_CARD_COLLAPSED') === '1';
-    if (collapsed) {
-        document.getElementById('role-card-content').style.display = 'none';
-        document.getElementById('role-card-arrow').className = 'fa-solid fa-chevron-down text-xs text-gray-400';
-        document.getElementById('role-card-status').innerText = '已收起';
-    }
     updateModeHint();
 }
 

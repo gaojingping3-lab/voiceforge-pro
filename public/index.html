@@ -673,30 +673,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 <!-- 角色卡 -->
                 <div id="role-card" class="mb-3 rounded-xl border border-base-300 overflow-hidden bg-base-100/60 backdrop-blur">
-                    <div class="flex items-center justify-between px-3 py-2 cursor-pointer" onclick="toggleRoleCard()">
+                    <div class="flex items-center justify-between px-3 py-2 cursor-pointer" onclick="showRoleList()">
                         <div class="flex items-center gap-2">
                             <div id="role-avatar" class="role-avatar">?</div>
                             <span class="font-bold text-sm" id="role-card-name">角色卡</span>
-                            <span class="text-xs text-gray-400" id="role-card-status">已展开</span>
                         </div>
                         <div class="flex items-center gap-1">
-                            <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation(); showRoleList()" title="切换角色">
-                                <i class="fa-solid fa-people-arrows"></i>
-                            </button>
                             <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation(); resetRoleCard()" title="一键重置">
                                 <i class="fa-solid fa-rotate-left"></i>
                             </button>
                             <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation(); editRoleCard()" title="编辑">
                                 <i class="fa-solid fa-pen"></i>
                             </button>
-                            <i class="fa-solid fa-chevron-up text-xs text-gray-400" id="role-card-arrow"></i>
                         </div>
-                    </div>
-                    <div id="role-card-content" class="px-3 pb-3">
-                        <div class="text-xs text-gray-500 leading-relaxed mb-2" id="role-card-desc">点击编辑按钮设置角色人设，AI会始终记住这个设定。</div>
-                        <button class="btn btn-primary btn-xs w-full" onclick="editRoleCard()">
-                            <i class="fa-solid fa-pen"></i> 编辑角色卡
-                        </button>
                     </div>
                 </div>
 
@@ -1224,6 +1213,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </dialog>
 
-    <script src="assets/js/app.js?v=20260910f"></script>
+    <script src="assets/js/app.js?v=20260910g"></script>
 </body>
 </html>
