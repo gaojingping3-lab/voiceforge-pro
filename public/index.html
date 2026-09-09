@@ -145,6 +145,12 @@
   /* 2. 标签切换过渡 */
   .tab-content-section { transition: opacity 0.2s ease; }
   .tab-content-section.fading { opacity: 0; }
+  /* 强制禁止生图页面横向滚动 */
+  #image-section, #image-section * {
+    overflow-x: hidden !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
   .tab { position: relative; transition: all 0.2s ease; }
   .tab.tab-active::after {
     content: '';
@@ -1239,6 +1245,6 @@ document.addEventListener('DOMContentLoaded', () => {
         <p class="absolute bottom-6 left-0 right-0 text-center text-white/60 text-xs">长按图片可保存到相册</p>
     </div>
 
-    <script src="assets/js/app.js?v=20260910n"></script>
+    <script src="assets/js/app.js?v=20260910o"></script>
 </body>
 </html>
