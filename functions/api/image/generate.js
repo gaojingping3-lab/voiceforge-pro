@@ -67,11 +67,12 @@ export async function onRequestPost(context) {
         console.log('[Agnes] trying endpoint:', endpoint);
 
         try {
-          // 请求体：同时兼容 response_format 顶层和 extra_body 两种写法
+          // 方案B：用Agnes 2.1的size + ratio参数，更规范
           const requestBody = {
             model: agnesModel,
             prompt: prompt,
-            size: outputSize,
+            size: '1K',
+            ratio: ratio,
             n: 1,
             response_format: 'b64_json',
             extra_body: { response_format: 'b64_json' }
