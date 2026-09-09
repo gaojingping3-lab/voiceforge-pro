@@ -4852,23 +4852,67 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
 // 生图防重复触发标志
 let isGeneratingChatImage = false;
 
-// ===== 魔法棒角度菜单：点击展开拍摄角度，选择后用该角度+最近4条聊天记录生成 =====
+// ===== 魔法棒角度菜单：单角色/双角色分别显示不同菜单，选择后用该角度+最近4条聊天记录生成 =====
 function toggleMagicMenu(e) {
     if (e) e.stopPropagation(); // 阻止冒泡，避免被document点击监听立即关闭
-    const menu = document.getElementById('magic-view-menu');
-    if (menu) menu.classList.toggle('hidden');
+    const isDual = localStorage.getItem('DUAL_ROLE_MODE') === '1';
+    const singleMenu = document.getElementById('magic-view-menu');
+    const dualMenu = document.getElementById('magic-dual-menu');
+    if (isDual) {
+        singleMenu?.classList.add('hidden');
+        dualMenu?.classList.toggle('hidden');
+    } else {
+        dualMenu?.classList.add('hidden');
+        singleMenu?.classList.toggle('hidden');
+    }
 }
 
+// 单角色菜单：直接用选中的角度词
 function magicGenerate(viewWord) {
-    const menu = document.getElementById('magic-view-menu');
-    if (menu) menu.classList.add('hidden');
+    document.getElementById('magic-view-menu')?.classList.add('hidden');
     generateImageFromChat(viewWord || '', 4);
 }
 
-// 点击页面其他地方时自动收起角度菜单
+// 双角色菜单：自动拼接当前角色A/B名字，再生成
+function magicDualGenerate(type) {
+    document.getElementById('magic-dual-menu')?.classList.add('hidden');
+    // 读取当前选中的两个角色名
+    const roleAId = document.getElementById('dual-role-a')?.value;
+    const roleBId = document.getElementById('dual-role-b')?.value;
+    const roleA = roleAId ? getRoleList().find(r => r.id == roleAId) : null;
+    const roleB = roleBId ? getRoleList().find(r => r.id == roleBId) : null;
+    const nameA = roleA?.name || '角色A';
+    const nameB = roleB?.name || '角色B';
+
+    let prompt = '';
+    switch (type) {
+        case 'aBack':
+            prompt = `${nameA}背对镜头，${nameB}看着她`;
+            break;
+        case 'bBack':
+            prompt = `${nameB}背对镜头，${nameA}看着她`;
+            break;
+        case 'bothBack':
+            prompt = `${nameA}和${nameB}都背对镜头`;
+            break;
+        case 'fullbody':
+            prompt = `${nameA}和${nameB}全身照`;
+            break;
+        case 'hug':
+            prompt = `${nameA}和${nameB}拥抱在一起`;
+            break;
+        case 'normal':
+        default:
+            prompt = `${nameA}和${nameB}在一起`;
+            break;
+    }
+    generateImageFromChat(prompt, 4);
+}
+
+// 点击页面其他地方时自动收起两个菜单
 document.addEventListener('click', function () {
-    const menu = document.getElementById('magic-view-menu');
-    if (menu && !menu.classList.contains('hidden')) menu.classList.add('hidden');
+    document.getElementById('magic-view-menu')?.classList.add('hidden');
+    document.getElementById('magic-dual-menu')?.classList.add('hidden');
 });
 
 async function generateImageFromChat(userInput = '', messageCount = 2) {
