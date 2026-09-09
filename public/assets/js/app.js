@@ -3742,7 +3742,7 @@ function pickModelByPrompt(prompt) {
 // 自动轮换队列（只使用Pollinations无审核系列，去掉不稳定的zimage）
 const AUTO_MODEL_QUEUE = ['pollinations-flux-realism', 'pollinations-seedream', 'pollinations-flux'];
 
-async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimizedPrompt, inputImage = null) {
+async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimizedPrompt, inputImage = null, ratio = '1:1') {
     // 第一步：优化提示词
     // 如果传入了 preOptimizedPrompt（聊天里用角色AI生成的），直接用，不再单独调用DeepSeek
     let optimizedPrompt;
@@ -3778,7 +3778,7 @@ async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimiz
         }
 
         try {
-            const requestBody = { prompt: optimizedPrompt, model: currentModel, agnesApiKey: getAgnesApiKey() };
+            const requestBody = { prompt: optimizedPrompt, model: currentModel, agnesApiKey: getAgnesApiKey(), ratio: ratio };
             if (inputImage) {
                 requestBody.inputImage = inputImage;
             }
@@ -3911,8 +3911,9 @@ async function optimizePromptManual() {
     }
 }
 
-// 全局变量：保存上传的图片base64
+// 全局变量：保存上传的图片base64和比例
 let uploadedImageBase64 = null;
+let uploadedImageRatio = '1:1'; // 默认正方形
 
 // 处理图片上传
 function handleImageUpload(event) {
@@ -3925,12 +3926,28 @@ function handleImageUpload(event) {
     const reader = new FileReader();
     reader.onload = function(e) {
         uploadedImageBase64 = e.target.result;
+        // 读取图片宽高比
+        const img = new Image();
+        img.onload = function() {
+            const w = img.width;
+            const h = img.height;
+            // 判断比例，映射到Agnes支持的比例
+            if (w > h * 1.2) {
+                uploadedImageRatio = '16:9'; // 横图
+            } else if (h > w * 1.2) {
+                uploadedImageRatio = '9:16'; // 竖图
+            } else {
+                uploadedImageRatio = '1:1'; // 正方形
+            }
+            console.log('[Img2Img] 图片比例:', w + 'x' + h, '->', uploadedImageRatio);
+        };
+        img.src = uploadedImageBase64;
         // 显示预览
         const preview = document.getElementById('uploaded-image-preview');
-        const img = document.getElementById('uploaded-image');
+        const imgEl = document.getElementById('uploaded-image');
         const removeBtn = document.getElementById('remove-uploaded-img-btn');
-        if (preview && img && removeBtn) {
-            img.src = uploadedImageBase64;
+        if (preview && imgEl && removeBtn) {
+            imgEl.src = uploadedImageBase64;
             preview.classList.remove('hidden');
             removeBtn.classList.remove('hidden');
         }
@@ -3942,6 +3959,7 @@ function handleImageUpload(event) {
 // 移除上传的图片
 function removeUploadedImage() {
     uploadedImageBase64 = null;
+    uploadedImageRatio = '1:1';
     const preview = document.getElementById('uploaded-image-preview');
     const img = document.getElementById('uploaded-image');
     const removeBtn = document.getElementById('remove-uploaded-img-btn');
@@ -3976,7 +3994,7 @@ async function generateImage() {
         const preOptimized = isPromptOptimized ? prompt : null;
         const result = await generateImageWithSafety(prompt, model, (msg) => {
             if (statusText) statusText.textContent = msg;
-        }, preOptimized, uploadedImageBase64);
+        }, preOptimized, uploadedImageBase64, uploadedImageRatio);
 
         // 生成完成后重置优化标记，下次输入新提示词时重新优化
         isPromptOptimized = false;
