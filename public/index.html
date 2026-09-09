@@ -380,6 +380,38 @@
   #chat-messages .chat-bubble::before {
     display: none !important;
   }
+
+  /* === 语音通话模式 === */
+  #voice-call-overlay {
+    transition: opacity 0.3s ease;
+  }
+  #voice-call-overlay.show {
+    display: flex !important;
+  }
+  /* 波形动画 */
+  .wave-bar {
+    animation: wavePulse 1s ease-in-out infinite;
+  }
+  @keyframes wavePulse {
+    0%, 100% { transform: scaleY(0.5); }
+    50% { transform: scaleY(1.2); }
+  }
+  /* 通话状态：AI说话时波形更快 */
+  #voice-call-overlay.ai-speaking .wave-bar {
+    animation-duration: 0.4s;
+  }
+  /* 通话状态：倾听时呼吸效果 */
+  #voice-call-overlay.listening #call-avatar {
+    animation: avatarPulse 2s ease-in-out infinite;
+  }
+  @keyframes avatarPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+    50% { box-shadow: 0 0 0 20px rgba(37, 99, 235, 0); }
+  }
+  /* 通话中禁止页面滚动 */
+  body.voice-call-active {
+    overflow: hidden !important;
+  }
 </style>
 
 <div id="premium-bg-layer"></div>
@@ -573,6 +605,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         </button>
                         <button id="autoplay-btn" class="btn btn-ghost btn-xs" onclick="toggleAutoPlay()" title="自动朗读">
                             <i class="fa-solid fa-volume-high"></i>
+                        </button>
+                        <button class="btn btn-ghost btn-xs" onclick="toggleVoiceCallMode()" title="语音通话模式">
+                            <i class="fa-solid fa-phone-volume"></i>
                         </button>
                         <button class="btn btn-ghost btn-xs" onclick="toggleChatFullscreen()" title="全屏模式"><i class="fa-solid fa-expand"></i></button>
                         <button class="btn btn-ghost btn-xs" onclick="clearChat()"><i class="fa-solid fa-trash"></i> 清空</button>
@@ -1253,6 +1288,43 @@ document.addEventListener('DOMContentLoaded', () => {
         <p class="absolute bottom-6 left-0 right-0 text-center text-white/60 text-xs">长按图片可保存到相册</p>
     </div>
 
-    <script src="assets/js/app.js?v=20260909d"></script>
+    <!-- 语音通话全屏模式 -->
+    <div id="voice-call-overlay" class="hidden fixed inset-0 z-[9998] bg-base-200/95 backdrop-blur-xl flex flex-col items-center justify-between py-12 px-6" onclick="handleCallOverlayClick()">
+        <!-- 顶部：通话信息 -->
+        <div class="text-center mt-8">
+            <div class="text-xs text-base-content/50 uppercase tracking-widest mb-2">语音通话中</div>
+            <div id="call-role-name" class="text-2xl font-bold mb-1">AI角色</div>
+            <div id="call-status" class="text-sm text-primary">正在倾听...</div>
+            <div id="call-timer" class="text-xs text-base-content/40 mt-2 font-mono">00:00</div>
+        </div>
+
+        <!-- 中间：头像 + 波形动画 -->
+        <div class="flex flex-col items-center">
+            <div id="call-avatar" class="w-28 h-28 rounded-2xl bg-primary/20 flex items-center justify-center text-5xl mb-8 shadow-lg">
+                <i class="fa-solid fa-user text-primary"></i>
+            </div>
+            <!-- 波形动画 -->
+            <div id="call-waveform" class="flex items-end gap-1 h-12">
+                <div class="w-1.5 bg-primary rounded-full wave-bar" style="height: 30%; animation-delay: 0s;"></div>
+                <div class="w-1.5 bg-primary rounded-full wave-bar" style="height: 60%; animation-delay: 0.1s;"></div>
+                <div class="w-1.5 bg-primary rounded-full wave-bar" style="height: 100%; animation-delay: 0.2s;"></div>
+                <div class="w-1.5 bg-primary rounded-full wave-bar" style="height: 70%; animation-delay: 0.3s;"></div>
+                <div class="w-1.5 bg-primary rounded-full wave-bar" style="height: 40%; animation-delay: 0.4s;"></div>
+                <div class="w-1.5 bg-primary rounded-full wave-bar" style="height: 80%; animation-delay: 0.5s;"></div>
+                <div class="w-1.5 bg-primary rounded-full wave-bar" style="height: 50%; animation-delay: 0.6s;"></div>
+            </div>
+            <div id="call-hint" class="text-xs text-base-content/40 mt-4">点击屏幕可打断AI说话</div>
+        </div>
+
+        <!-- 底部：挂断按钮 -->
+        <div class="mb-8">
+            <button class="btn btn-circle btn-lg bg-error text-white hover:bg-error/80 shadow-xl" onclick="event.stopPropagation(); exitVoiceCallMode()">
+                <i class="fa-solid fa-phone-slash text-2xl"></i>
+            </button>
+            <div class="text-xs text-base-content/40 text-center mt-3">挂断</div>
+        </div>
+    </div>
+
+    <script src="assets/js/app.js?v=20260909e"></script>
 </body>
 </html>
