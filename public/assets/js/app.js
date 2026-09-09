@@ -2014,8 +2014,9 @@ async function sendChatMessage() {
     if (!text) return;
 
     // 检测生图关键词：发送"拍张照片"等消息时直接触发生图，不走普通对话
-    const photoKeywords = ['拍张照片', '拍张照', '拍照看看', '拍个照', '发张照片', '发张图', '画张图', '生成图片', '拍照片', '看看照片', '拍全身', '拍特写', '拍半身', '来张全身', '来张特写', '来张半身'];
-    const isPhotoRequest = photoKeywords.some(kw => text.includes(kw));
+    // 用正则匹配更灵活：拍张照、拍张全身照、拍特写、发张照片、画张图等都能触发
+    const photoRegex = /(拍|发|画)[张个]?(全身|特写|半身|一下)?(照片|照|图片|图)|生成图片|看看照片|拍照看看/;
+    const isPhotoRequest = photoRegex.test(text);
     if (isPhotoRequest) {
         input.value = '';
         input.style.height = 'auto';
