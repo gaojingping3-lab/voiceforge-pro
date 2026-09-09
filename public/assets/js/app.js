@@ -4526,7 +4526,7 @@ function getRoleGender(roleDesc) {
 function getCameraViewConstraint(userInput) {
     const t = userInput || '';
     if (/背影|背面|背后|背对|后背|背对着|朝后|后方/.test(t)) {
-        return { type: 'rear', tags: 'direct rear view, camera directly behind the character, character facing completely away from camera, full back visible, centered rear composition, back of head and back visible, no face visible, no side view, no three-quarter view, no front view' };
+        return { type: 'rear', tags: 'direct rear view, camera directly behind the character, character facing completely away from the camera, full back visible, back of the character clearly visible, centered rear composition, back of head visible, no face visible, no side profile, no side view, no three-quarter view, no front view' };
     }
     if (/侧面|侧脸|侧影|侧身|侧颜|正侧/.test(t)) {
         return { type: 'side', tags: 'side profile view, character in exact profile, camera positioned directly to the side, clear side profile, no front view, no rear view, no three-quarter view' };
@@ -4535,6 +4535,59 @@ function getCameraViewConstraint(userInput) {
         return { type: 'front', tags: 'front view, character facing the camera directly, face fully visible, centered front composition, no side view, no rear view, no three-quarter view' };
     }
     return null;
+}
+
+// ===== C2. 背面模式程序级二次清洗：LLM即使没完全遵守system prompt，也在最终prompt里洗掉正面/侧面冲突词 =====
+function cleanRearViewPrompt(promptText) {
+    if (!promptText) return promptText;
+    // 按长度降序先删短语再删单词，避免互相破坏（如先删 facial features 再删 face）
+    const banned = [
+        'looking at the camera', 'looking at camera', 'looks at camera', 'look at camera',
+        'facial features', 'facial expression', 'facial expressions',
+        'three-quarter view', 'three quarter view', 'three quarters view',
+        'side profile',
+        'front view',
+        'profile', 'profiles',
+        'eye contact', 'eyes', 'face',
+        'smile', 'smiles', 'smiling', 'gaze', 'gazes', 'gazing',
+        'expression', 'expressions'
+    ];
+    let cleaned = promptText;
+    for (const phrase of banned) {
+        const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`\\b${escaped.replace(/\s+/g, '\\s+')}\\b`, 'gi');
+        cleaned = cleaned.replace(regex, '');
+    }
+    // 清理删除后残留的孤立逗号/空格
+    cleaned = cleaned
+        .replace(/\s*,\s*,+\s*/g, ',')
+        .replace(/^[\s,]+/, '')
+        .replace(/[\s,]+$/, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+    return cleaned;
+}
+
+// ===== C3. 纯视角请求判断：输入只有视角/景别、没有动作场景时，不必再调LLM翻译（视角已由代码确定）=====
+function isPureViewRequest(userInput) {
+    if (!userInput) return false;
+    let t = userInput
+        .replace(/拍.*?(张|个|张照片|张图|张图片|照|图|照片|图片)/g, '')
+        .replace(/(给我|帮我|来|弄|搞|生成|做|我想|我想要|我要|让我|让|看看|看|从|给|她的|他的|一个|一张|的|她|他|你|我)/g, '')
+        .replace(/(照片|图片|图|照)/g, '')
+        .replace(/[，。！？、,.\s]/g, '')
+        .trim();
+    t = t.replace(/背影|背面|背后|背对|后背|背对着|朝后|后方|侧面|侧脸|侧影|侧身|侧颜|正脸|正面|正对|面朝|面向|全身|半身|特写|近景|远景|大头|镜头/g, '').trim();
+    return t.length < 2;
+}
+
+// ===== C4. 双角色分工判断：输入同时含"背对"类词和"看着/面对"类词（如"A背对镜头，B看着A"），不能全局强制背面 =====
+function isDualSplitRear(userInput, isDualMode) {
+    if (!isDualMode) return false;
+    const t = userInput || '';
+    const hasRear = /背影|背面|背后|背对|后背/.test(t);
+    const hasOtherView = /看着|看向|望向|凝视|望着|盯着|面对|正对/.test(t);
+    return hasRear && hasOtherView;
 }
 
 // ===== A. 身份块：简单哈希，用于缓存key（角色卡一改哈希就变，自动重译）=====
@@ -4879,12 +4932,34 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
 
         let rolePrompt = await generatePromptWithRoleAI(conversationText, isDualMode, { roleA, roleB }, isBackView, { identity: identityOpts, genders, cameraView });
 
-        // 【严格执行】视角/动作/景别关键词，强制加到提示词开头（权重最高）+ 末尾（重复强调）
-        const strictKeywords = await translateUserActionToEnglish(userInput);
+        // ===== C 程序级二次清洗兜底：背面模式下，LLM即使没听话，也在最终prompt里洗掉正面/侧面冲突词 =====
+        // 双角色分工场景（A背对镜头，B看着A）不做全局清洗，避免把B的朝向也洗成背面
+        const isSplitRear = isDualSplitRear(userInput, isDualMode);
+        if (cameraView && cameraView.type === 'rear' && !isSplitRear) {
+            const beforeClean = rolePrompt;
+            rolePrompt = cleanRearViewPrompt(rolePrompt);
+            console.log('[视角兜底] 背面模式二次清洗, 清洗前:', beforeClean.length, '清洗后:', rolePrompt.length);
+        }
+
+        // ===== 纯视角请求跳过LLM二次翻译（视角已由代码确定）；分工场景也跳过，避免AI加戏 =====
+        let strictKeywords = '';
+        if (isSplitRear || (cameraView && isPureViewRequest(userInput))) {
+            // 视角已代码确定，不调用translateUserActionToEnglish
+        } else {
+            strictKeywords = await translateUserActionToEnglish(userInput);
+        }
+
         // 默认全身照：用户没明确指定景别（全身/半身/特写/各视角等）时默认 full body
         const hasShotType = /全身|半身|特写|背影|背面|背后|背对|正面|正脸|侧脸|侧身|侧面|近景|远景|大头/.test(userInput || '');
         let finalKeywords = '';
-        if (cameraView) finalKeywords += cameraView.tags; // 代码确定性视角，最优先
+        if (cameraView) {
+            if (isSplitRear) {
+                // 双角色分工：只强调"指定角色背对、另一个正常可见"，不强加全局背面约束
+                finalKeywords = 'only the character instructed to face away is seen from directly behind (facing completely away from camera), the other character faces naturally and remains fully visible, do not force both characters to face away';
+            } else {
+                finalKeywords += cameraView.tags; // 代码确定性视角，最优先
+            }
+        }
         if (strictKeywords) finalKeywords += (finalKeywords ? ', ' : '') + strictKeywords;
         if (!hasShotType) {
             finalKeywords += (finalKeywords ? ', ' : '') + 'full body shot, full body, standing full figure, entire body visible from head to toe';
