@@ -421,8 +421,13 @@ function switchTab(tabId) {
 // ============================================
 let audioCtx = null;
 function getAudioCtx() {
-    if (!audioCtx) {
+    // 如果AudioContext不存在或已被关闭（通话模式可能导致closed），自动重新创建
+    if (!audioCtx || audioCtx.state === 'closed') {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        ttsAudioInited = false; // 强制重新初始化静音振荡器
+        ttsKeepAliveOsc = null;
+        ttsKeepAliveGain = null;
+        ttsCurrentSource = null;
     }
     // 浏览器自动播放策略：如果被暂停，尝试恢复
     if (audioCtx.state === 'suspended') {
