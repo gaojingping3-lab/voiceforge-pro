@@ -2170,13 +2170,11 @@ async function sendCallMessage(text) {
 function waitForAISpeechEnd() {
     isCallAISpeaking = true;
     updateCallStatus('AI正在说话...', 'speaking');
-    startBargeInDetection(); // 启动语音打断检测
 
     let waited = 0;
     const checkInterval = setInterval(() => {
         if (!isCallMode) {
             clearInterval(checkInterval);
-            stopBargeInDetection();
             return;
         }
         waited += 300;
@@ -2185,7 +2183,6 @@ function waitForAISpeechEnd() {
             ttsQueueManager.queue.length === 0 &&
             !ttsQueueManager.isPlaying) {
             clearInterval(checkInterval);
-            stopBargeInDetection();
             isCallAISpeaking = false;
             callSending = false;
             if (isCallMode) {
@@ -2195,7 +2192,6 @@ function waitForAISpeechEnd() {
         // 超时保护：30秒后强制恢复监听（防止生图等情况卡住）
         if (waited > 30000) {
             clearInterval(checkInterval);
-            stopBargeInDetection();
             isCallAISpeaking = false;
             callSending = false;
             if (isCallMode) {
@@ -2437,9 +2433,20 @@ async function exitVoiceCallMode() {
     await initTTSAudio();
 }
 
-// 点击通话界面：不再打断（改为语音打断），仅做视觉反馈
+// 点击通话界面：打断AI说话，重新监听
 function handleCallOverlayClick() {
-    // 语音打断已替代点击打断，这里不做任何操作
+    if (!isCallMode) return;
+
+    if (isCallAISpeaking) {
+        // 打断AI说话
+        if (typeof ttsQueueManager !== 'undefined') {
+            ttsQueueManager.clearQueue();
+        }
+        isCallAISpeaking = false;
+        callSending = false;
+        updateCallStatus('已打断，请说话...', 'listening');
+        setTimeout(() => startCallListening(), 200);
+    }
 }
 
 // 发送聊天消息
