@@ -2378,7 +2378,7 @@ function toggleVoiceCallMode() {
 }
 
 // 退出语音通话模式
-function exitVoiceCallMode() {
+async function exitVoiceCallMode() {
     isCallMode = false;
     isCallListening = false;
     isCallAISpeaking = false;
@@ -2422,11 +2422,14 @@ function exitVoiceCallMode() {
     const input = document.getElementById('chat-input');
     if (input) input.value = '';
 
-    // 重新激活音频会话，防止退出通话后全局AudioContext被挂起导致静音
-    const ctx = getAudioCtx();
-    if (ctx.state !== 'running') {
-        ctx.resume().catch(() => {});
-    }
+    // 等语音识别完全释放后，强制重置音频系统（防止iOS音频会话被占用导致静音）
+    await new Promise(r => setTimeout(r, 300));
+    audioCtx = null;
+    ttsAudioInited = false;
+    ttsKeepAliveOsc = null;
+    ttsKeepAliveGain = null;
+    ttsCurrentSource = null;
+    await initTTSAudio();
 }
 
 // 点击通话界面：不再打断（改为语音打断），仅做视觉反馈
