@@ -4721,7 +4721,9 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
         const identity = opts.identity || {};
         const genders = opts.genders || {};
         const cameraView = opts.cameraView || null;
-        const backMode = isBackView || cameraView?.type === 'rear';
+        // P1-H1：双角色分工（A背对、B看着A）时，不进入全局背面禁脸，改用分工专用视角规则
+        const splitRear = opts.splitRear === true;
+        const backMode = !splitRear && (isBackView || cameraView?.type === 'rear');
 
         // 单人起手式标签（性别确定则写死，不让AI猜）
         const singleTag = genders.single === 'female' ? '1girl' : (genders.single === 'male' ? '1boy' : '1girl或1boy（按角色性别判断）');
@@ -4734,9 +4736,15 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
             else dualTag = '1girl, 1boy';
         }
         // 视角硬约束文本
-        const viewRule = cameraView
-            ? `\n【镜头视角-最高硬约束】必须严格采用此视角，不得弱化、改写或自行推测，把它放在人物起手式之后的最前面，并在结尾再重复一次：${cameraView.tags}`
-            : '';
+        let viewRule = '';
+        if (cameraView) {
+            if (splitRear && cameraView.type === 'rear') {
+                // 双角色分工：只有被指定背对的角色才背面，另一角色自然朝向、允许面部眼睛表情
+                viewRule = `\n【镜头视角-分工硬约束】只有用户明确指定背对镜头的那个角色，才采用 direct rear view（facing completely away from camera, full back visible, no face visible for that character）；另一个角色保持自然朝向，必须正常出现面部、眼睛和表情；严禁把两个角色都画成背面。`;
+            } else {
+                viewRule = `\n【镜头视角-最高硬约束】必须严格采用此视角，不得弱化、改写或自行推测，把它放在人物起手式之后的最前面，并在结尾再重复一次：${cameraView.tags}`;
+            }
+        }
 
         let systemContent;
 
@@ -4936,6 +4944,8 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         // C. 镜头视角硬约束（正/侧/背），替代旧的单纯"背"字检测
         const cameraView = getCameraViewConstraint(userInput);
         const isBackView = cameraView?.type === 'rear';
+        // P1-H1：双角色分工（A背对、B看着A）提前判定，传给 generatePromptWithRoleAI 避免全局禁脸
+        const isSplitRear = isDualSplitRear(userInput, isDualMode);
 
         // A. 固定身份块（带缓存，同一角色只翻译一次） + B. 确定性性别（不让AI猜）
         let identityOpts = {}, genders = {};
@@ -4949,11 +4959,10 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
             genders = { single: cur ? getRoleGender(cur.desc) : '' };
         }
 
-        let rolePrompt = await generatePromptWithRoleAI(conversationText, isDualMode, { roleA, roleB }, isBackView, { identity: identityOpts, genders, cameraView });
+        let rolePrompt = await generatePromptWithRoleAI(conversationText, isDualMode, { roleA, roleB }, isBackView, { identity: identityOpts, genders, cameraView, splitRear: isSplitRear });
 
         // ===== C 程序级二次清洗兜底：背面模式下，LLM即使没听话，也在最终prompt里洗掉正面/侧面冲突词 =====
         // 双角色分工场景（A背对镜头，B看着A）不做全局清洗，避免把B的朝向也洗成背面
-        const isSplitRear = isDualSplitRear(userInput, isDualMode);
         if (cameraView && cameraView.type === 'rear' && !isSplitRear) {
             const beforeClean = rolePrompt;
             rolePrompt = cleanRearViewPrompt(rolePrompt);

@@ -119,9 +119,9 @@ export async function onRequestPost(context) {
             } catch (e) {}
             const fullErr = `[${epName}] HTTP ${response.status}: ${errDetail || '无错误详情'}`;
             allErrors.push(fullErr);
-            // 401/403 是Key问题，429是限流（账号级别，换域名没用），都不重试
-            if (response.status === 401 || response.status === 403 || response.status === 429) break;
-            continue; // 试下一个endpoint
+            // P1-S1：401/403 认证失败时继续尝试另一个 endpoint（Key 可能注册在另一域名）；429 限流保持 break
+            if (response.status === 429) break;
+            continue; // 401/403 及其他错误，试下一个 endpoint
           }
 
           const data = await response.json();
