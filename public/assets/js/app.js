@@ -2569,11 +2569,11 @@ async function sendChatMessage() {
         if (memoPrompt) {
             messages.push({ role: 'system', content: memoPrompt });
         }
-        // 情绪感知：检测用户当前情绪，调整回复语气
-        const emotion = detectEmotion(text);
-        if (emotion !== 'neutral' && EMOTION_PROMPTS[emotion]) {
-            messages.push({ role: 'system', content: EMOTION_PROMPTS[emotion] });
-        }
+        // 情绪感知已关闭（减少system prompt，提升回复速度）
+        // const emotion = detectEmotion(text);
+        // if (emotion !== 'neutral' && EMOTION_PROMPTS[emotion]) {
+        //     messages.push({ role: 'system', content: EMOTION_PROMPTS[emotion] });
+        // }
         if (useConstraint) {
             messages.push({ role: 'system', content: roleConstraints });
         }
