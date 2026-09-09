@@ -2044,6 +2044,7 @@ let callTimerInterval = null;
 let callSeconds = 0;
 let callRetryCount = 0;
 let callSavedAutoPlay = false;
+let callSavedReasoning = 'off';
 const MAX_CALL_RETRIES = 2;
 
 // 初始化通话模式的语音识别
@@ -2053,7 +2054,7 @@ function initCallRecognition() {
 
     callRecognition = new SpeechRecognition();
     callRecognition.lang = 'zh-CN';
-    callRecognition.interimResults = false;
+    callRecognition.interimResults = true; // 实时返回中间结果
     callRecognition.continuous = false;
     callRecognition.maxAlternatives = 1;
 
@@ -2063,11 +2064,24 @@ function initCallRecognition() {
     };
 
     callRecognition.onresult = (event) => {
-        const text = event.results[0][0].transcript.trim();
-        if (text) {
-            updateCallStatus('你说：' + text, 'thinking');
-            // 延迟一点再发送，让用户看到识别结果
-            setTimeout(() => sendCallMessage(text), 500);
+        let interim = '';
+        let finalText = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const text = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalText += text;
+            } else {
+                interim += text;
+            }
+        }
+        // 实时显示识别结果
+        if (interim) {
+            updateCallStatus('你说：' + interim, 'listening');
+        }
+        // 最终结果立刻发送
+        if (finalText.trim()) {
+            updateCallStatus('你说：' + finalText, 'thinking');
+            sendCallMessage(finalText.trim());
         }
     };
 
@@ -2079,7 +2093,7 @@ function initCallRecognition() {
                 if (isCallMode && !isCallAISpeaking) {
                     startCallListening();
                 }
-            }, 300);
+            }, 200);
         }
     };
 
@@ -2094,7 +2108,7 @@ function initCallRecognition() {
             callRetryCount++;
             if (callRetryCount < MAX_CALL_RETRIES && isCallMode) {
                 updateCallStatus('没听清，请再说一遍...', 'listening');
-                setTimeout(() => startCallListening(), 500);
+                setTimeout(() => startCallListening(), 200);
             } else {
                 updateCallStatus('长时间未说话，通话即将结束', 'error');
                 setTimeout(() => exitVoiceCallMode(), 2000);
@@ -2134,7 +2148,7 @@ async function sendCallMessage(text) {
         updateCallStatus('发送失败，请重试', 'error');
         callSending = false;
         if (isCallMode) {
-            setTimeout(() => startCallListening(), 1000);
+            setTimeout(() => startCallListening(), 500);
         }
     }
 }
@@ -2159,7 +2173,7 @@ function waitForAISpeechEnd() {
             isCallAISpeaking = false;
             callSending = false;
             if (isCallMode) {
-                setTimeout(() => startCallListening(), 500);
+                setTimeout(() => startCallListening(), 200);
             }
         }
         // 超时保护：30秒后强制恢复监听（防止生图等情况卡住）
@@ -2169,7 +2183,7 @@ function waitForAISpeechEnd() {
             callSending = false;
             if (isCallMode) {
                 updateCallStatus('请继续说话...', 'listening');
-                setTimeout(() => startCallListening(), 500);
+                setTimeout(() => startCallListening(), 200);
             }
         }
     }, 300);
@@ -2232,6 +2246,10 @@ function toggleVoiceCallMode() {
         localStorage.setItem('AUTOPLAY_TTS', 'true');
     }
 
+    // 强制关闭thinking（通话模式要快）
+    callSavedReasoning = localStorage.getItem('LLM_REASONING') || 'off';
+    localStorage.setItem('LLM_REASONING', 'off');
+
     // 显示通话界面
     const overlay = document.getElementById('voice-call-overlay');
     if (!overlay) return;
@@ -2266,7 +2284,7 @@ function toggleVoiceCallMode() {
 
     // 延迟一点开始监听，让界面先显示
     updateCallStatus('通话已连接，请说话...', 'listening');
-    setTimeout(() => startCallListening(), 800);
+    setTimeout(() => startCallListening(), 400);
 }
 
 // 退出语音通话模式
@@ -2296,6 +2314,9 @@ function exitVoiceCallMode() {
     autoPlayTTS = callSavedAutoPlay;
     localStorage.setItem('AUTOPLAY_TTS', callSavedAutoPlay ? 'true' : 'false');
 
+    // 恢复thinking设置
+    localStorage.setItem('LLM_REASONING', callSavedReasoning);
+
     // 隐藏通话界面
     const overlay = document.getElementById('voice-call-overlay');
     if (overlay) {
@@ -2321,7 +2342,7 @@ function handleCallOverlayClick() {
         isCallAISpeaking = false;
         callSending = false;
         updateCallStatus('已打断，请说话...', 'listening');
-        setTimeout(() => startCallListening(), 300);
+        setTimeout(() => startCallListening(), 200);
     }
 }
 
