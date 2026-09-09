@@ -2224,7 +2224,8 @@ async function startBargeInDetection() {
         callBargeInStream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
         });
-        callBargeInAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // 复用全局AudioContext，避免iOS多AudioContext导致音频会话挂起
+        callBargeInAudioCtx = getAudioCtx();
         if (callBargeInAudioCtx.state === 'suspended') {
             await callBargeInAudioCtx.resume();
         }
@@ -2275,10 +2276,8 @@ function stopBargeInDetection() {
         callBargeInStream.getTracks().forEach(t => t.stop());
         callBargeInStream = null;
     }
-    if (callBargeInAudioCtx) {
-        callBargeInAudioCtx.close().catch(() => {});
-        callBargeInAudioCtx = null;
-    }
+    // 复用全局AudioContext，不关闭
+    callBargeInAudioCtx = null;
     callBargeInAnalyser = null;
 }
 
@@ -2422,6 +2421,12 @@ function exitVoiceCallMode() {
     // 清空输入框
     const input = document.getElementById('chat-input');
     if (input) input.value = '';
+
+    // 重新激活音频会话，防止退出通话后全局AudioContext被挂起导致静音
+    const ctx = getAudioCtx();
+    if (ctx.state !== 'running') {
+        ctx.resume().catch(() => {});
+    }
 }
 
 // 点击通话界面：不再打断（改为语音打断），仅做视觉反馈
