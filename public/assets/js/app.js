@@ -4584,9 +4584,9 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
             const appearance = extractAppearanceFromRoleCard(roleDesc);
 
             if (appearance) {
-                systemContent = `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，生成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 【外貌部分】严格按照以下原文翻译成英文，不要改写、不要添加、不要遗漏：${appearance}\n3. 【动作部分】从对话中提取人物当前的动作、表情、姿态，用英文描述\n4. 明确人物性别（man/woman/girl/boy）\n5. 不要输出任何中文，不要加引号，直接输出提示词本身\n6. 不要添加风格词，风格已由系统固定前缀处理\n7. 提示词必须达到250-350个英文单词，尽可能详细地描写：五官细节、发丝质感、服装细节、动作神态、环境氛围、光线方向、景别、画质细节，把每个能画出来的细节都写清楚，让画面更精致丰富`;
+                systemContent = `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，生成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 【外貌部分】严格按照以下原文翻译成英文，不要改写、不要添加、不要遗漏：${appearance}\n3. 【动作部分】从对话中提取人物当前的动作、表情、姿态，用英文描述\n4. 明确人物性别（man/woman/girl/boy）\n5. 不要输出任何中文，不要加引号，直接输出提示词本身\n6. 不要添加风格词，风格已由系统固定前缀处理\n7. 提示词必须达到250-350个英文单词，尽可能详细地描写：五官细节、发丝质感、服装细节、动作神态、环境氛围、光线方向、景别、画质细节，把每个能画出来的细节都写清楚，让画面更精致丰富\n8. 【景别最高优先级】如果用户消息中有【用户拍摄要求】，其中提到的景别（如全身/full body、半身/half body、特写/close-up）、角度、动作必须100%严格遵守并放在提示词最前面，绝对不得擅自改成其他景别。用户明确要求全身(full body)时，禁止写half body、bust、portrait、close-up等任何非全身描述`;
             } else {
-                systemContent = `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，提取画面视觉信息，转换成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 包含人物外貌（严格按照角色设定，不要改写）、服装、当前动作、表情、环境\n3. 明确人物性别（man/woman/girl/boy）\n4. 不要输出任何中文，不要加引号，直接输出提示词本身\n5. 不要添加风格词，风格已由系统固定前缀处理\n6. 提示词必须达到250-350个英文单词，尽可能详细地描写：五官细节、发丝质感、服装细节、动作神态、环境氛围、光线方向、景别、画质细节，把每个能画出来的细节都写清楚，让画面更精致丰富`;
+                systemContent = `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，提取画面视觉信息，转换成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 包含人物外貌（严格按照角色设定，不要改写）、服装、当前动作、表情、环境\n3. 明确人物性别（man/woman/girl/boy）\n4. 不要输出任何中文，不要加引号，直接输出提示词本身\n5. 不要添加风格词，风格已由系统固定前缀处理\n6. 提示词必须达到250-350个英文单词，尽可能详细地描写：五官细节、发丝质感、服装细节、动作神态、环境氛围、光线方向、景别、画质细节，把每个能画出来的细节都写清楚，让画面更精致丰富\n7. 【景别最高优先级】如果用户消息中有【用户拍摄要求】，其中提到的景别（如全身/full body、半身/half body、特写/close-up）、角度、动作必须100%严格遵守并放在提示词最前面，绝对不得擅自改成其他景别。用户明确要求全身(full body)时，禁止写half body、bust、portrait、close-up等任何非全身描述`;
             }
         }
 
@@ -4713,10 +4713,10 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理画面描述...</span></div>';
         let rolePrompt = await generatePromptWithRoleAI(conversationText, isDualMode, { roleA, roleB });
 
-        // 【严格执行】用AI把用户的动作/景别要求翻译成英文，强制加到提示词末尾
+        // 【严格执行】用AI把用户的动作/景别要求翻译成英文，强制加到提示词开头（权重最高）+ 末尾（重复强调）
         const strictKeywords = await translateUserActionToEnglish(userInput);
         if (strictKeywords) {
-            rolePrompt = rolePrompt + ', ' + strictKeywords;
+            rolePrompt = strictKeywords + ', ' + rolePrompt + ', ' + strictKeywords;
             console.log('[严格执行] 已强制加入用户动作要求:', strictKeywords);
         }
 
