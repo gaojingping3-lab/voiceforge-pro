@@ -2014,7 +2014,7 @@ async function sendChatMessage() {
     if (!text) return;
 
     // 检测生图关键词：发送"拍张照片"等消息时直接触发生图，不走普通对话
-    const photoKeywords = ['拍张照片', '拍张照', '拍照看看', '拍个照', '发张照片', '发张图', '画张图', '生成图片', '拍照片', '看看照片'];
+    const photoKeywords = ['拍张照片', '拍张照', '拍照看看', '拍个照', '发张照片', '发张图', '画张图', '生成图片', '拍照片', '看看照片', '拍全身', '拍特写', '拍半身', '来张全身', '来张特写', '来张半身'];
     const isPhotoRequest = photoKeywords.some(kw => text.includes(kw));
     if (isPhotoRequest) {
         input.value = '';
@@ -3868,9 +3868,9 @@ async function optimizePromptManual() {
             })
         });
 
-        // 20秒超时（DeepSeek偶尔会慢，给足时间）
+        // 60秒超时（给足时间，生成好自动填进来，不会轻易超时）
         const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('优化超时')), 20000);
+            setTimeout(() => reject(new Error('优化超时')), 60000);
         });
 
         let response;
@@ -4153,10 +4153,23 @@ async function generateImageFromChat() {
         loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理画面描述...</span></div>';
         const rolePrompt = await generatePromptWithRoleAI(conversationText);
 
+        // 景别识别：从用户最后一条消息中检测全身/特写/半身
+        const lastUserMsg = recentMessages.find(m => m.role === 'user')?.content || '';
+        let shotTypeKeyword = '';
+        if (/全身|全身照|整个人|从头到脚/.test(lastUserMsg)) {
+            shotTypeKeyword = 'full body shot, entire body, head to toe, full length';
+        } else if (/特写|脸部特写|面部特写|近景|脸/.test(lastUserMsg)) {
+            shotTypeKeyword = 'close-up shot, face portrait, detailed face, closeup';
+        } else if (/半身|上半身|腰部以上|胸像/.test(lastUserMsg)) {
+            shotTypeKeyword = 'upper body shot, waist up, half body';
+        }
+        // 如果识别到景别，加在提示词最前面
+        const finalPrompt = shotTypeKeyword ? shotTypeKeyword + ', ' + rolePrompt : rolePrompt;
+
         // 第二步：用角色AI生成的提示词直接生图（跳过独立的提示词优化）
         const result = await generateImageWithSafety(conversationText, getImageModel(), (msg) => {
             loadingBubble.innerHTML = `<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${msg}</span></div>`;
-        }, rolePrompt);
+        }, finalPrompt);
 
         // 3. 把图片插入聊天记录
         loadingDiv.remove();
