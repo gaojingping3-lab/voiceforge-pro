@@ -824,9 +824,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <i class="fa-solid fa-arrow-down text-sm"></i>
                 </button>
                 <div class="flex gap-2 items-end" style="padding-bottom: env(safe-area-inset-bottom);">
-                    <textarea id="chat-input" placeholder="跟乐说点什么..." class="textarea textarea-bordered textarea-sm flex-1 resize-none" rows="1" style="max-height: 100px; min-height: 40px;" oninput="autoResizeInput(); updateEmotionIndicator();" onkeydown="handleChatKeydown(event)"></textarea>
-                    <!-- 情绪指示器 -->
-                    <span id="emotion-indicator" class="text-lg opacity-0 transition-opacity self-center" title="检测到的情绪">😊</span>
+                    <textarea id="chat-input" placeholder="跟乐说点什么..." class="textarea textarea-bordered textarea-sm flex-1 resize-none" rows="1" style="max-height: 100px; min-height: 40px;" oninput="autoResizeInput();" onkeydown="handleChatKeydown(event)"></textarea>
+                    <!-- 语音通话按钮 -->
+                    <button class="btn btn-ghost btn-sm btn-circle self-center" onclick="toggleVoiceCallMode()" title="语音通话模式">
+                        <i class="fa-solid fa-phone-volume text-base"></i>
+                    </button>
                     <!-- 语音输入按钮 -->
                     <button id="btn-mic" class="btn btn-ghost btn-sm btn-circle self-center" onclick="toggleVoiceInput()" title="语音输入">
                         <i class="fa-solid fa-microphone text-base"></i>
@@ -1325,6 +1327,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260909h"></script>
+    <script src="assets/js/app.js?v=20260909i"></script>
 </body>
 </html>
