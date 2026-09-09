@@ -4502,6 +4502,98 @@ function extractAppearanceFromRoleCard(roleDesc) {
     return '';
 }
 
+// ===== B. 性别确定性提取：返回 'female' / 'male' / ''（不确定返回空，交回给AI判断）=====
+function getRoleGender(roleDesc) {
+    if (!roleDesc) return '';
+    // 1. 明确字段：性别：女 / 性别: 男 / 【性别】女 / gender: female
+    let m = roleDesc.match(/(?:性别|gender)\s*[：:＝=]\s*([女男]|female|male|girl|boy|woman|man)/i);
+    if (m) {
+        const v = m[1].toLowerCase();
+        if (/女|female|girl|woman/.test(v)) return 'female';
+        if (/男|male|boy|man/.test(v)) return 'male';
+    }
+    m = roleDesc.match(/【性别】\s*([女男])/);
+    if (m) return m[1] === '女' ? 'female' : 'male';
+    // 2. 弱信号：明确人称名词计数
+    const femaleHits = (roleDesc.match(/少女|女孩|女人|女性|女子|女生|御姐|萝莉|女王|少妇/g) || []).length;
+    const maleHits = (roleDesc.match(/少年|男孩|男人|男性|男子|男生|大叔|正太/g) || []).length;
+    if (femaleHits > maleHits) return 'female';
+    if (maleHits > femaleHits) return 'male';
+    return '';
+}
+
+// ===== C. 镜头视角硬约束：确定性识别 正/侧/背，返回固定英文约束串 =====
+function getCameraViewConstraint(userInput) {
+    const t = userInput || '';
+    if (/背影|背面|背后|背对|后背|背对着|朝后|后方/.test(t)) {
+        return { type: 'rear', tags: 'direct rear view, camera directly behind the character, character facing completely away from camera, full back visible, centered rear composition, back of head and back visible, no face visible, no side view, no three-quarter view, no front view' };
+    }
+    if (/侧面|侧脸|侧影|侧身|侧颜|正侧/.test(t)) {
+        return { type: 'side', tags: 'side profile view, character in exact profile, camera positioned directly to the side, clear side profile, no front view, no rear view, no three-quarter view' };
+    }
+    if (/正脸|正面|正对|面朝镜头|面向镜头|正面照|正对镜头/.test(t)) {
+        return { type: 'front', tags: 'front view, character facing the camera directly, face fully visible, centered front composition, no side view, no rear view, no three-quarter view' };
+    }
+    return null;
+}
+
+// ===== A. 身份块：简单哈希，用于缓存key（角色卡一改哈希就变，自动重译）=====
+function simpleHash(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) {
+        h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+    }
+    return Math.abs(h).toString(36);
+}
+
+// ===== A. 获取角色固定英文身份块（localStorage缓存，同一角色只翻译一次）。任何失败都返回null回退，不阻断生图 =====
+async function ensureIdentityBlock(role) {
+    if (!role || !role.desc) return null;
+    try {
+        const appearance = extractAppearanceFromRoleCard(role.desc) || role.desc;
+        const gender = getRoleGender(role.desc);
+        const rid = role.id || 'noid';
+        const hash = simpleHash(role.desc);
+        const cacheKey = `IMG_IDENTITY_${rid}_${hash}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached && cached.length > 20) return cached;
+
+        const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+        const llmKey = localStorage.getItem('LLM_KEY') || '';
+        const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+        const genderHint = gender === 'female' ? '女性(female)' : gender === 'male' ? '男性(male)' : '请根据描述判断';
+
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmKey}` },
+            body: JSON.stringify({
+                baseUrl: llmUrl, model: llmModel,
+                messages: [
+                    { role: 'system', content: '你是AI绘画角色身份块生成器。把角色外貌资料翻译成一段固定的英文 Character Identity Block，用于生图时锁定角色长相。要求：只输出英文逗号分隔标签，不要解释；必须包含性别与年龄感、发色发型、瞳色、脸型五官、身材、固定服装、配饰；客观写实；不要动作、表情、场景、镜头、光线；控制在80-120个英文单词；身份信息必须忠于资料，不得改写或臆造发色、瞳色、发型、服装。' },
+                    { role: 'user', content: `角色名：${role.name}\n性别：${genderHint}\n外貌资料：${appearance}` }
+                ],
+                temperature: 0, stream: false, thinking: { type: 'disabled' }
+            })
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        let block = data.choices?.[0]?.message?.content?.trim() || '';
+        block = block.replace(/["'`]/g, '').replace(/\n/g, ' ').trim();
+        if (block.length < 20) return null;
+        // 清掉同角色旧缓存后写入新缓存
+        try {
+            Object.keys(localStorage).forEach(k => {
+                if (k.startsWith(`IMG_IDENTITY_${rid}_`)) localStorage.removeItem(k);
+            });
+            localStorage.setItem(cacheKey, block);
+        } catch (e) {}
+        return block;
+    } catch (e) {
+        console.warn('身份块生成失败，回退现有逻辑:', e.message);
+        return null;
+    }
+}
+
 // 从角色卡描述中去掉外貌部分（正常聊天用，减少system prompt长度，加快回复）
 function stripAppearanceFromRoleCard(roleDesc) {
     if (!roleDesc) return '';
@@ -4562,7 +4654,7 @@ async function translateUserActionToEnglish(userInput) {
 }
 
 // 用当前聊天角色AI生成生图提示词（复用角色人设，不单独调用DeepSeek提示词大师）
-async function generatePromptWithRoleAI(conversationText, isDualMode = false, dualRoles = null, isBackView = false) {
+async function generatePromptWithRoleAI(conversationText, isDualMode = false, dualRoles = null, isBackView = false, opts = {}) {
     try {
         const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
         const llmKey = localStorage.getItem('LLM_KEY') || '';
@@ -4572,41 +4664,79 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
         // 读取用户设置里的System Prompt，让生图提示词也遵守
         const customSystem = localStorage.getItem('LLM_SYSTEM') || '';
 
+        // ===== A身份块 / B确定性性别 / C视角（由主流程预取后传入）=====
+        const identity = opts.identity || {};
+        const genders = opts.genders || {};
+        const cameraView = opts.cameraView || null;
+        const backMode = isBackView || cameraView?.type === 'rear';
+
+        // 单人起手式标签（性别确定则写死，不让AI猜）
+        const singleTag = genders.single === 'female' ? '1girl' : (genders.single === 'male' ? '1boy' : '1girl或1boy（按角色性别判断）');
+        // 双角色起手式
+        let dualTag = '按两个角色性别判断（2girls / 2boys / 1girl 1boy）';
+        const ga = genders.A, gb = genders.B;
+        if (ga && gb) {
+            if (ga === 'female' && gb === 'female') dualTag = '2girls';
+            else if (ga === 'male' && gb === 'male') dualTag = '2boys';
+            else dualTag = '1girl, 1boy';
+        }
+        // 视角硬约束文本
+        const viewRule = cameraView
+            ? `\n【镜头视角-最高硬约束】必须严格采用此视角，不得弱化、改写或自行推测，把它放在人物起手式之后的最前面，并在结尾再重复一次：${cameraView.tags}`
+            : '';
+
         let systemContent;
 
         if (isDualMode && dualRoles && dualRoles.roleA && dualRoles.roleB) {
             // 双角色模式：提取两个角色的外貌，明确要求画面包含两个人物
             const appearanceA = extractAppearanceFromRoleCard(dualRoles.roleA.desc) || dualRoles.roleA.desc;
             const appearanceB = extractAppearanceFromRoleCard(dualRoles.roleB.desc) || dualRoles.roleB.desc;
-            systemContent = `你是一个世界级AI绘画提示词工程师（Stable Diffusion和FLUX模型）。根据下面两个角色的对话和角色设定，生成HIGHLY PRECISE的纯视觉英文生图提示词。要求：
+            // A. 有缓存身份块就用固定块（禁止改写），否则退回原文翻译
+            const idA = identity.A
+                ? `【角色A固定身份块-必须原样使用，禁止改写其发色/瞳色/发型/服装/性别】：${identity.A}`
+                : `【角色A外貌】姓名：${dualRoles.roleA.name}，严格按原文翻译成英文，不得改写或遗漏：${appearanceA}`;
+            const idB = identity.B
+                ? `【角色B固定身份块-必须原样使用，禁止改写其发色/瞳色/发型/服装/性别】：${identity.B}`
+                : `【角色B外貌】姓名：${dualRoles.roleB.name}，严格按原文翻译成英文，不得改写或遗漏：${appearanceB}`;
+            systemContent = `你是一个世界级AI绘画提示词工程师（Stable Diffusion和FLUX模型）。根据下面两个角色的对话和设定，生成HIGHLY PRECISE的纯视觉英文生图提示词。
+【输出结构-严格按此顺序分层】①人物起手式标签(${dualTag}) → ②角色A固定身份 → ③角色B固定身份 → ④两人当前动作与空间关系 → ⑤镜头景别/视角 → ⑥场景环境 → ⑦光线画质。
+要求：
 1. 只输出逗号分隔的英文视觉标签，不要任何解释、对话、台词或引号
-2. 【破除隐喻】对话中的文学隐喻（如"灼热呼吸""温度攀升""压迫感""心动"）不得直接使用，必须翻译成具体的视觉动作（如face to face、extremely close up、intense eye contact、pinning to wall、leaning close）
-3. 【角色A外貌】姓名：${dualRoles.roleA.name}，严格按照以下原文翻译成英文，不要改写、不要添加、不要遗漏：${appearanceA}
-4. 【角色B外貌】姓名：${dualRoles.roleB.name}，严格按照以下原文翻译成英文，不要改写、不要添加、不要遗漏：${appearanceB}
-5. 【人物起手式】提示词最前面必须用Danbooru标签明确人物数量和性别（如1girl, 1boy或2girls或2boys），与角色卡性别完全一致
-6. 【动作部分-最高约束】必须严格按照对话原文提取两个人物各自当前的动作、表情、姿态，用英文描述。对话中出现的核心动作（站/坐/走/跑/拥抱/牵手/亲吻/抚摸/看/微笑/哭泣等）绝对不允许改变、替换、省略或加戏，也不得添加对话中没有的动作。你只能把动作写得更详细（如补充动作的姿势细节、力度、神态、手部位置），但动作本身必须和对话完全一致
-7. 【镜头语言与构图】精确描述两个人的手部位置、身体语言、空间关系（谁靠向谁、谁的手放在哪里），基于对话上下文
-8. 画面中必须同时包含两个人物，不要只画一个人
-9. 不要添加风格词，风格已由系统固定前缀处理
-10. 提示词必须达到300-400个英文单词，两个人物的外貌、服装、动作、神态、位置关系、环境氛围、光线方向都要尽可能详细描写，让画面更精致丰富
-11. 【动作权重】核心动作描述必须放在提示词最前面（紧跟人物标签和景别之后），并且两个人的核心动作在提示词开头和结尾各出现一次，确保动作不被稀释
-12. 【视觉安全防护】画面保持视觉干净和PG-13（聚焦强烈氛围、特写、面部表情），即使聊天内容有暗示性，也只用肢体动作和表情传达张力，不输出任何敏感部位或露骨描写`;
+2. ${idA}
+3. ${idB}
+4. 【破除隐喻】对话中的文学隐喻（如"灼热呼吸""温度攀升""压迫感"）不得直接使用，必须翻译成具体视觉动作（face to face、extremely close up、intense eye contact、pinning to wall、leaning close）
+5. 【动作最高约束】严格按对话原文提取两人各自的动作、表情、姿态，核心动作（站/坐/走/跑/拥抱/牵手/亲吻/抚摸/看/微笑等）不许改变、替换、省略或加戏，只能补充姿势细节、手部位置、谁靠向谁
+6. 【人物起手式】必须使用 ${dualTag}，性别已由系统确定，禁止更改；画面必须同时包含两个人物，不能只画一个
+7. 不要添加风格词（系统已有固定写实前缀）
+8. 除两个固定身份块外，动作/构图/场景/光线部分合计控制在180-280个英文单词，按结构精炼有序，不要堆砌无关形容词
+9. 【视觉安全防护】保持PG-13，只用肢体动作和表情传达张力，不输出敏感部位或露骨描写${viewRule}`;
         } else {
-            // 单人模式：原来的逻辑
+            // 单人模式
             const roleDesc = currentRole ? currentRole.desc : '';
             const roleName = currentRole ? currentRole.name : 'AI';
             const appearance = extractAppearanceFromRoleCard(roleDesc);
-
-            if (appearance) {
-                systemContent = `你是${roleName}，同时是一名世界级AI绘画提示词工程师（Stable Diffusion和FLUX模型）。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，生成HIGHLY PRECISE的纯视觉英文生图提示词。要求：\n1. 只输出逗号分隔的英文视觉标签，不要任何解释、对话、台词或引号\n2. 【破除隐喻】对话中的文学隐喻（如"灼热呼吸""温度攀升""压迫感""心动"）不得直接使用，必须翻译成具体的视觉动作（如face to face、extremely close up、intense eye contact、leaning close、touching cheek）\n3. 【外貌部分】严格按照以下原文翻译成英文，不要改写、不要添加、不要遗漏：${appearance}\n4. 【人物起手式】提示词最前面必须用Danbooru标签明确人物数量和性别（1girl或1boy），与角色卡性别完全一致\n5. 【动作部分-最高约束】必须严格按照对话原文提取人物当前的动作、表情、姿态，用英文描述。对话中出现的核心动作（站/坐/走/跑/拥抱/牵手/亲吻/抚摸/看/微笑/哭泣等）绝对不允许改变、替换、省略或加戏，也不得添加对话中没有的动作。你只能把动作写得更详细（如补充动作的姿势细节、力度、神态、手部位置），但动作本身必须和对话完全一致\n6. 【镜头语言与构图】精确描述手部位置、身体姿态、头部朝向、眼神方向，基于对话上下文\n7. 不要添加风格词，风格已由系统固定前缀处理\n8. 提示词必须达到250-350个英文单词，尽可能详细地描写：五官细节、发丝质感、服装细节、动作神态、环境氛围、光线方向、景别、画质细节，把每个能画出来的细节都写清楚，让画面更精致丰富\n9. 【景别最高优先级】如果用户消息中有【用户拍摄要求】，其中提到的景别（如全身/full body、半身/half body、特写/close-up）、角度、动作必须100%严格遵守并放在提示词最前面，绝对不得擅自改成其他景别。用户明确要求全身(full body)时，禁止写half body、bust、portrait、close-up等任何非全身描述\n10. 【动作权重】核心动作描述必须放在提示词最前面（紧跟人物标签和景别之后），并且核心动作在提示词开头和结尾各出现一次，确保动作不被稀释\n11. 【视觉安全防护】画面保持视觉干净和PG-13（聚焦强烈氛围、特写、面部表情），即使聊天内容有暗示性，也只用肢体动作和表情传达张力，不输出任何敏感部位或露骨描写`;
-            } else {
-                systemContent = `你是${roleName}，同时是一名世界级AI绘画提示词工程师（Stable Diffusion和FLUX模型）。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，提取画面视觉信息，生成HIGHLY PRECISE的纯视觉英文生图提示词。要求：\n1. 只输出逗号分隔的英文视觉标签，不要任何解释、对话、台词或引号\n2. 【破除隐喻】对话中的文学隐喻（如"灼热呼吸""温度攀升""压迫感""心动"）不得直接使用，必须翻译成具体的视觉动作（如face to face、extremely close up、intense eye contact、leaning close、touching cheek）\n3. 包含人物外貌（严格按照角色设定翻译成英文，不要改写）、服装、当前动作、表情、环境\n4. 【人物起手式】提示词最前面必须用Danbooru标签明确人物数量和性别（1girl或1boy），与角色卡性别完全一致\n5. 【动作部分-最高约束】必须严格按照对话原文提取人物当前的动作、表情、姿态，用英文描述。对话中出现的核心动作（站/坐/走/跑/拥抱/牵手/亲吻/抚摸/看/微笑/哭泣等）绝对不允许改变、替换、省略或加戏，也不得添加对话中没有的动作。你只能把动作写得更详细（如补充动作的姿势细节、力度、神态、手部位置），但动作本身必须和对话完全一致\n6. 【镜头语言与构图】精确描述手部位置、身体姿态、头部朝向、眼神方向，基于对话上下文\n7. 不要添加风格词，风格已由系统固定前缀处理\n8. 提示词必须达到250-350个英文单词，尽可能详细地描写：五官细节、发丝质感、服装细节、动作神态、环境氛围、光线方向、景别、画质细节，把每个能画出来的细节都写清楚，让画面更精致丰富\n9. 【景别最高优先级】如果用户消息中有【用户拍摄要求】，其中提到的景别（如全身/full body、半身/half body、特写/close-up）、角度、动作必须100%严格遵守并放在提示词最前面，绝对不得擅自改成其他景别。用户明确要求全身(full body)时，禁止写half body、bust、portrait、close-up等任何非全身描述\n10. 【动作权重】核心动作描述必须放在提示词最前面（紧跟人物标签和景别之后），并且核心动作在提示词开头和结尾各出现一次，确保动作不被稀释\n11. 【视觉安全防护】画面保持视觉干净和PG-13（聚焦强烈氛围、特写、面部表情），即使聊天内容有暗示性，也只用肢体动作和表情传达张力，不输出任何敏感部位或露骨描写`;
-            }
+            const idSingle = identity.single
+                ? `【固定身份块-必须原样使用，禁止改写其发色/瞳色/发型/服装/性别】：${identity.single}`
+                : (appearance
+                    ? `【外貌部分】严格按原文翻译成英文，不得改写或遗漏：${appearance}`
+                    : `【人物外貌】严格按角色设定翻译成英文，包含发型发色、五官、身材、服装，不要改写：${roleDesc}`);
+            systemContent = `你是${roleName}，同时是一名世界级AI绘画提示词工程师（Stable Diffusion和FLUX模型）。角色设定：${roleDesc}\n\n请根据下面的对话内容，生成HIGHLY PRECISE的纯视觉英文生图提示词。
+【输出结构-严格按此顺序分层】①人物起手式标签(${singleTag}) → ②固定身份(外貌/服装) → ③当前动作与表情 → ④镜头景别/视角 → ⑤场景环境 → ⑥光线画质。
+要求：
+1. 只输出逗号分隔的英文视觉标签，不要任何解释、对话、台词或引号
+2. ${idSingle}
+3. 【破除隐喻】文学隐喻翻译成具体视觉动作（face to face、extremely close up、leaning close、touching cheek等），不要直接用抽象词
+4. 【人物起手式】必须使用 ${singleTag}，性别已由系统确定，禁止更改
+5. 【动作最高约束】严格按对话原文提取动作、表情、姿态，核心动作（站/坐/走/跑/拥抱/牵手/看/微笑等）不许改变、替换、省略或加戏，只能补充姿势细节、手部位置、头部朝向、眼神方向
+6. 不要添加风格词（系统已有固定写实前缀）
+7. 除固定身份块外，动作/场景/光线部分合计控制在120-200个英文单词，按结构精炼有序，不要堆砌无关形容词
+8. 【景别最高优先级】若有【用户拍摄要求】，其景别（全身full body/半身half body/特写close-up）必须100%遵守并放在最前；要求全身时禁止写half body、bust、portrait、close-up
+9. 【视觉安全防护】保持PG-13，只用动作表情传达张力，不输出敏感部位或露骨描写${viewRule}`;
         }
 
-        // 【背面拍摄强制指令】只要用户输入包含"背"字（背影/背面/背后/背对），进入背面模式
-        if (isBackView) {
-            systemContent += `\n\n【背面拍摄强制指令-最高优先级】用户要求拍摄背影/背面视角。必须严格遵守：\n- 提示词最前面（第一位）写上：view from behind, character seen from the back, back view, rear view, facing away from camera\n- 外貌部分只能描写背影相关内容：发型、发色、发丝质感、身形体态、肩背线条、服装背面的样式和材质、鞋、整体轮廓\n- 严禁出现任何正面描述词：face, eyes, facial features, expression, smile, gaze, look at camera 等一律禁止\n- 画面必须是人物背面视角，镜头在人物身后`;
+        // 【背面拍摄】视角为背面时，外貌只写背影，禁止正面五官描述
+        if (backMode) {
+            systemContent += `\n\n【背面拍摄强制指令】本图为背面视角：身份/外貌部分只允许描写背影可见内容（发型发色、发丝、身形体态、肩背线条、服装背面、鞋、轮廓），严禁出现 face, eyes, facial features, expression, smile, gaze, look at camera 等任何正面词。`;
         }
 
         const messages = [];
@@ -4728,23 +4858,40 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
             conversationText += `\n\n【用户拍摄要求】${userInput}\n请根据以上拍摄要求生成画面，包含景别、角度、表情、动作等细节。`;
         }
 
-        // 第一步：用当前聊天角色AI生成生图提示词（复用角色人设，不单独调用DeepSeek提示词大师）
+        // 第一步：预取身份块/性别/视角，再用角色AI生成提示词
         loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理画面描述...</span></div>';
-        // 检测背面拍摄：用户输入包含"背"字（背影/背面/背后/背对）就进入背面模式
-        const isBackView = /背/.test(userInput || '');
-        let rolePrompt = await generatePromptWithRoleAI(conversationText, isDualMode, { roleA, roleB }, isBackView);
 
-        // 【严格执行】用AI把用户的动作/景别要求翻译成英文，强制加到提示词开头（权重最高）+ 末尾（重复强调）
+        // C. 镜头视角硬约束（正/侧/背），替代旧的单纯"背"字检测
+        const cameraView = getCameraViewConstraint(userInput);
+        const isBackView = cameraView?.type === 'rear';
+
+        // A. 固定身份块（带缓存，同一角色只翻译一次） + B. 确定性性别（不让AI猜）
+        let identityOpts = {}, genders = {};
+        if (isDualMode && roleA && roleB) {
+            const [blockA, blockB] = await Promise.all([ensureIdentityBlock(roleA), ensureIdentityBlock(roleB)]);
+            identityOpts = { A: blockA, B: blockB };
+            genders = { A: getRoleGender(roleA.desc), B: getRoleGender(roleB.desc) };
+        } else {
+            const cur = getCurrentRole();
+            identityOpts = { single: await ensureIdentityBlock(cur) };
+            genders = { single: cur ? getRoleGender(cur.desc) : '' };
+        }
+
+        let rolePrompt = await generatePromptWithRoleAI(conversationText, isDualMode, { roleA, roleB }, isBackView, { identity: identityOpts, genders, cameraView });
+
+        // 【严格执行】视角/动作/景别关键词，强制加到提示词开头（权重最高）+ 末尾（重复强调）
         const strictKeywords = await translateUserActionToEnglish(userInput);
-        // 默认全身照：用户没明确指定景别（全身/半身/特写/背影/正面/侧脸等）时，默认 full body
-        const hasShotType = /全身|半身|特写|背影|背面|背后|背对|正面|侧脸|侧身|近景|远景|大头/.test(userInput || '');
-        let finalKeywords = strictKeywords;
+        // 默认全身照：用户没明确指定景别（全身/半身/特写/各视角等）时默认 full body
+        const hasShotType = /全身|半身|特写|背影|背面|背后|背对|正面|正脸|侧脸|侧身|侧面|近景|远景|大头/.test(userInput || '');
+        let finalKeywords = '';
+        if (cameraView) finalKeywords += cameraView.tags; // 代码确定性视角，最优先
+        if (strictKeywords) finalKeywords += (finalKeywords ? ', ' : '') + strictKeywords;
         if (!hasShotType) {
-            finalKeywords = (finalKeywords ? finalKeywords + ', ' : '') + 'full body shot, full body, standing full figure, entire body visible from head to toe';
+            finalKeywords += (finalKeywords ? ', ' : '') + 'full body shot, full body, standing full figure, entire body visible from head to toe';
         }
         if (finalKeywords) {
             rolePrompt = finalKeywords + ', ' + rolePrompt + ', ' + finalKeywords;
-            console.log('[严格执行] 已强制加入拍摄要求:', finalKeywords);
+            console.log('[严格执行] 已强制加入视角/拍摄要求:', finalKeywords);
         }
 
         // 第二步：用角色AI生成的提示词直接生图（跳过独立的提示词优化）
