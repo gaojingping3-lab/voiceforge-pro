@@ -3970,6 +3970,25 @@ function removeUploadedImage() {
     if (input) input.value = '';
 }
 
+// 全屏图片查看器
+function openImageViewer() {
+    const generatedImg = document.getElementById('generated-image');
+    const viewerImg = document.getElementById('image-viewer-img');
+    const viewer = document.getElementById('image-viewer');
+    if (!generatedImg || !generatedImg.src || !viewer || !viewerImg) return;
+    viewerImg.src = generatedImg.src;
+    viewer.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeImageViewer() {
+    const viewer = document.getElementById('image-viewer');
+    if (viewer) {
+        viewer.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+}
+
 async function generateImage() {
     const prompt = document.getElementById('image-prompt').value.trim();
     const model = getImageModel();

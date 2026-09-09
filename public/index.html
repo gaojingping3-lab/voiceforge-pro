@@ -865,8 +865,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 <!-- 结果展示 -->
                 <div id="image-result" class="hidden">
-                    <div class="rounded-xl overflow-hidden border border-base-300 mb-3">
-                        <img id="generated-image" class="w-full" alt="生成的图片" />
+                    <div class="rounded-xl overflow-hidden border border-base-300 mb-3 cursor-zoom-in" onclick="openImageViewer()">
+                        <img id="generated-image" class="w-full" alt="生成的图片，点击放大" />
                     </div>
                     <div class="flex gap-2">
                         <a id="image-download-btn" class="btn btn-primary btn-xs flex-1" download="ai-generated.png">
@@ -1227,6 +1227,15 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </dialog>
 
-    <script src="assets/js/app.js?v=20260910k"></script>
+    <!-- 全屏图片查看器 -->
+    <div id="image-viewer" class="hidden fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center" onclick="closeImageViewer()">
+        <button class="absolute top-4 right-4 btn btn-ghost btn-circle text-white text-xl z-10" onclick="closeImageViewer()">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <img id="image-viewer-img" class="max-w-full max-h-full object-contain" alt="放大查看" />
+        <p class="absolute bottom-6 left-0 right-0 text-center text-white/60 text-xs">长按图片可保存到相册</p>
+    </div>
+
+    <script src="assets/js/app.js?v=20260910l"></script>
 </body>
 </html>
