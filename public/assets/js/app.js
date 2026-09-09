@@ -4136,30 +4136,42 @@ async function translateUserActionToEnglish(userInput) {
 }
 
 // 用当前聊天角色AI生成生图提示词（复用角色人设，不单独调用DeepSeek提示词大师）
-async function generatePromptWithRoleAI(conversationText) {
+async function generatePromptWithRoleAI(conversationText, isDualMode = false, dualRoles = null) {
     try {
         const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
         const llmKey = localStorage.getItem('LLM_KEY') || '';
         const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
         const currentRole = getCurrentRole();
 
-        // 构造角色人设（复用当前聊天的角色卡）
-        const roleDesc = currentRole ? currentRole.desc : '';
-        const roleName = currentRole ? currentRole.name : 'AI';
-
-        // 尝试从角色卡提取外貌部分
-        const appearance = extractAppearanceFromRoleCard(roleDesc);
-
         // 读取用户设置里的System Prompt，让生图提示词也遵守
         const customSystem = localStorage.getItem('LLM_SYSTEM') || '';
 
         let systemContent;
-        if (appearance) {
-            // 提取到外貌：角色AI只负责翻译外貌+提取动作，外貌严格按原文翻译不改写
-            systemContent = `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，生成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 【外貌部分】严格按照以下原文翻译成英文，不要改写、不要添加、不要遗漏：${appearance}\n3. 【动作部分】从对话中提取人物当前的动作、表情、姿态，用英文描述\n4. 明确人物性别（man/woman/girl/boy）\n5. 不要输出任何中文，不要加引号，直接输出提示词本身\n6. 不要添加风格词，风格已由系统固定前缀处理`;
+
+        if (isDualMode && dualRoles && dualRoles.roleA && dualRoles.roleB) {
+            // 双角色模式：提取两个角色的外貌，明确要求画面包含两个人物
+            const appearanceA = extractAppearanceFromRoleCard(dualRoles.roleA.desc) || dualRoles.roleA.desc;
+            const appearanceB = extractAppearanceFromRoleCard(dualRoles.roleB.desc) || dualRoles.roleB.desc;
+            systemContent = `你是一个专业的画面描述提取者。根据下面两个角色的对话，生成英文写实绘图提示词。要求：
+1. 只输出英文提示词，不要任何对话、解释、动作描写或台词
+2. 【角色A外貌】姓名：${dualRoles.roleA.name}，严格按照以下原文翻译成英文，不要改写、不要添加、不要遗漏：${appearanceA}
+3. 【角色B外貌】姓名：${dualRoles.roleB.name}，严格按照以下原文翻译成英文，不要改写、不要添加、不要遗漏：${appearanceB}
+4. 【动作部分】从对话中分别提取两个人物当前的动作、表情、姿态，用英文描述
+5. 明确两个人物的性别（man/woman/girl/boy）
+6. 画面中必须同时包含两个人物，不要只画一个人
+7. 不要输出任何中文，不要加引号，直接输出提示词本身
+8. 不要添加风格词，风格已由系统固定前缀处理`;
         } else {
-            // 没提取到外貌：降级为原来的方式，整个desc传给角色AI
-            systemContent = `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，提取画面视觉信息，转换成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 包含人物外貌（严格按照角色设定，不要改写）、服装、当前动作、表情、环境\n3. 明确人物性别（man/woman/girl/boy）\n4. 不要输出任何中文，不要加引号，直接输出提示词本身\n5. 不要添加风格词，风格已由系统固定前缀处理`;
+            // 单人模式：原来的逻辑
+            const roleDesc = currentRole ? currentRole.desc : '';
+            const roleName = currentRole ? currentRole.name : 'AI';
+            const appearance = extractAppearanceFromRoleCard(roleDesc);
+
+            if (appearance) {
+                systemContent = `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，生成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 【外貌部分】严格按照以下原文翻译成英文，不要改写、不要添加、不要遗漏：${appearance}\n3. 【动作部分】从对话中提取人物当前的动作、表情、姿态，用英文描述\n4. 明确人物性别（man/woman/girl/boy）\n5. 不要输出任何中文，不要加引号，直接输出提示词本身\n6. 不要添加风格词，风格已由系统固定前缀处理`;
+            } else {
+                systemContent = `你是${roleName}。角色设定：${roleDesc}\n\n现在请你根据下面的对话内容，提取画面视觉信息，转换成英文写实绘图提示词。要求：\n1. 只输出英文提示词，不要任何对话、解释、动作描写或台词\n2. 包含人物外貌（严格按照角色设定，不要改写）、服装、当前动作、表情、环境\n3. 明确人物性别（man/woman/girl/boy）\n4. 不要输出任何中文，不要加引号，直接输出提示词本身\n5. 不要添加风格词，风格已由系统固定前缀处理`;
+            }
         }
 
         const messages = [];
@@ -4262,9 +4274,9 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         // 把最近两轮对话整理成文本，前面加上角色外貌信息
         let conversationText;
         if (isDualMode) {
-            // 双角色：消息本身已包含[角色名]，直接用
+            // 双角色：AI消息本身已包含[角色名]前缀，直接用，不要加空冒号
             conversationText = roleInfo + recentMessages.map(m =>
-                `${m.role === 'user' ? '我' : ''}: ${m.content}`
+                m.role === 'user' ? `我: ${m.content}` : m.content
             ).join('\n');
         } else {
             // 单人：加上当前角色名
@@ -4280,7 +4292,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
 
         // 第一步：用当前聊天角色AI生成生图提示词（复用角色人设，不单独调用DeepSeek提示词大师）
         loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理画面描述...</span></div>';
-        let rolePrompt = await generatePromptWithRoleAI(conversationText);
+        let rolePrompt = await generatePromptWithRoleAI(conversationText, isDualMode, { roleA, roleB });
 
         // 【严格执行】用AI把用户的动作/景别要求翻译成英文，强制加到提示词末尾
         const strictKeywords = await translateUserActionToEnglish(userInput);
