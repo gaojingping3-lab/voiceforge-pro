@@ -2047,6 +2047,14 @@ let callSavedAutoPlay = false;
 let callSavedReasoning = 'off';
 const MAX_CALL_RETRIES = 2;
 
+// 语音打断（Barge-in）相关
+let callBargeInAudioCtx = null;
+let callBargeInAnalyser = null;
+let callBargeInStream = null;
+let callBargeInInterval = null;
+const BARGE_IN_THRESHOLD = 35; // 音量阈值 0-255
+const BARGE_IN_DURATION = 250; // 持续超过阈值多少ms判定为说话
+
 // 初始化通话模式的语音识别
 function initCallRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -2157,11 +2165,13 @@ async function sendCallMessage(text) {
 function waitForAISpeechEnd() {
     isCallAISpeaking = true;
     updateCallStatus('AI正在说话...', 'speaking');
+    startBargeInDetection(); // 启动语音打断检测
 
     let waited = 0;
     const checkInterval = setInterval(() => {
         if (!isCallMode) {
             clearInterval(checkInterval);
+            stopBargeInDetection();
             return;
         }
         waited += 300;
@@ -2170,6 +2180,7 @@ function waitForAISpeechEnd() {
             ttsQueueManager.queue.length === 0 &&
             !ttsQueueManager.isPlaying) {
             clearInterval(checkInterval);
+            stopBargeInDetection();
             isCallAISpeaking = false;
             callSending = false;
             if (isCallMode) {
@@ -2179,6 +2190,7 @@ function waitForAISpeechEnd() {
         // 超时保护：30秒后强制恢复监听（防止生图等情况卡住）
         if (waited > 30000) {
             clearInterval(checkInterval);
+            stopBargeInDetection();
             isCallAISpeaking = false;
             callSending = false;
             if (isCallMode) {
@@ -2199,8 +2211,87 @@ function startCallListening() {
         // 重启识别器
         setTimeout(() => {
             if (isCallMode) startCallListening();
-        }, 500);
+        }, 200);
     }
+}
+
+// ============================================
+// 语音打断（Barge-in）：AI说话时用户开口自动打断
+// ============================================
+async function startBargeInDetection() {
+    if (!isCallMode || !isCallAISpeaking) return;
+    try {
+        callBargeInStream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+        });
+        callBargeInAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (callBargeInAudioCtx.state === 'suspended') {
+            await callBargeInAudioCtx.resume();
+        }
+        const source = callBargeInAudioCtx.createMediaStreamSource(callBargeInStream);
+        callBargeInAnalyser = callBargeInAudioCtx.createAnalyser();
+        callBargeInAnalyser.fftSize = 256;
+        source.connect(callBargeInAnalyser);
+
+        const dataArray = new Uint8Array(callBargeInAnalyser.frequencyBinCount);
+        let aboveThresholdTime = 0;
+        let lastCheck = Date.now();
+
+        callBargeInInterval = setInterval(() => {
+            if (!isCallMode || !isCallAISpeaking) {
+                stopBargeInDetection();
+                return;
+            }
+            callBargeInAnalyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            const avg = sum / dataArray.length;
+
+            const now = Date.now();
+            const delta = now - lastCheck;
+            lastCheck = now;
+
+            if (avg > BARGE_IN_THRESHOLD) {
+                aboveThresholdTime += delta;
+                if (aboveThresholdTime > BARGE_IN_DURATION) {
+                    // 用户说话了，打断AI
+                    triggerBargeIn();
+                }
+            } else {
+                aboveThresholdTime = 0;
+            }
+        }, 50);
+    } catch (e) {
+        console.warn('打断检测启动失败:', e);
+    }
+}
+
+function stopBargeInDetection() {
+    if (callBargeInInterval) {
+        clearInterval(callBargeInInterval);
+        callBargeInInterval = null;
+    }
+    if (callBargeInStream) {
+        callBargeInStream.getTracks().forEach(t => t.stop());
+        callBargeInStream = null;
+    }
+    if (callBargeInAudioCtx) {
+        callBargeInAudioCtx.close().catch(() => {});
+        callBargeInAudioCtx = null;
+    }
+    callBargeInAnalyser = null;
+}
+
+function triggerBargeIn() {
+    if (!isCallAISpeaking) return;
+    stopBargeInDetection();
+    if (typeof ttsQueueManager !== 'undefined') {
+        ttsQueueManager.clearQueue();
+    }
+    isCallAISpeaking = false;
+    callSending = false;
+    updateCallStatus('已打断，请说话...', 'listening');
+    setTimeout(() => startCallListening(), 200);
 }
 
 // 更新通话状态显示
@@ -2294,6 +2385,9 @@ function exitVoiceCallMode() {
     isCallAISpeaking = false;
     callSending = false;
 
+    // 停止打断检测
+    stopBargeInDetection();
+
     // 停止识别
     if (callRecognition) {
         try { callRecognition.stop(); } catch (e) {}
@@ -2330,20 +2424,9 @@ function exitVoiceCallMode() {
     if (input) input.value = '';
 }
 
-// 点击通话界面：打断AI说话，重新监听
+// 点击通话界面：不再打断（改为语音打断），仅做视觉反馈
 function handleCallOverlayClick() {
-    if (!isCallMode) return;
-
-    if (isCallAISpeaking) {
-        // 打断AI说话
-        if (typeof ttsQueueManager !== 'undefined') {
-            ttsQueueManager.clearQueue();
-        }
-        isCallAISpeaking = false;
-        callSending = false;
-        updateCallStatus('已打断，请说话...', 'listening');
-        setTimeout(() => startCallListening(), 200);
-    }
+    // 语音打断已替代点击打断，这里不做任何操作
 }
 
 // 发送聊天消息
