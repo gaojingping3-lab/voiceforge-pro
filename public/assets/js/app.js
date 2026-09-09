@@ -4844,6 +4844,25 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
 // 生图防重复触发标志
 let isGeneratingChatImage = false;
 
+// ===== 魔法棒角度菜单：点击展开拍摄角度，选择后用该角度+最近4条聊天记录生成 =====
+function toggleMagicMenu(e) {
+    if (e) e.stopPropagation(); // 阻止冒泡，避免被document点击监听立即关闭
+    const menu = document.getElementById('magic-view-menu');
+    if (menu) menu.classList.toggle('hidden');
+}
+
+function magicGenerate(viewWord) {
+    const menu = document.getElementById('magic-view-menu');
+    if (menu) menu.classList.add('hidden');
+    generateImageFromChat(viewWord || '', 4);
+}
+
+// 点击页面其他地方时自动收起角度菜单
+document.addEventListener('click', function () {
+    const menu = document.getElementById('magic-view-menu');
+    if (menu && !menu.classList.contains('hidden')) menu.classList.add('hidden');
+});
+
 async function generateImageFromChat(userInput = '', messageCount = 2) {
     // 防重复：正在生成时静默返回，不弹alert打扰用户
     if (isGeneratingChatImage) {

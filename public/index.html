@@ -600,9 +600,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h2 class="card-title text-lg"><i class="fa-solid fa-comments text-primary"></i> 与乐 语音对话</h2>
                     <div class="flex items-center gap-1">
                         <span id="total-tokens-display" class="text-xs text-gray-400 ml-2">0 tokens</span>
-                        <button class="btn btn-ghost btn-xs" onclick="generateImageFromChat('', 4)" title="根据最近4条对话生成图片">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i>
-                        </button>
+                        <div class="relative">
+                            <button id="magic-wand-btn" class="btn btn-ghost btn-xs" onclick="toggleMagicMenu(event)" title="选择拍摄角度，根据最近4条对话生成图片">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            </button>
+                            <!-- 魔法棒角度菜单：点击展开，选择后按该角度+最近4条聊天记录生成 -->
+                            <div id="magic-view-menu" class="hidden absolute right-0 top-full mt-1 z-50 bg-base-100 border border-base-300 rounded-box shadow-xl p-2 w-36">
+                                <div class="text-xs text-gray-400 px-1 pb-1">拍摄角度</div>
+                                <div class="grid grid-cols-2 gap-1">
+                                    <button class="btn btn-xs" onclick="magicGenerate('全身照')">全身照</button>
+                                    <button class="btn btn-xs" onclick="magicGenerate('半身照')">半身照</button>
+                                    <button class="btn btn-xs" onclick="magicGenerate('特写')">特写</button>
+                                    <button class="btn btn-xs" onclick="magicGenerate('背面')">背面</button>
+                                    <button class="btn btn-xs" onclick="magicGenerate('侧面')">侧面</button>
+                                    <button class="btn btn-xs" onclick="magicGenerate('正脸')">正脸</button>
+                                </div>
+                            </div>
+                        </div>
                         <button id="autoplay-btn" class="btn btn-ghost btn-xs" onclick="toggleAutoPlay()" title="自动朗读">
                             <i class="fa-solid fa-volume-high"></i>
                         </button>
@@ -1320,6 +1334,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260910e"></script>
+    <script src="assets/js/app.js?v=20260910f"></script>
 </body>
 </html>
