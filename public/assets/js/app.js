@@ -4949,8 +4949,8 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
             strictKeywords = await translateUserActionToEnglish(userInput);
         }
 
-        // 默认全身照：用户没明确指定景别（全身/半身/特写/各视角等）时默认 full body
-        const hasShotType = /全身|半身|特写|背影|背面|背后|背对|正面|正脸|侧脸|侧身|侧面|近景|远景|大头/.test(userInput || '');
+        // 默认全身照：用户没明确指定景别（全身/半身/特写/近景/远景/大头）时默认 full body（视角词如背面/侧面不算景别）
+        const hasShotType = /全身|半身|特写|近景|远景|大头/.test(userInput || '');
         let finalKeywords = '';
         if (cameraView) {
             if (isSplitRear) {
