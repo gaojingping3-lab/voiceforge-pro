@@ -4646,8 +4646,11 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
     if (isGeneratingChatImage) {
         return;
     }
+    // 上下文条数：魔法棒按钮传4时用4条；普通生图自动调整：单人3条（1轮对话），双角色4条
+    const isDualMode = localStorage.getItem('DUAL_ROLE_MODE') === '1';
+    const effectiveCount = messageCount > 2 ? messageCount : (isDualMode ? 4 : 3);
     // 取最近N条消息
-    const recentMessages = chatHistory.slice(-messageCount);
+    const recentMessages = chatHistory.slice(-effectiveCount);
     if (recentMessages.length < 2) {
         alert('至少需要一轮对话才能生成图片');
         return;
