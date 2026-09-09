@@ -151,6 +151,17 @@
     max-width: 100% !important;
     box-sizing: border-box !important;
   }
+  /* 生图页面细滚动条 */
+  #image-section ::-webkit-scrollbar {
+    width: 3px !important;
+  }
+  #image-section ::-webkit-scrollbar-track {
+    background: transparent !important;
+  }
+  #image-section ::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.15) !important;
+    border-radius: 2px !important;
+  }
   .tab { position: relative; transition: all 0.2s ease; }
   .tab.tab-active::after {
     content: '';
@@ -1245,6 +1256,6 @@ document.addEventListener('DOMContentLoaded', () => {
         <p class="absolute bottom-6 left-0 right-0 text-center text-white/60 text-xs">长按图片可保存到相册</p>
     </div>
 
-    <script src="assets/js/app.js?v=20260910o"></script>
+    <script src="assets/js/app.js?v=20260910p"></script>
 </body>
 </html>
