@@ -1426,16 +1426,29 @@ function updateTotalTokensDisplay() {
 }
 
 // 永久记忆：保存聊天历史到localStorage
+// 获取当前聊天记录的storage key（按角色ID分组，双角色单独存）
+function getChatStorageKey() {
+    const isDual = localStorage.getItem('DUAL_ROLE_MODE') === '1';
+    if (isDual) {
+        return 'CHAT_HISTORY_DUAL';
+    }
+    const currentRole = getCurrentRole();
+    const roleId = currentRole ? currentRole.id : 'default';
+    return 'CHAT_HISTORY_' + roleId;
+}
+
 function saveChatHistory() {
     try {
-        localStorage.setItem('PERM_CHAT_HISTORY', JSON.stringify(chatHistory));
+        const key = getChatStorageKey();
+        localStorage.setItem(key, JSON.stringify(chatHistory));
     } catch (e) {
         console.warn('LocalStorage存储空间不足，自动清理最早的历史记录:', e);
         // 逐步清理最旧的记录，直到能存下
         while (chatHistory.length > 20) {
             chatHistory.shift();
             try {
-                localStorage.setItem('PERM_CHAT_HISTORY', JSON.stringify(chatHistory));
+                const key = getChatStorageKey();
+                localStorage.setItem(key, JSON.stringify(chatHistory));
                 return;
             } catch (inner) {
                 // 继续清理
@@ -1444,13 +1457,27 @@ function saveChatHistory() {
     }
 }
 
-// 永久记忆：从localStorage恢复聊天历史
+// 永久记忆：从localStorage恢复聊天历史（按当前角色加载）
 function loadChatHistory() {
-    const saved = localStorage.getItem('PERM_CHAT_HISTORY');
+    const key = getChatStorageKey();
+    const saved = localStorage.getItem(key);
     if (saved) {
         try {
             chatHistory = JSON.parse(saved);
         } catch (e) {
+            chatHistory = [];
+        }
+    } else {
+        // 第一次加载：如果有旧版全局记录，迁移到当前角色名下
+        const oldSaved = localStorage.getItem('PERM_CHAT_HISTORY');
+        if (oldSaved) {
+            try {
+                chatHistory = JSON.parse(oldSaved);
+                saveChatHistory(); // 保存到新的分组key
+            } catch (e) {
+                chatHistory = [];
+            }
+        } else {
             chatHistory = [];
         }
     }
@@ -2594,30 +2621,22 @@ function switchRole(id) {
     }
 
     setTimeout(() => {
-        // 如果有聊天记录，询问是否清空
-        if (chatHistory.length > 0) {
-            if (!confirm('切换角色后是否清空当前聊天记录？\n\n确定：清空记忆，用新角色重新开始\n取消：保留聊天记录（可能导致人设混乱）')) {
-                // 用户选择取消，只切换角色不清空
-                localStorage.setItem('CURRENT_ROLE_ID', id);
-                renderRoleCard();
-                updateFullscreenTitle();
-                document.getElementById('role-list-modal').close();
-                sfxSuccess();
-                if (chatContainer) chatContainer.style.opacity = '1';
-                return;
-            }
-            // 用户选择清空
-            chatHistory = [];
-            localStorage.removeItem('PERM_CHAT_HISTORY');
-            if (chatContainer) chatContainer.innerHTML = '';
-        }
+        // 先保存当前角色的聊天记录
+        saveChatHistory();
+
+        // 切换角色ID
         localStorage.setItem('CURRENT_ROLE_ID', id);
         renderRoleCard();
         updateFullscreenTitle();
         document.getElementById('role-list-modal').close();
-        // AI主动发送开场白
+
+        // 加载新角色的聊天记录
+        loadChatHistory();
+        renderChatHistory();
+
+        // 如果新角色没有聊天记录，且有开场白，就显示开场白
         const role = getCurrentRole();
-        if (role.opening && chatContainer) {
+        if (role.opening && chatHistory.length === 0 && chatContainer) {
             const aiDiv = document.createElement('div');
             aiDiv.className = 'chat chat-start msg-enter relative gap-2';
             aiDiv.appendChild(createChatAvatar(role.name, false));
@@ -2625,24 +2644,14 @@ function switchRole(id) {
             bubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
             bubble.innerHTML = formatChatText(role.opening);
             aiDiv.appendChild(bubble);
-            // 加播放按钮
-            const playBtn = document.createElement('button');
-            playBtn.className = 'play-voice-btn absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
-            playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
-            playBtn.title = '播放语音';
-            playBtn.onclick = () => playChatMessage(bubble);
-            aiDiv.appendChild(playBtn);
             chatContainer.appendChild(aiDiv);
-            smartScroll(chatContainer);
-            // 加入记忆
             chatHistory.push({ role: 'assistant', content: role.opening });
             saveChatHistory();
+            smartScroll(chatContainer);
         }
+
         sfxSuccess();
-        // 淡入效果
-        if (chatContainer) {
-            chatContainer.style.opacity = '1';
-        }
+        if (chatContainer) chatContainer.style.opacity = '1';
     }, 200);
 }
 
@@ -2814,6 +2823,10 @@ function toggleDualRoleMode() {
     const toggle = document.getElementById('dual-role-toggle');
     const bar = document.getElementById('dual-role-bar');
     const singleVoiceBar = document.getElementById('single-voice-bar');
+
+    // 先保存当前模式的聊天记录
+    saveChatHistory();
+
     isDualMode = toggle.checked;
     if (isDualMode) {
         bar.classList.remove('hidden');
@@ -2821,6 +2834,7 @@ function toggleDualRoleMode() {
         fillDualRoleSelects();
         // 隐藏单角色卡，避免混淆
         document.getElementById('role-card').classList.add('hidden');
+        localStorage.setItem('DUAL_ROLE_MODE', '1');
     } else {
         bar.classList.add('hidden');
         if (singleVoiceBar) singleVoiceBar.classList.remove('hidden');
@@ -2829,7 +2843,13 @@ function toggleDualRoleMode() {
         dualRoleA = null;
         dualRoleB = null;
         document.getElementById('role-card').classList.remove('hidden');
+        localStorage.setItem('DUAL_ROLE_MODE', '0');
     }
+
+    // 加载新模式的聊天记录并重新渲染
+    loadChatHistory();
+    renderChatHistory();
+
     updateFullscreenTitle();
 }
 
@@ -2884,7 +2904,7 @@ async function startDualChat() {
         } else {
             // 用户选择清空
             chatHistory = [];
-            localStorage.removeItem('PERM_CHAT_HISTORY');
+            localStorage.removeItem(getChatStorageKey());
             document.getElementById('chat-messages').innerHTML = '';
         }
     }
@@ -3371,11 +3391,11 @@ function updateModeHint() {
 
 // 清空聊天记录（同时清除永久记忆）
 function clearChat() {
-    if (!confirm('确定清空所有聊天记录吗？AI将忘记全部对话内容。')) return;
+    if (!confirm('确定清空当前角色的聊天记录吗？AI将忘记全部对话内容。')) return;
     const container = document.getElementById('chat-messages');
     container.innerHTML = ''; // 清空，不显示默认欢迎消息
     chatHistory = []; // 清空对话记忆
-    localStorage.removeItem('PERM_CHAT_HISTORY'); // 清除本地永久记忆
+    localStorage.removeItem(getChatStorageKey()); // 清除当前角色的本地永久记忆
     // 重置总tokens
     totalTokensUsed = 0;
     localStorage.removeItem('TOTAL_TOKENS_USED');
