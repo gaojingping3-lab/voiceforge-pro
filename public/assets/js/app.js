@@ -4086,6 +4086,143 @@ function stripAppearanceFromRoleCard(roleDesc) {
     return result.trim();
 }
 
+// 从用户输入中严格提取景别和动作关键词，翻译成英文强制加入提示词
+function extractShotAndActionKeywords(userInput) {
+    if (!userInput) return '';
+    const keywords = [];
+
+    // 景别词映射（优先级：长词优先）
+    const shotMap = [
+        ['全身照', 'full body shot'],
+        ['全身', 'full body shot'],
+        ['特写', 'close-up shot'],
+        ['近景', 'close shot'],
+        ['远景', 'wide shot'],
+        ['全景', 'wide shot'],
+        ['半身', 'upper body shot'],
+        ['腰部以上', 'waist up shot'],
+        ['头像', 'headshot portrait'],
+        ['侧脸', 'side profile view'],
+        ['正面', 'front view'],
+        ['背面', 'back view'],
+        ['背影', 'back view'],
+        ['俯视', 'high angle shot'],
+        ['仰视', 'low angle shot'],
+        ['侧面', 'side view']
+    ];
+
+    // 动作/表情词映射
+    const actionMap = [
+        ['大笑', 'laughing out loud'],
+        ['微笑', 'smiling gently'],
+        ['笑着', 'smiling'],
+        ['笑', 'smiling'],
+        ['挥手', 'waving hand'],
+        ['招手', 'waving hand'],
+        ['坐着', 'sitting'],
+        ['坐下', 'sitting'],
+        ['站着', 'standing'],
+        ['站立', 'standing'],
+        ['跑步', 'running'],
+        ['跑', 'running'],
+        ['跳跃', 'jumping'],
+        ['跳', 'jumping'],
+        ['走路', 'walking'],
+        ['走', 'walking'],
+        ['跳舞', 'dancing'],
+        ['看镜头', 'looking at camera'],
+        ['盯着镜头', 'looking at camera'],
+        ['闭眼', 'eyes closed'],
+        ['闭着眼睛', 'eyes closed'],
+        ['抬头', 'looking up'],
+        ['低头', 'looking down'],
+        ['转身', 'turning around'],
+        ['回头', 'looking back'],
+        ['喝水', 'drinking water'],
+        ['吃东西', 'eating'],
+        ['看书', 'reading a book'],
+        ['读书', 'reading a book'],
+        ['玩手机', 'looking at phone'],
+        ['看手机', 'looking at phone'],
+        ['自拍', 'taking a selfie'],
+        ['抱臂', 'arms crossed'],
+        ['叉腰', 'hands on hips'],
+        ['托腮', 'resting chin on hand'],
+        ['歪头', 'head tilted'],
+        ['眨眼', 'winking'],
+        ['嘟嘴', 'pouting'],
+        ['生气', 'angry expression'],
+        ['难过', 'sad expression'],
+        ['开心', 'happy expression'],
+        ['害羞', 'shy expression'],
+        ['惊讶', 'surprised expression'],
+        ['思考', 'thinking pose'],
+        ['躺着', 'lying down'],
+        ['趴下', 'lying on stomach'],
+        ['盘腿', 'cross-legged'],
+        ['踮脚', 'standing on tiptoes'],
+        ['伸懒腰', 'stretching'],
+        ['打哈欠', 'yawning'],
+        ['睡觉', 'sleeping'],
+        ['工作', 'working'],
+        ['打字', 'typing'],
+        ['写字', 'writing'],
+        ['画画', 'drawing'],
+        ['弹吉他', 'playing guitar'],
+        ['弹钢琴', 'playing piano'],
+        ['唱歌', 'singing'],
+        ['听音乐', 'listening to music'],
+        ['喝咖啡', 'drinking coffee'],
+        ['喝茶', 'drinking tea'],
+        ['喝酒', 'drinking alcohol'],
+        ['做饭', 'cooking'],
+        ['切菜', 'chopping vegetables'],
+        ['洗衣服', 'washing clothes'],
+        ['打扫', 'cleaning'],
+        ['购物', 'shopping'],
+        ['开车', 'driving'],
+        ['骑车', 'riding bicycle'],
+        ['游泳', 'swimming'],
+        ['洗澡', 'taking a shower'],
+        ['化妆', 'putting on makeup'],
+        ['梳头', 'combing hair'],
+        ['扎头发', 'tying hair'],
+        ['戴帽子', 'wearing a hat'],
+        ['戴眼镜', 'wearing glasses'],
+        ['拿花', 'holding flowers'],
+        ['拿礼物', 'holding a gift'],
+        ['拿伞', 'holding an umbrella'],
+        ['抱宠物', 'holding a pet'],
+        ['摸头', 'patting head'],
+        ['牵手', 'holding hands'],
+        ['拥抱', 'hugging'],
+        ['接吻', 'kissing'],
+        ['比心', 'making heart gesture'],
+        ['比耶', 'making peace sign'],
+        ['点赞', 'thumbs up'],
+        ['OK手势', 'OK gesture']
+    ];
+
+    // 提取景别
+    for (const [cn, en] of shotMap) {
+        if (userInput.includes(cn)) {
+            keywords.push(en);
+            break; // 景别只取第一个
+        }
+    }
+
+    // 提取动作（可以多个）
+    const foundActions = new Set();
+    for (const [cn, en] of actionMap) {
+        if (userInput.includes(cn) && !foundActions.has(en)) {
+            foundActions.add(en);
+            keywords.push(en);
+        }
+    }
+
+    return keywords.join(', ');
+}
+
 // 用当前聊天角色AI生成生图提示词（复用角色人设，不单独调用DeepSeek提示词大师）
 async function generatePromptWithRoleAI(conversationText) {
     try {
@@ -4231,7 +4368,14 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
 
         // 第一步：用当前聊天角色AI生成生图提示词（复用角色人设，不单独调用DeepSeek提示词大师）
         loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理画面描述...</span></div>';
-        const rolePrompt = await generatePromptWithRoleAI(conversationText);
+        let rolePrompt = await generatePromptWithRoleAI(conversationText);
+
+        // 【严格执行】从用户输入中提取景别和动作关键词，强制加到提示词末尾，不依赖AI理解
+        const strictKeywords = extractShotAndActionKeywords(userInput);
+        if (strictKeywords) {
+            rolePrompt = rolePrompt + ', ' + strictKeywords;
+            console.log('[严格执行] 已强制加入关键词:', strictKeywords);
+        }
 
         // 第二步：用角色AI生成的提示词直接生图（跳过独立的提示词优化）
         const result = await generateImageWithSafety(conversationText, getImageModel(), (msg) => {
