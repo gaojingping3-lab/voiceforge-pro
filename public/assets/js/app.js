@@ -2019,7 +2019,7 @@ async function sendChatMessage() {
     if (isPhotoRequest) {
         input.value = '';
         input.style.height = 'auto';
-        await generateImageFromChat();
+        await generateImageFromChat(text); // 把当前用户输入传过去，用于景别识别
         return;
     }
 
@@ -4089,7 +4089,7 @@ async function generatePromptWithRoleAI(conversationText) {
 // 生图防重复触发标志
 let isGeneratingChatImage = false;
 
-async function generateImageFromChat() {
+async function generateImageFromChat(userInput = '') {
     // 防重复：正在生成时静默返回，不弹alert打扰用户
     if (isGeneratingChatImage) {
         return;
@@ -4153,8 +4153,8 @@ async function generateImageFromChat() {
         loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理画面描述...</span></div>';
         const rolePrompt = await generatePromptWithRoleAI(conversationText);
 
-        // 景别识别：从用户最后一条消息中检测全身/特写/半身
-        const lastUserMsg = recentMessages.find(m => m.role === 'user')?.content || '';
+        // 景别识别：优先从当前用户输入检测，其次从历史消息中检测
+        const lastUserMsg = userInput || recentMessages.find(m => m.role === 'user')?.content || '';
         let shotTypeKeyword = '';
         if (/全身|全身照|整个人|从头到脚/.test(lastUserMsg)) {
             shotTypeKeyword = 'full body shot, entire body, head to toe, full length';
