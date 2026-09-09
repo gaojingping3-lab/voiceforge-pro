@@ -2013,9 +2013,8 @@ async function sendChatMessage() {
     const text = input.value.trim();
     if (!text) return;
 
-    // 检测生图关键词：发送"拍张照片"等消息时直接触发生图，不走普通对话
-    // 用正则匹配更灵活：拍张照、拍张全身照、拍特写、发张照片、画张图等都能触发
-    const photoRegex = /(拍|发|画)[张个]?(全身|特写|半身|一下)?(照片|照|图片|图)|生成图片|看看照片|拍照看看/;
+    // 检测生图关键词：只要包含"照片"，或"拍/发/画"+"照/图"就触发生图
+    const photoRegex = /照片|拍.*(照|图)|发.*(照片|图)|画.*(图|图片)|生成图片|看看照片/;
     const isPhotoRequest = photoRegex.test(text);
     if (isPhotoRequest) {
         input.value = '';
@@ -4135,21 +4134,6 @@ async function generateImageFromChat(userInput = '') {
             roleInfo = currentRole ? `角色名：${currentRole.name}\n角色设定（包含外貌特征）：${currentRole.desc}\n\n` : '';
         }
 
-        // 景别识别：优先从当前用户输入检测，其次从历史消息中检测（提前识别，传给角色AI）
-        const lastUserMsg = userInput || recentMessages.find(m => m.role === 'user')?.content || '';
-        let shotTypeKeyword = '';
-        let shotTypeDesc = '';
-        if (/全身|全身照|整个人|从头到脚/.test(lastUserMsg)) {
-            shotTypeKeyword = 'full body shot, entire body, head to toe, full length';
-            shotTypeDesc = '【景别要求】全身照，从头到脚完整显示人物全身';
-        } else if (/特写|脸部特写|面部特写|近景|脸/.test(lastUserMsg)) {
-            shotTypeKeyword = 'close-up shot, face portrait, detailed face, closeup';
-            shotTypeDesc = '【景别要求】脸部特写，聚焦面部细节';
-        } else if (/半身|上半身|腰部以上|胸像/.test(lastUserMsg)) {
-            shotTypeKeyword = 'upper body shot, waist up, half body';
-            shotTypeDesc = '【景别要求】上半身，腰部以上';
-        }
-
         // 把最近两轮对话整理成文本，前面加上角色外貌信息
         let conversationText;
         if (isDualMode) {
@@ -4164,22 +4148,19 @@ async function generateImageFromChat(userInput = '') {
                 `${m.role === 'user' ? '我' : currentRole?.name || 'AI'}: ${m.content}`
             ).join('\n');
         }
-        // 如果有景别要求，加在对话文本末尾，让角色AI生成提示词时就包含
-        if (shotTypeDesc) {
-            conversationText += '\n\n' + shotTypeDesc;
+        // 把用户的拍摄要求也加进去，让角色AI自己理解（全身/特写/侧脸/微笑等）
+        if (userInput) {
+            conversationText += `\n\n【用户拍摄要求】${userInput}\n请根据以上拍摄要求生成画面，包含景别、角度、表情、动作等细节。`;
         }
 
         // 第一步：用当前聊天角色AI生成生图提示词（复用角色人设，不单独调用DeepSeek提示词大师）
         loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理画面描述...</span></div>';
         const rolePrompt = await generatePromptWithRoleAI(conversationText);
 
-        // 如果识别到景别，再加在提示词最前面（双重保险）
-        const finalPrompt = shotTypeKeyword ? shotTypeKeyword + ', ' + rolePrompt : rolePrompt;
-
         // 第二步：用角色AI生成的提示词直接生图（跳过独立的提示词优化）
         const result = await generateImageWithSafety(conversationText, getImageModel(), (msg) => {
             loadingBubble.innerHTML = `<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${msg}</span></div>`;
-        }, finalPrompt);
+        }, rolePrompt);
 
         // 3. 把图片插入聊天记录
         loadingDiv.remove();
