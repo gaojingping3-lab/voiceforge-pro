@@ -4759,7 +4759,7 @@ const FIXED_IMAGE_STYLE = 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens
 const IMAGE_STYLES = {
     photorealistic: { name: '写实照片', prefix: 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, natural lighting, realistic skin texture, visible pores, low saturation, lifelike, candid photo, no makeup filter' },
     anime: { name: '动漫二次元', prefix: 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality' },
-    japanese_anime: { name: '日系动漫插画', prefix: 'Japanese anime illustration, cute kawaii style, moe, big sparkling eyes, detailed beautiful eyes, soft features, sweet expression, adorable, cel shading, clean lineart, vibrant pastel colors, soft shading, detailed outdoor background, scenic environment, blue sky with clouds, natural sunlight, rich environmental details, depth of field, cinematic composition, no white background, no plain background, studio ghibli inspired, high quality anime artwork' }
+    japanese_anime: { name: '日系动漫插画', prefix: 'anime style, semi-realistic, cel shading, clean lineart, vibrant colors, soft natural lighting, detailed background, cinematic composition, high quality, masterpiece, studio anime key visual' }
 };
 const ANATOMY_LOCK = 'masterpiece, high quality, detailed, anatomically correct, correct hands, five fingers per hand, natural posture, proper anatomy';
 
