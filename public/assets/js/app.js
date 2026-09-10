@@ -5317,21 +5317,9 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         // P1-H1：双角色分工（A背对、B看着A）提前判定，传给 generatePromptWithRoleAI 避免全局禁脸
         const isSplitRear = isDualSplitRear(userInput, isDualMode);
 
-        // A. 固定身份块（带缓存，同一角色只翻译一次） + B. 确定性性别（不让AI猜）
-        let identityOpts = {}, genders = {};
-        if (isDualMode && roleA && roleB) {
-            const [blockA, blockB] = await Promise.all([ensureIdentityBlock(roleA), ensureIdentityBlock(roleB)]);
-            identityOpts = { A: blockA, B: blockB };
-            genders = { A: getRoleGender(roleA.desc), B: getRoleGender(roleB.desc) };
-        } else {
-            const cur = getCurrentRole();
-            identityOpts = { single: await ensureIdentityBlock(cur) };
-            genders = { single: cur ? getRoleGender(cur.desc) : '' };
-        }
-
         let rolePrompt;
 
-        // 中文直接生成模式：跳过DeepSeek翻译，直接用中文构造提示词
+        // 中文直接生成模式：跳过DeepSeek翻译和身份块，直接用中文构造提示词（最快）
         if (getPromptLang() === 'zh') {
             loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在用中文提示词生成图片...</span></div>';
             const stylePrefix = getFixedStyleByMode();
@@ -5348,8 +5336,19 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
             }
             if (userInput) rolePrompt += `，${userInput}`;
         } else {
-            // 英文优化模式：用角色AI把中文聊天翻译成英文生图提示词
+            // 英文优化模式：先取身份块（带缓存），再用角色AI把中文聊天翻译成英文生图提示词
             loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理画面描述...</span></div>';
+            // A. 固定身份块（带缓存，同一角色只翻译一次） + B. 确定性性别（不让AI猜）
+            let identityOpts = {}, genders = {};
+            if (isDualMode && roleA && roleB) {
+                const [blockA, blockB] = await Promise.all([ensureIdentityBlock(roleA), ensureIdentityBlock(roleB)]);
+                identityOpts = { A: blockA, B: blockB };
+                genders = { A: getRoleGender(roleA.desc), B: getRoleGender(roleB.desc) };
+            } else {
+                const cur = getCurrentRole();
+                identityOpts = { single: await ensureIdentityBlock(cur) };
+                genders = { single: cur ? getRoleGender(cur.desc) : '' };
+            }
             rolePrompt = await generatePromptWithRoleAI(conversationText, isDualMode, { roleA, roleB }, isBackView, { identity: identityOpts, genders, cameraView, splitRear: isSplitRear });
         }
 
@@ -5362,10 +5361,10 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
             console.log('[视角兜底] 背面模式二次清洗, 清洗前:', beforeClean.length, '清洗后:', rolePrompt.length);
         }
 
-        // ===== 纯视角请求跳过LLM二次翻译（视角已由代码确定）；分工场景也跳过，避免AI加戏 =====
+        // ===== 纯视角请求跳过LLM二次翻译（视角已由代码确定）；分工场景也跳过，避免AI加戏；中文模式也跳过（直接用中文）=====
         let strictKeywords = '';
-        if (isSplitRear || (cameraView && isPureViewRequest(userInput))) {
-            // 视角已代码确定，不调用translateUserActionToEnglish
+        if (isSplitRear || (cameraView && isPureViewRequest(userInput)) || getPromptLang() === 'zh') {
+            // 视角已代码确定，或中文模式，不调用translateUserActionToEnglish
         } else {
             strictKeywords = await translateUserActionToEnglish(userInput);
         }
