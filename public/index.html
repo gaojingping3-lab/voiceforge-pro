@@ -905,6 +905,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     </select>
                 </div>
 
+                <!-- 生图提示词语言 -->
+                <div class="form-control w-full mb-4">
+                    <label class="label py-1"><span class="label-text font-bold">生图提示词语言</span></label>
+                    <select id="modal-prompt-lang" class="select select-bordered w-full text-sm" onchange="savePromptLang()">
+                        <option value="en">🌐 英文优化后生成（默认，经过AI翻译）</option>
+                        <option value="zh">🇨🇳 中文直接生成（不翻译，更贴近原意）</option>
+                    </select>
+                </div>
+
                 <!-- 上传图片（图生图/P图） -->
                 <div class="form-control w-full mb-4">
                     <label class="label py-1"><span class="label-text font-bold">上传参考图（可选，上传后为图生图模式）</span></label>
@@ -1356,6 +1365,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260910w"></script>
+    <script src="assets/js/app.js?v=20260910x"></script>
 </body>
 </html>

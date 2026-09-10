@@ -1973,6 +1973,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initSingleVoiceSelect(); // 恢复单人模式AI声音选择
     loadImageModelSelect(); // 恢复生图模型选择
     initImageStyleSelect(); // 恢复生图画风选择
+    initPromptLangSelect(); // 恢复生图提示词语言选择
 
     // 生图页面：用户手动编辑提示词时，清除"已优化"标记
     const imagePromptInput = document.getElementById('image-prompt');
@@ -4787,6 +4788,25 @@ function initImageStyleSelect() {
     }
 }
 
+// ===== 生图提示词语言开关（中文直接生成 / 英文优化后生成）=====
+function getPromptLang() {
+    return localStorage.getItem('PROMPT_LANG') || 'en';
+}
+
+function savePromptLang() {
+    const sel = document.getElementById('modal-prompt-lang');
+    if (sel) {
+        localStorage.setItem('PROMPT_LANG', sel.value);
+    }
+}
+
+function initPromptLangSelect() {
+    const sel = document.getElementById('modal-prompt-lang');
+    if (sel) {
+        sel.value = getPromptLang();
+    }
+}
+
 // 负面提示词：防止人体扭曲/坏手/多手指（传给生图模型）
 const NEGATIVE_PROMPT = 'bad hands, missing fingers, extra fingers, deformed hands, mutated hands, poorly drawn hands, extra limbs, missing limbs, deformed body, distorted proportions, bad anatomy, ugly, blurry, low quality';
 
@@ -5309,11 +5329,33 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
             genders = { single: cur ? getRoleGender(cur.desc) : '' };
         }
 
-        let rolePrompt = await generatePromptWithRoleAI(conversationText, isDualMode, { roleA, roleB }, isBackView, { identity: identityOpts, genders, cameraView, splitRear: isSplitRear });
+        let rolePrompt;
+
+        // 中文直接生成模式：跳过DeepSeek翻译，直接用中文构造提示词
+        if (getPromptLang() === 'zh') {
+            loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在用中文提示词生成图片...</span></div>';
+            if (isDualMode && roleA && roleB) {
+                const appA = extractAppearanceFromRoleCard(roleA.desc) || roleA.desc;
+                const appB = extractAppearanceFromRoleCard(roleB.desc) || roleB.desc;
+                const chatText = recentMessages.map(m => m.role === 'user' ? `我: ${m.content}` : m.content).join('；');
+                rolePrompt = `${roleA.name}（${appA}）和${roleB.name}（${appB}），画面中有两个人，${chatText}`;
+            } else {
+                const cur = getCurrentRole();
+                const app = cur ? (extractAppearanceFromRoleCard(cur.desc) || cur.desc) : '';
+                const chatText = recentMessages.map(m => `${m.role === 'user' ? '我' : cur?.name || 'AI'}: ${m.content}`).join('；');
+                rolePrompt = cur ? `${cur.name}，${app}，画面中只有一个人，${chatText}` : chatText;
+            }
+            if (userInput) rolePrompt += `，${userInput}`;
+        } else {
+            // 英文优化模式：用角色AI把中文聊天翻译成英文生图提示词
+            loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理画面描述...</span></div>';
+            rolePrompt = await generatePromptWithRoleAI(conversationText, isDualMode, { roleA, roleB }, isBackView, { identity: identityOpts, genders, cameraView, splitRear: isSplitRear });
+        }
 
         // ===== C 程序级二次清洗兜底：背面模式下，LLM即使没听话，也在最终prompt里洗掉正面/侧面冲突词 =====
         // 双角色分工场景（A背对镜头，B看着A）不做全局清洗，避免把B的朝向也洗成背面
-        if (cameraView && cameraView.type === 'rear' && !isSplitRear) {
+        // 中文直接生成模式跳过清洗（清洗是针对英文关键词的）
+        if (cameraView && cameraView.type === 'rear' && !isSplitRear && getPromptLang() !== 'zh') {
             const beforeClean = rolePrompt;
             rolePrompt = cleanRearViewPrompt(rolePrompt);
             console.log('[视角兜底] 背面模式二次清洗, 清洗前:', beforeClean.length, '清洗后:', rolePrompt.length);
