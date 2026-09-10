@@ -4759,12 +4759,18 @@ const FIXED_IMAGE_STYLE = 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens
 const IMAGE_STYLES = {
     photorealistic: { name: '写实照片', prefix: 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, natural lighting, realistic skin texture, visible pores, low saturation, lifelike, candid photo, no makeup filter' },
     anime: { name: '动漫二次元', prefix: 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality' },
-    monochrome_anime: { name: '黑白动漫', prefix: 'anime style, monochrome, black and white, manga style, ink drawing, clean lineart, grayscale, no color, high contrast, screentone' }
+    japanese_anime: { name: '日系动漫插画', prefix: 'Japanese anime illustration, cel shading, clean lineart, vibrant colors, detailed eyes, studio ghibli inspired, high quality anime artwork, soft shading, anime key visual' }
 };
 const ANATOMY_LOCK = 'masterpiece, high quality, detailed, anatomically correct, correct hands, five fingers per hand, natural posture, proper anatomy';
 
 function getImageStyle() {
-    return localStorage.getItem('IMAGE_STYLE') || 'photorealistic';
+    const s = localStorage.getItem('IMAGE_STYLE') || 'photorealistic';
+    // 旧值迁移：monochrome_anime 已替换为 japanese_anime
+    if (s === 'monochrome_anime') {
+        localStorage.setItem('IMAGE_STYLE', 'japanese_anime');
+        return 'japanese_anime';
+    }
+    return s;
 }
 
 function getFixedStyleByMode() {
