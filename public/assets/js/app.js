@@ -5334,16 +5334,17 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         // 中文直接生成模式：跳过DeepSeek翻译，直接用中文构造提示词
         if (getPromptLang() === 'zh') {
             loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在用中文提示词生成图片...</span></div>';
+            const stylePrefix = getFixedStyleByMode();
             if (isDualMode && roleA && roleB) {
                 const appA = extractAppearanceFromRoleCard(roleA.desc) || roleA.desc;
                 const appB = extractAppearanceFromRoleCard(roleB.desc) || roleB.desc;
                 const chatText = recentMessages.map(m => m.role === 'user' ? `我: ${m.content}` : m.content).join('；');
-                rolePrompt = `${roleA.name}（${appA}）和${roleB.name}（${appB}），画面中有两个人，2girls, exactly 2 people, only two characters, ${chatText}`;
+                rolePrompt = `${stylePrefix}, ${roleA.name}（${appA}）和${roleB.name}（${appB}），画面中有两个人，2girls, exactly 2 people, only two characters, ${chatText}`;
             } else {
                 const cur = getCurrentRole();
                 const app = cur ? (extractAppearanceFromRoleCard(cur.desc) || cur.desc) : '';
                 const chatText = recentMessages.map(m => `${m.role === 'user' ? '我' : cur?.name || 'AI'}: ${m.content}`).join('；');
-                rolePrompt = cur ? `${cur.name}，${app}，画面中只有一个人，solo, 1girl, only one person, no other people, single character, ${chatText}` : chatText;
+                rolePrompt = cur ? `${stylePrefix}, ${cur.name}，${app}，画面中只有一个人，solo, 1girl, only one person, no other people, single character, ${chatText}` : `${stylePrefix}, ${chatText}`;
             }
             if (userInput) rolePrompt += `，${userInput}`;
         } else {
