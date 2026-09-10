@@ -898,7 +898,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <!-- 生图画风选择 -->
                 <div class="form-control w-full mb-4">
                     <label class="label py-1"><span class="label-text font-bold">生图画风</span></label>
-                    <select id="modal-image-style" class="select select-bordered w-full text-sm">
+                    <select id="modal-image-style" class="select select-bordered w-full text-sm" onchange="saveImageStyle()">
                         <option value="photorealistic">📷 写实照片（默认）</option>
                         <option value="anime">🎨 动漫二次元</option>
                         <option value="cyberpunk">🌃 赛博朋克</option>
@@ -1359,6 +1359,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260910p"></script>
+    <script src="assets/js/app.js?v=20260910q"></script>
 </body>
 </html>

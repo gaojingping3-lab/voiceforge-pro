@@ -1972,6 +1972,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initDualRoleBarCollapse(); // 恢复双角色控制面板折叠状态
     initSingleVoiceSelect(); // 恢复单人模式AI声音选择
     loadImageModelSelect(); // 恢复生图模型选择
+    initImageStyleSelect(); // 恢复生图画风选择
 
     // 生图页面：用户手动编辑提示词时，清除"已优化"标记
     const imagePromptInput = document.getElementById('image-prompt');
@@ -4676,6 +4677,22 @@ function getImageStyle() {
 function getFixedStyleByMode() {
     const style = IMAGE_STYLES[getImageStyle()] || IMAGE_STYLES.photorealistic;
     return style.prefix + ', ' + ANATOMY_LOCK;
+}
+
+// 保存生图画风（AI生图页面下拉框onchange直接调用，无需点保存按钮）
+function saveImageStyle() {
+    const sel = document.getElementById('modal-image-style');
+    if (sel) {
+        localStorage.setItem('IMAGE_STYLE', sel.value);
+    }
+}
+
+// 页面加载时同步画风下拉框的当前值
+function initImageStyleSelect() {
+    const sel = document.getElementById('modal-image-style');
+    if (sel) {
+        sel.value = getImageStyle();
+    }
 }
 
 // 负面提示词：防止人体扭曲/坏手/多手指（传给生图模型）
