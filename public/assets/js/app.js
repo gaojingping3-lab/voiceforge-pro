@@ -4483,7 +4483,7 @@ async function generateImage() {
 // ============================================
 
 // 固定风格前缀：每次生图都强制加上，锁死画风不漂移
-const FIXED_IMAGE_STYLE = 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, natural indoor lighting, soft window light, realistic skin texture, visible pores, low saturation, lifelike, candid photo, no makeup filter, no anime, no illustration, no overexposure';
+const FIXED_IMAGE_STYLE = 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, natural lighting, realistic skin texture, visible pores, low saturation, lifelike, candid photo, no makeup filter, no anime, no illustration, no overexposure';
 
 // 从角色卡描述中提取外貌部分（用【外貌】或"外貌："标记）
 function extractAppearanceFromRoleCard(roleDesc) {
