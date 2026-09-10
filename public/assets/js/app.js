@@ -5177,7 +5177,7 @@ function toggleMagicMenu(e) {
 // 单角色菜单：直接用选中的角度词
 function magicGenerate(viewWord) {
     document.getElementById('magic-view-menu')?.classList.add('hidden');
-    generateImageFromChat(viewWord || '', 4);
+    generateImageFromChat(viewWord || '', 2);
 }
 
 // 双角色菜单：自动拼接当前角色A/B名字，再生成
@@ -5213,7 +5213,7 @@ function magicDualGenerate(type) {
             prompt = `${nameA}和${nameB}在一起`;
             break;
     }
-    generateImageFromChat(prompt, 4);
+    generateImageFromChat(prompt, 2);
 }
 
 // 点击页面其他地方时自动收起两个菜单
@@ -5227,7 +5227,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
     if (isGeneratingChatImage) {
         return;
     }
-    // 上下文条数：魔法棒按钮传4时用4条；普通生图自动调整：单人2条（1轮对话），双角色4条
+    // 上下文条数：单人2条（1轮对话），双角色4条；魔法棒和普通生图统一
     const isDualMode = localStorage.getItem('DUAL_ROLE_MODE') === '1';
     const effectiveCount = messageCount > 2 ? messageCount : (isDualMode ? 4 : 2);
     // 取最近N条消息
