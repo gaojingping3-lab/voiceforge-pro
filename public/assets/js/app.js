@@ -5076,7 +5076,7 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
 6. 【人物起手式】必须使用 ${dualTag}，性别已由系统确定，禁止更改；画面必须同时包含两个人物，不能只画一个
 7. 不要添加风格词（系统已有固定写实前缀）
 8. 除两个固定身份块外，动作/构图/场景/光线部分合计控制在180-280个英文单词，按结构精炼有序，不要堆砌无关形容词
-9. 【视觉安全防护】保持PG-13，只用肢体动作和表情传达张力，不输出敏感部位或露骨描写${viewRule}`;
+${viewRule}`;
         } else {
             // 单人模式
             const roleDesc = currentRole ? currentRole.desc : '';
@@ -5098,7 +5098,7 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
 6. 不要添加风格词（系统已有固定写实前缀）
 7. 除固定身份块外，动作/场景/光线部分合计控制在120-200个英文单词，按结构精炼有序，不要堆砌无关形容词
 8. 【景别最高优先级】若有【用户拍摄要求】，其景别（全身full body/半身half body/特写close-up）必须100%遵守并放在最前；要求全身时禁止写half body、bust、portrait、close-up
-9. 【视觉安全防护】保持PG-13，只用动作表情传达张力，不输出敏感部位或露骨描写${viewRule}`;
+${viewRule}`;
         }
 
         // 【背面拍摄】视角为背面时，外貌只写背影，禁止正面五官描述
