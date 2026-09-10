@@ -4340,6 +4340,89 @@ function pickModelByPrompt(prompt) {
 // 自动轮换队列（只使用Pollinations无审核系列，去掉不稳定的zimage）
 const AUTO_MODEL_QUEUE = ['pollinations-flux-realism', 'pollinations-seedream', 'pollinations-flux'];
 
+// ============================================
+// 前端直连 Agnes（绕过Cloudflare IP限流）
+// 失败时自动降级走后端 /api/image/generate
+// ============================================
+async function generateAgnesDirect(prompt, ratio = '1:1', inputImage = null) {
+    const agnesApiKey = getAgnesApiKey();
+    if (!agnesApiKey) {
+        throw new Error('未配置 Agnes API Key');
+    }
+    const agnesModel = 'agnes-image-2.1-flash';
+    const endpoints = [
+        { url: 'https://apihub.agnes-ai.cn/v1/images/generations', name: '.cn' },
+        { url: 'https://apihub.agnes-ai.com/v1/images/generations', name: '.com' }
+    ];
+    let lastError = null;
+
+    for (const { url: endpoint, name: epName } of endpoints) {
+        try {
+            const requestBody = {
+                model: agnesModel,
+                prompt: prompt,
+                size: '1K',
+                ratio: ratio,
+                n: 1,
+                response_format: 'b64_json',
+                extra_body: { response_format: 'b64_json' }
+            };
+            if (inputImage) {
+                requestBody.extra_body.image = [inputImage];
+            }
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${agnesApiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                let errDetail = '';
+                try {
+                    const errData = await response.json();
+                    errDetail = errData.error?.message || errData.message || JSON.stringify(errData).substring(0, 200);
+                } catch (e) {}
+                lastError = new Error(`[Agnes直连 ${epName}] HTTP ${response.status}: ${errDetail}`);
+                if (response.status === 429) break;
+                continue;
+            }
+
+            const data = await response.json();
+            const item = data.data?.[0];
+            if (!item || !item.b64_json) {
+                lastError = new Error(`[Agnes直连 ${epName}] 返回数据为空`);
+                continue;
+            }
+
+            let b64 = item.b64_json;
+            let contentType = 'image/png';
+            if (b64.startsWith('data:')) {
+                const match = b64.match(/^data:([^;]+);base64,(.+)$/);
+                if (match) {
+                    contentType = match[1] || 'image/png';
+                    b64 = match[2];
+                }
+            }
+            const binaryString = atob(b64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            const blob = new Blob([bytes], { type: contentType });
+            return { blob, model: 'agnes-2.1' };
+        } catch (err) {
+            // CORS错误或网络错误，记录后试下一个endpoint
+            lastError = new Error(`[Agnes直连 ${epName}] ${err.message || err}`);
+            continue;
+        }
+    }
+    throw lastError || new Error('Agnes直连失败');
+}
+
 async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimizedPrompt, inputImage = null, ratio = '1:1') {
     // 第一步：优化提示词
     // 如果传入了 preOptimizedPrompt（聊天里用角色AI生成的），直接用，不再单独调用DeepSeek
@@ -4376,6 +4459,19 @@ async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimiz
         }
 
         try {
+            // Agnes 模型：优先前端直连（绕过Cloudflare IP限流），失败自动降级走后端
+            if (currentModel === 'agnes-2.1') {
+                try {
+                    if (onStatusUpdate) onStatusUpdate('正在直连 Agnes 生成图片...');
+                    const directResult = await generateAgnesDirect(optimizedPrompt, ratio, inputImage);
+                    return { blob: directResult.blob, prompt: optimizedPrompt, model: currentModel };
+                } catch (directErr) {
+                    console.warn('Agnes直连失败，降级走后端:', directErr.message);
+                    if (onStatusUpdate) onStatusUpdate('Agnes直连失败，尝试后端通道...');
+                    // 继续往下走后端通道
+                }
+            }
+
             const requestBody = { prompt: optimizedPrompt, model: currentModel, agnesApiKey: getAgnesApiKey(), ratio: ratio, negative_prompt: NEGATIVE_PROMPT };
             if (inputImage) {
                 requestBody.inputImage = inputImage;
