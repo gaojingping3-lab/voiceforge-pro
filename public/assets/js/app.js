@@ -4947,7 +4947,7 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
 1. 只输出逗号分隔的英文视觉标签，不要任何解释、对话、台词或引号
 2. ${idSingle}
 3. 【破除隐喻】文学隐喻翻译成具体视觉动作（face to face、extremely close up、leaning close、touching cheek等），不要直接用抽象词
-4. 【人物起手式】必须使用 ${singleTag}，性别已由系统确定，禁止更改
+4. 【人物起手式】必须使用 ${singleTag}，性别已由系统确定，禁止更改；画面中必须只有1个人物，绝对不能出现第二个人、路人、背景人影或多人群像
 5. 【动作最高约束】严格按对话原文提取动作、表情、姿态，核心动作（站/坐/走/跑/拥抱/牵手/看/微笑等）不许改变、替换、省略或加戏，只能补充姿势细节、手部位置、头部朝向、眼神方向
 6. 不要添加风格词（系统已有固定写实前缀）
 7. 除固定身份块外，动作/场景/光线部分合计控制在120-200个英文单词，按结构精炼有序，不要堆砌无关形容词
@@ -5001,8 +5001,9 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
             return FIXED_IMAGE_STYLE + ', ' + conversationText;
         }
 
-        // 强制加上固定风格前缀，锁死画风
-        return FIXED_IMAGE_STYLE + ', ' + prompt;
+        // 强制加上固定风格前缀，锁死画风；单人模式额外锁死只有1个人物
+        const soloLock = isDualMode ? '' : ', solo, 1 person, only one character, no other people, no background figures';
+        return FIXED_IMAGE_STYLE + soloLock + ', ' + prompt;
     } catch (e) {
         console.warn('角色AI生成提示词异常，降级用原始文本:', e.message);
         return FIXED_IMAGE_STYLE + ', ' + conversationText;
