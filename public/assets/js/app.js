@@ -4662,11 +4662,7 @@ const FIXED_IMAGE_STYLE = 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens
 // ============================================
 const IMAGE_STYLES = {
     photorealistic: { name: '写实照片', prefix: 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, natural lighting, realistic skin texture, visible pores, low saturation, lifelike, candid photo, no makeup filter' },
-    anime: { name: '动漫二次元', prefix: 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality' },
-    cyberpunk: { name: '赛博朋克', prefix: 'cyberpunk style, neon lights, futuristic city, high contrast, cinematic lighting, blade runner aesthetic, rainy streets' },
-    ink: { name: '中国水墨', prefix: 'traditional Chinese ink painting, monochrome, brush strokes, rice paper texture, minimalist, sumi-e style, elegant' },
-    oil: { name: '油画', prefix: 'oil painting style, thick brushstrokes, classical painting, rich textures, rembrandt lighting, fine art, textured canvas' },
-    render3d: { name: '3D渲染', prefix: '3D render, octane render, unreal engine 5, volumetric lighting, hyperdetailed, CGI, ray tracing' }
+    anime: { name: '动漫二次元', prefix: 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality' }
 };
 const ANATOMY_LOCK = 'masterpiece, high quality, detailed, anatomically correct, correct hands, five fingers per hand, natural posture, proper anatomy';
 
