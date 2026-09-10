@@ -5384,6 +5384,12 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         if (!hasShotType) {
             finalKeywords += (finalKeywords ? ', ' : '') + 'full body shot, full body, standing full figure, entire body visible from head to toe';
         }
+        // 人物数量硬锁：单人强制只有1人，双角色强制2人，前后各加一次强化
+        if (isDualMode) {
+            finalKeywords += (finalKeywords ? ', ' : '') + 'exactly 2 people, only two characters, no third person, no extra people';
+        } else {
+            finalKeywords += (finalKeywords ? ', ' : '') + 'only one person in the entire image, absolutely no other people, no duplicates, no clones, no second person';
+        }
         if (finalKeywords) {
             rolePrompt = finalKeywords + ', ' + rolePrompt + ', ' + finalKeywords;
             console.log('[严格执行] 已强制加入视角/拍摄要求:', finalKeywords);
