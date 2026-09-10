@@ -5338,12 +5338,12 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
                 const appA = extractAppearanceFromRoleCard(roleA.desc) || roleA.desc;
                 const appB = extractAppearanceFromRoleCard(roleB.desc) || roleB.desc;
                 const chatText = recentMessages.map(m => m.role === 'user' ? `我: ${m.content}` : m.content).join('；');
-                rolePrompt = `${roleA.name}（${appA}）和${roleB.name}（${appB}），画面中有两个人，${chatText}`;
+                rolePrompt = `${roleA.name}（${appA}）和${roleB.name}（${appB}），画面中有两个人，2girls, exactly 2 people, only two characters, ${chatText}`;
             } else {
                 const cur = getCurrentRole();
                 const app = cur ? (extractAppearanceFromRoleCard(cur.desc) || cur.desc) : '';
                 const chatText = recentMessages.map(m => `${m.role === 'user' ? '我' : cur?.name || 'AI'}: ${m.content}`).join('；');
-                rolePrompt = cur ? `${cur.name}，${app}，画面中只有一个人，${chatText}` : chatText;
+                rolePrompt = cur ? `${cur.name}，${app}，画面中只有一个人，solo, 1girl, only one person, no other people, single character, ${chatText}` : chatText;
             }
             if (userInput) rolePrompt += `，${userInput}`;
         } else {
