@@ -78,10 +78,8 @@ export async function onRequestPost(context) {
             response_format: 'b64_json',
             extra_body: { response_format: 'b64_json' }
           };
-          // 负面提示词（防人体扭曲/坏手），Agnes不支持时会自动忽略
-          if (negativePrompt) {
-            requestBody.negative_prompt = negativePrompt;
-          }
+          // 注意：Agnes 图片接口不支持 negative_prompt 参数，会返回400错误，所以不传
+          // 负面约束已通过正面提示词中的 correct hands/five fingers/proper anatomy 实现
 
           // 图生图模式：传入参考图（Agnes 2.1要求放在extra_body.image，是数组，保留Data URI前缀）
           if (inputImage) {
