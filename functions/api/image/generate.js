@@ -11,6 +11,7 @@ export async function onRequestPost(context) {
     const agnesApiKey = body.agnesApiKey || '';
     const inputImage = body.inputImage || ''; // 图生图：上传的参考图base64
     const ratio = body.ratio || '1:1'; // 图片比例
+    const negativePrompt = body.negative_prompt || ''; // 负面提示词（防人体扭曲/坏手）
 
     // 根据比例设置输出尺寸（Agnes 1K档位）
     const sizeMap = {
@@ -77,6 +78,10 @@ export async function onRequestPost(context) {
             response_format: 'b64_json',
             extra_body: { response_format: 'b64_json' }
           };
+          // 负面提示词（防人体扭曲/坏手），Agnes不支持时会自动忽略
+          if (negativePrompt) {
+            requestBody.negative_prompt = negativePrompt;
+          }
 
           // 图生图模式：传入参考图（Agnes 2.1要求放在extra_body.image，是数组，保留Data URI前缀）
           if (inputImage) {
@@ -201,7 +206,10 @@ export async function onRequestPost(context) {
 
     const pollinationsModel = model.replace('pollinations-', '');
     const encodedPrompt = encodeURIComponent(prompt);
-    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?model=${pollinationsModel}&width=1024&height=1024&nologo=true`;
+    let url = `https://image.pollinations.ai/prompt/${encodedPrompt}?model=${pollinationsModel}&width=1024&height=1024&nologo=true`;
+    if (negativePrompt) {
+      url += `&negative_prompt=${encodeURIComponent(negativePrompt)}`;
+    }
 
     // 最多重试3次，遇到429限流时等待后重试
     let lastError = null;

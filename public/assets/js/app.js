@@ -1572,7 +1572,7 @@ async function restoreChatImages() {
                     const response = await fetch('/api/image/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: item.prompt, model: getImageModel(), agnesApiKey: getAgnesApiKey() })
+                        body: JSON.stringify({ prompt: item.prompt, model: getImageModel(), agnesApiKey: getAgnesApiKey(), negative_prompt: NEGATIVE_PROMPT })
                     });
                     if (!response.ok) {
                         let errorMsg = '生成失败';
@@ -4364,7 +4364,7 @@ async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimiz
         }
 
         try {
-            const requestBody = { prompt: optimizedPrompt, model: currentModel, agnesApiKey: getAgnesApiKey(), ratio: ratio };
+            const requestBody = { prompt: optimizedPrompt, model: currentModel, agnesApiKey: getAgnesApiKey(), ratio: ratio, negative_prompt: NEGATIVE_PROMPT };
             if (inputImage) {
                 requestBody.inputImage = inputImage;
             }
@@ -4643,7 +4643,10 @@ async function generateImage() {
 // ============================================
 
 // 固定风格前缀：每次生图都强制加上，锁死画风不漂移
-const FIXED_IMAGE_STYLE = 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, natural lighting, realistic skin texture, visible pores, low saturation, lifelike, candid photo, no makeup filter, no anime, no illustration, no overexposure';
+const FIXED_IMAGE_STYLE = 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, natural lighting, realistic skin texture, visible pores, low saturation, lifelike, candid photo, no makeup filter, no anime, no illustration, no overexposure, anatomically correct, correct hands, five fingers per hand, natural posture, proper anatomy';
+
+// 负面提示词：防止人体扭曲/坏手/多手指（传给生图模型）
+const NEGATIVE_PROMPT = 'bad hands, missing fingers, extra fingers, deformed hands, mutated hands, poorly drawn hands, extra limbs, missing limbs, deformed body, distorted proportions, bad anatomy, ugly, blurry, low quality';
 
 // 从角色卡描述中提取外貌部分（用【外貌】或"外貌："标记）
 function extractAppearanceFromRoleCard(roleDesc) {
@@ -5240,7 +5243,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
                 const response = await fetch('/api/image/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: savedPrompt, model: getImageModel(), agnesApiKey: getAgnesApiKey() })
+                    body: JSON.stringify({ prompt: savedPrompt, model: getImageModel(), agnesApiKey: getAgnesApiKey(), negative_prompt: NEGATIVE_PROMPT })
                 });
                 if (!response.ok) {
                     let errorMsg = '生成失败';
