@@ -1047,6 +1047,11 @@ function syncModalInputs() {
     if (userRoleDesc) {
         userRoleDesc.value = localStorage.getItem('USER_ROLE_DESC') || '';
     }
+    // 加载生图画风
+    const styleSelect = document.getElementById('modal-image-style');
+    if (styleSelect) {
+        styleSelect.value = getImageStyle();
+    }
 }
 
 function saveModalKeys() {
@@ -1076,6 +1081,11 @@ function saveModalKeys() {
     // 保存用户角色设定（角色C）
     const userRoleDesc = document.getElementById('user-role-desc').value.trim();
     localStorage.setItem('USER_ROLE_DESC', userRoleDesc);
+    // 保存生图画风
+    const styleSelect = document.getElementById('modal-image-style');
+    if (styleSelect) {
+        localStorage.setItem('IMAGE_STYLE', styleSelect.value);
+    }
     onEngineChange();
     updateModeHint();
     sfxSave();
@@ -4269,6 +4279,7 @@ async function optimizeImagePrompt(prompt) {
         const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
         const llmKey = localStorage.getItem('LLM_KEY') || '';
         const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+        const styleInfo = IMAGE_STYLES[getImageStyle()] || IMAGE_STYLES.photorealistic;
 
         // 8秒超时降级：优化太慢就用原始提示词，不让用户一直等
         const fetchPromise = fetch('/api/chat', {
@@ -4282,7 +4293,7 @@ async function optimizeImagePrompt(prompt) {
                 model: llmModel,
                 messages: [
                     { role: 'system', content: IMAGE_PROMPT_OPTIMIZER },
-                    { role: 'user', content: `根据以下对话内容和角色设定，生成一段详细的英文生图提示词。必须严格根据对话中的动作、场景、人物互动来生成画面，不能脱离对话内容凭空想象。角色外貌必须严格按照设定描述。\n\n${prompt}` }
+                    { role: 'user', content: `根据以下对话内容和角色设定，生成一段详细的英文生图提示词。必须严格根据对话中的动作、场景、人物互动来生成画面，不能脱离对话内容凭空想象。角色外貌必须严格按照设定描述。\n\n当前画风要求：${styleInfo.name}风格，画面必须符合"${styleInfo.prefix}"的视觉特征。\n\n${prompt}` }
                 ],
                 temperature: 0.8,
                 stream: false
@@ -4297,15 +4308,15 @@ async function optimizeImagePrompt(prompt) {
 
         if (!response.ok) {
             console.warn('提示词优化失败，使用原始提示词:', response.status);
-            return prompt;
+            return getFixedStyleByMode() + ', ' + prompt;
         }
 
         const data = await response.json();
         const optimized = data.choices?.[0]?.message?.content?.trim();
-        return optimized || prompt;
+        return getFixedStyleByMode() + ', ' + (optimized || prompt);
     } catch (e) {
         console.warn('提示词优化异常/超时，使用原始提示词:', e.message || e);
-        return prompt;
+        return getFixedStyleByMode() + ', ' + prompt;
     }
 }
 
@@ -4642,8 +4653,30 @@ async function generateImage() {
 // 根据对话生成图片
 // ============================================
 
-// 固定风格前缀：每次生图都强制加上，锁死画风不漂移
+// 固定风格前缀：每次生图都强制加上，锁死画风不漂移（保留兼容，实际生图用getFixedStyleByMode）
 const FIXED_IMAGE_STYLE = 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, natural lighting, realistic skin texture, visible pores, low saturation, lifelike, candid photo, no makeup filter, no anime, no illustration, no overexposure, anatomically correct, correct hands, five fingers per hand, natural posture, proper anatomy';
+
+// ============================================
+// 画风选择器（6种，设置里切换，聊天生图和AI生图页统一生效）
+// ============================================
+const IMAGE_STYLES = {
+    photorealistic: { name: '写实照片', prefix: 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, natural lighting, realistic skin texture, visible pores, low saturation, lifelike, candid photo, no makeup filter' },
+    anime: { name: '动漫二次元', prefix: 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality' },
+    cyberpunk: { name: '赛博朋克', prefix: 'cyberpunk style, neon lights, futuristic city, high contrast, cinematic lighting, blade runner aesthetic, rainy streets' },
+    ink: { name: '中国水墨', prefix: 'traditional Chinese ink painting, monochrome, brush strokes, rice paper texture, minimalist, sumi-e style, elegant' },
+    oil: { name: '油画', prefix: 'oil painting style, thick brushstrokes, classical painting, rich textures, rembrandt lighting, fine art, textured canvas' },
+    render3d: { name: '3D渲染', prefix: '3D render, octane render, unreal engine 5, volumetric lighting, hyperdetailed, CGI, ray tracing' }
+};
+const ANATOMY_LOCK = 'masterpiece, high quality, detailed, anatomically correct, correct hands, five fingers per hand, natural posture, proper anatomy';
+
+function getImageStyle() {
+    return localStorage.getItem('IMAGE_STYLE') || 'photorealistic';
+}
+
+function getFixedStyleByMode() {
+    const style = IMAGE_STYLES[getImageStyle()] || IMAGE_STYLES.photorealistic;
+    return style.prefix + ', ' + ANATOMY_LOCK;
+}
 
 // 负面提示词：防止人体扭曲/坏手/多手指（传给生图模型）
 const NEGATIVE_PROMPT = 'bad hands, missing fingers, extra fingers, deformed hands, mutated hands, poorly drawn hands, extra limbs, missing limbs, deformed body, distorted proportions, bad anatomy, ugly, blurry, low quality';
@@ -4990,7 +5023,7 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
 
         if (!response.ok) {
             console.warn('角色AI生成提示词失败，降级用原始文本:', response.status);
-            return FIXED_IMAGE_STYLE + ', ' + conversationText;
+            return getFixedStyleByMode() + ', ' + conversationText;
         }
 
         const data = await response.json();
@@ -5001,15 +5034,15 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
 
         // 如果清理后太短，降级用原始文本
         if (prompt.length < 20) {
-            return FIXED_IMAGE_STYLE + ', ' + conversationText;
+            return getFixedStyleByMode() + ', ' + conversationText;
         }
 
         // 强制加上固定风格前缀，锁死画风；单人模式额外锁死只有1个人物
         const soloLock = isDualMode ? '' : ', solo, 1 person, only one character, no other people, no background figures';
-        return FIXED_IMAGE_STYLE + soloLock + ', ' + prompt;
+        return getFixedStyleByMode() + soloLock + ', ' + prompt;
     } catch (e) {
         console.warn('角色AI生成提示词异常，降级用原始文本:', e.message);
-        return FIXED_IMAGE_STYLE + ', ' + conversationText;
+        return getFixedStyleByMode() + ', ' + conversationText;
     }
 }
 
