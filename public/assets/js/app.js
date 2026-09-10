@@ -1442,6 +1442,166 @@ function getChatStorageKey() {
     return 'CHAT_HISTORY_' + roleId;
 }
 
+// ============================================
+// 聊天生图图片持久化（IndexedDB 免费本地存储，最多保留30张，超出自动删最旧）
+// ============================================
+const CHAT_IMG_DB = 'voiceforge-chat-images';
+const CHAT_IMG_STORE = 'chatImages';
+const CHAT_IMG_LIMIT = 30;
+
+function openImageDB() {
+    return new Promise((resolve, reject) => {
+        if (!window.indexedDB) { reject(new Error('浏览器不支持IndexedDB')); return; }
+        const req = indexedDB.open(CHAT_IMG_DB, 1);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(CHAT_IMG_STORE)) {
+                const store = db.createObjectStore(CHAT_IMG_STORE, { keyPath: 'id', autoIncrement: true });
+                store.createIndex('ts', 'ts');
+                store.createIndex('roleKey', 'roleKey');
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('打开图片库失败'));
+    });
+}
+
+// 保存一张生图（带提示词，供重新生成）
+async function saveChatImage(blob, savedPrompt) {
+    try {
+        const db = await openImageDB();
+        return new Promise((resolve) => {
+            const tx = db.transaction(CHAT_IMG_STORE, 'readwrite');
+            tx.objectStore(CHAT_IMG_STORE).add({ blob, ts: Date.now(), roleKey: getChatStorageKey(), prompt: savedPrompt || '' });
+            tx.oncomplete = () => { trimChatImages(); resolve(); };
+            tx.onerror = () => resolve();
+        });
+    } catch (e) { console.warn('[ImgDB] 保存失败:', e.message); }
+}
+
+// 超过30张自动删最旧
+async function trimChatImages() {
+    try {
+        const db = await openImageDB();
+        const countReq = db.transaction(CHAT_IMG_STORE, 'readonly').objectStore(CHAT_IMG_STORE).count();
+        countReq.onsuccess = () => {
+            const count = countReq.result;
+            if (count <= CHAT_IMG_LIMIT) return;
+            const tx = db.transaction(CHAT_IMG_STORE, 'readwrite');
+            const store = tx.objectStore(CHAT_IMG_STORE);
+            const idx = store.index('ts');
+            let toDelete = count - CHAT_IMG_LIMIT;
+            const cursorReq = idx.openCursor();
+            cursorReq.onsuccess = () => {
+                const cursor = cursorReq.result;
+                if (cursor && toDelete > 0) {
+                    store.delete(cursor.primaryKey);
+                    toDelete--;
+                    cursor.continue();
+                }
+            };
+        };
+    } catch (e) { console.warn('[ImgDB] 裁剪失败:', e.message); }
+}
+
+// 读取当前角色所有图片（按时间正序）
+async function loadRoleChatImages() {
+    try {
+        const db = await openImageDB();
+        return new Promise((resolve) => {
+            const tx = db.transaction(CHAT_IMG_STORE, 'readonly');
+            const all = tx.objectStore(CHAT_IMG_STORE).getAll();
+            all.onsuccess = () => {
+                const key = getChatStorageKey();
+                const list = (all.result || []).filter(it => it.roleKey === key).sort((a, b) => a.ts - b.ts);
+                resolve(list);
+            };
+            all.onerror = () => resolve([]);
+        });
+    } catch (e) { return []; }
+}
+
+// 清空当前角色的图片
+async function clearRoleChatImages() {
+    try {
+        const db = await openImageDB();
+        return new Promise((resolve) => {
+            const key = getChatStorageKey();
+            const tx = db.transaction(CHAT_IMG_STORE, 'readwrite');
+            const store = tx.objectStore(CHAT_IMG_STORE);
+            const idx = store.index('roleKey');
+            const cursorReq = idx.openCursor(IDBKeyRange.only(key));
+            cursorReq.onsuccess = () => {
+                const cursor = cursorReq.result;
+                if (cursor) {
+                    store.delete(cursor.primaryKey);
+                    cursor.continue();
+                }
+            };
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+        });
+    } catch (e) {}
+}
+
+// 刷新后从IndexedDB恢复当前角色的生图（按时间顺序插到聊天末尾）
+async function restoreChatImages() {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+    const images = await loadRoleChatImages();
+    for (const item of images) {
+        if (!item.blob) continue;
+        const imageUrl = URL.createObjectURL(item.blob);
+        const role = getCurrentRole();
+        const imageDiv = document.createElement('div');
+        imageDiv.className = 'chat chat-start relative gap-2';
+        imageDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
+        const imageBubble = document.createElement('div');
+        imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-1 max-w-[80%]';
+        imageBubble.innerHTML = `
+            <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
+            <div class="flex gap-2 mt-2 px-1 pb-1">
+                <button class="btn btn-primary btn-xs flex-1 regenerate-btn"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
+                <a href="${imageUrl}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
+            </div>
+        `;
+        if (item.prompt) {
+            imageBubble.dataset.savedPrompt = item.prompt;
+            imageBubble.querySelector('.regenerate-btn').onclick = async function() {
+                const btn = this;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中...';
+                try {
+                    const response = await fetch('/api/image/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: item.prompt, model: getImageModel(), agnesApiKey: getAgnesApiKey() })
+                    });
+                    if (!response.ok) {
+                        let errorMsg = '生成失败';
+                        try { const errData = await response.json(); errorMsg = errData.error || errorMsg; } catch (e) {}
+                        throw new Error(errorMsg);
+                    }
+                    const blob = await response.blob();
+                    const newImageUrl = URL.createObjectURL(blob);
+                    imageBubble.querySelector('img').src = newImageUrl;
+                    imageBubble.querySelector('a[download]').href = newImageUrl;
+                } catch (err) {
+                    alert('重新生成失败，图片未更新（仍是原图）: ' + (err.message || err));
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> 重新生成';
+                }
+            };
+        } else {
+            imageBubble.querySelector('.regenerate-btn').style.display = 'none';
+        }
+        imageDiv.appendChild(imageBubble);
+        container.appendChild(imageDiv);
+    }
+    container.scrollTop = container.scrollHeight;
+}
+
 function saveChatHistory() {
     try {
         const key = getChatStorageKey();
@@ -1547,6 +1707,8 @@ function renderChatHistory() {
         }
     }
     container.scrollTop = container.scrollHeight;
+    // 异步恢复本角色的历史生图（IndexedDB）
+    restoreChatImages();
 }
 
 // 停止所有音频播放（聊天音频 + TTS页面播放器）
@@ -3785,6 +3947,7 @@ function clearChat() {
     container.innerHTML = ''; // 清空，不显示默认欢迎消息
     chatHistory = []; // 清空对话记忆
     localStorage.removeItem(getChatStorageKey()); // 清除当前角色的本地永久记忆
+    clearRoleChatImages(); // 联动清空当前角色保存在IndexedDB里的生图
     // 重置总tokens
     totalTokensUsed = 0;
     localStorage.removeItem('TOTAL_TOKENS_USED');
@@ -5051,6 +5214,8 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         const imageUrl = URL.createObjectURL(result.blob);
         // 保存优化后的提示词，重新生成时直接用，不再优化
         const savedPrompt = result.prompt;
+        // 存入IndexedDB，刷新/重开页面后不丢失
+        saveChatImage(result.blob, savedPrompt);
 
         const imageDiv = document.createElement('div');
         imageDiv.className = 'chat chat-start relative gap-2';
