@@ -4662,7 +4662,8 @@ const FIXED_IMAGE_STYLE = 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens
 // ============================================
 const IMAGE_STYLES = {
     photorealistic: { name: '写实照片', prefix: 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, natural lighting, realistic skin texture, visible pores, low saturation, lifelike, candid photo, no makeup filter' },
-    anime: { name: '动漫二次元', prefix: 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality' }
+    anime: { name: '动漫二次元', prefix: 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality' },
+    monochrome_anime: { name: '黑白动漫', prefix: 'anime style, monochrome, black and white, manga style, ink drawing, clean lineart, grayscale, no color, high contrast, screentone' }
 };
 const ANATOMY_LOCK = 'masterpiece, high quality, detailed, anatomically correct, correct hands, five fingers per hand, natural posture, proper anatomy';
 
