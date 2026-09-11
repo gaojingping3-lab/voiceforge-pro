@@ -5732,11 +5732,24 @@ async function generateVideoFromChat(userInput = '') {
         videoPrompt += motionTags;
 
         // 调用 Agnes 视频（创建+轮询），实时更新状态
+        const videoStartTs = Date.now();
         const videoUrl = await generateAgnesVideoDirect(videoPrompt, (status, progress) => {
-            const statusText = status === 'queued' ? '排队中...'
-                : status === 'in_progress' ? `视频生成中 ${progress}%`
-                : '处理中...';
-            loadingBubble.innerHTML = `<div class="flex flex-col gap-1"><div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${statusText}</span></div><progress class="progress progress-primary w-48 h-2" value="${progress}" max="100"></progress></div>`;
+            const waited = Math.floor((Date.now() - videoStartTs) / 1000);
+            let statusText, bar;
+            if (status === 'queued') {
+                statusText = `排队中，已等待 ${waited}s...`;
+                bar = '<progress class="progress progress-primary w-48 h-2"></progress>'; // 无value=循环动画
+            } else if (status === 'in_progress') {
+                statusText = `视频渲染中，已等待 ${waited}s（约需1分钟，进度数字可能暂时不动，请勿离开页面）`;
+                // 服务器进度是粗粒度(常见0/30/100)，有值就显示，否则循环动画
+                bar = progress > 0
+                    ? `<progress class="progress progress-primary w-48 h-2" value="${progress}" max="100"></progress>`
+                    : '<progress class="progress progress-primary w-48 h-2"></progress>';
+            } else {
+                statusText = `处理中，已等待 ${waited}s...`;
+                bar = '<progress class="progress progress-primary w-48 h-2"></progress>';
+            }
+            loadingBubble.innerHTML = `<div class="flex flex-col gap-1"><div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${statusText}</span></div>${bar}</div>`;
         });
 
         // 渲染视频气泡
