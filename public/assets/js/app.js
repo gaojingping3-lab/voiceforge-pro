@@ -5544,14 +5544,48 @@ async function generateAgnesVideoDirect(prompt, onProgress) {
 
             const createData = await createRes.json();
             const videoId = createData.video_id || createData.task_id || createData.id;
+            const taskId = createData.task_id || createData.id || videoId;
             if (!videoId) {
                 lastError = new Error(`[Agnes视频 ${epName}] 创建任务成功但未返回 video_id`);
                 continue;
             }
+            console.log('[Agnes视频] 任务已创建:', videoId, createData);
+
+            // 从多种可能的响应结构里提取视频URL（兼容接口字段差异）
+            const extractVideoUrl = (d) => {
+                if (!d) return null;
+                const candidates = [
+                    d.metadata?.url,
+                    d.metadata?.video_url,
+                    d.url,
+                    d.video_url,
+                    d.output?.url,
+                    d.output,
+                    d.data?.url,
+                    d.data?.[0]?.url,
+                    d.result?.url,
+                    d.videos?.[0]?.url
+                ];
+                for (const c of candidates) {
+                    if (typeof c === 'string' && /^https?:\/\/.+\.(mp4|webm|mov)/i.test(c)) return c;
+                }
+                // 兜底：递归找第一个 .mp4 链接
+                const stack = [d];
+                while (stack.length) {
+                    const cur = stack.pop();
+                    if (!cur || typeof cur !== 'object') continue;
+                    for (const v of Object.values(cur)) {
+                        if (typeof v === 'string' && /^https?:\/\/.+\.(mp4|webm|mov)/i.test(v)) return v;
+                        if (v && typeof v === 'object') stack.push(v);
+                    }
+                }
+                return null;
+            };
 
             // 2. 轮询任务结果（每3秒一次，最多等3分钟）
             const startTime = Date.now();
             const MAX_WAIT = 180000;
+            let completedNoUrlCount = 0;
             while (Date.now() - startTime < MAX_WAIT) {
                 await new Promise(r => setTimeout(r, 3000));
                 let pollData = null;
@@ -5570,12 +5604,32 @@ async function generateAgnesVideoDirect(prompt, onProgress) {
                 if (onProgress) onProgress(status, progress);
 
                 if (status === 'completed') {
-                    const url = pollData.metadata?.url;
-                    if (!url) {
-                        lastError = new Error('视频任务已完成，但响应中没有视频 URL');
-                        break;
+                    let url = extractVideoUrl(pollData);
+                    if (url) {
+                        console.log('[Agnes视频] 生成成功:', url);
+                        return url;
                     }
-                    return url;
+                    // completed 但元数据可能延迟，再试旧版接口
+                    completedNoUrlCount++;
+                    console.warn('[Agnes视频] completed但暂无URL，第' + completedNoUrlCount + '次重试，完整响应:', pollData);
+                    if (completedNoUrlCount <= 3) {
+                        try {
+                            const legacyRes = await fetch(`${base}/v1/videos/${encodeURIComponent(taskId)}`, {
+                                headers: { 'Authorization': `Bearer ${agnesApiKey}` }
+                            });
+                            if (legacyRes.ok) {
+                                const legacyData = await legacyRes.json();
+                                url = extractVideoUrl(legacyData);
+                                if (url) {
+                                    console.log('[Agnes视频] 旧版接口拿到URL:', url);
+                                    return url;
+                                }
+                            }
+                        } catch (legacyErr) {}
+                        continue; // 再等几轮
+                    }
+                    lastError = new Error('视频任务已完成，但响应中没有视频 URL。响应结构: ' + JSON.stringify(pollData).substring(0, 300));
+                    break;
                 }
                 if (status === 'failed') {
                     lastError = new Error('视频生成失败: ' + JSON.stringify(pollData.error || pollData).substring(0, 200));
