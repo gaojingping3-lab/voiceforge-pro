@@ -13,17 +13,17 @@ export async function onRequestPost(context) {
     const ratio = body.ratio || '1:1'; // 图片比例
     const negativePrompt = body.negative_prompt || ''; // 负面提示词（防人体扭曲/坏手）
 
-    // 根据比例设置输出尺寸（Agnes 1K档位）
+    // 根据比例设置输出尺寸（Agnes 2K档位，仅用于日志；实际请求用 size:'2K'+ratio）
     const sizeMap = {
-      '1:1': '1024x1024',
-      '9:16': '736x1312',
-      '16:9': '1312x736',
-      '3:4': '864x1152',
-      '4:3': '1152x864',
-      '2:3': '832x1248',
-      '3:2': '1248x832'
+      '1:1': '2048x2048',
+      '9:16': '1472x2624',
+      '16:9': '2624x1472',
+      '3:4': '1728x2304',
+      '4:3': '2304x1728',
+      '2:3': '1664x2496',
+      '3:2': '2496x1664'
     };
-    const outputSize = sizeMap[ratio] || '1024x1024';
+    const outputSize = sizeMap[ratio] || '2048x2048';
     console.log('[Img2Img] 输出比例:', ratio, '-> 尺寸:', outputSize);
 
     if (!prompt.trim()) {
@@ -72,7 +72,7 @@ export async function onRequestPost(context) {
           const requestBody = {
             model: agnesModel,
             prompt: prompt,
-            size: '1K',
+            size: '2K',
             ratio: ratio,
             n: 1,
             response_format: 'b64_json',

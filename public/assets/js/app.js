@@ -4370,7 +4370,7 @@ async function generateAgnesDirect(prompt, ratio = '1:1', inputImage = null) {
             const requestBody = {
                 model: agnesModel,
                 prompt: prompt,
-                size: '1K',
+                size: '2K',
                 ratio: ratio,
                 n: 1,
                 response_format: 'b64_json',
