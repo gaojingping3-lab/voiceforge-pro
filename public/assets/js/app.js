@@ -5683,7 +5683,7 @@ async function generateVideoFromChat(userInput = '') {
     if (isGeneratingChatVideo || isGeneratingChatImage) return;
 
     const isDualMode = localStorage.getItem('DUAL_ROLE_MODE') === '1';
-    const effectiveCount = isDualMode ? 4 : 2;
+    const effectiveCount = 4; // 单人/双人统一取最近4条，动作上下文更连贯
     const recentMessages = chatHistory.slice(-effectiveCount);
     if (recentMessages.length < 2) {
         alert('至少需要一轮对话才能生成视频');
@@ -5728,6 +5728,8 @@ async function generateVideoFromChat(userInput = '') {
                 videoPrompt = cur ? `${stylePrefix}, ${cur.name}，${app}，画面中只有一个人，solo, 1girl, only one person, no other people, single character, ${chatText}` : `${stylePrefix}, ${chatText}`;
             }
             if (userInput) videoPrompt += `，${userInput}`;
+            // 中文模式补视频连贯约束：只演最后一刻的单一动作，避免多动作堆叠导致逻辑混乱
+            videoPrompt += '，单镜头连续拍摄不切换场景，只表现对话最后一刻的一个连贯自然动作，人物位置和背景物品保持稳定，动作符合物理常识，不要瞬移或变形';
         } else {
             // 英文模式：复用角色AI翻译链路
             loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理视频画面描述...</span></div>';
@@ -5755,15 +5757,17 @@ async function generateVideoFromChat(userInput = '') {
             videoPrompt = await generatePromptWithRoleAI(conversationText, isDualMode, { roleA, roleB }, false, { identity: identityOpts, genders, cameraView: null, splitRear: false });
         }
 
-        // 视频专属：自然动态运动描述（让角色"动起来"，同时保持脸部/服装稳定）
+        // 视频专属：自然动态 + 逻辑连贯硬约束（避免多动作堆叠导致瞬移/错乱/肢体变形）
         // 按当前画风区分：写实模式强制真人实拍感，动漫模式才用 animation 词
         const isRealisticVideo = getImageStyle() === 'photorealistic';
         const styleMotion = isRealisticVideo
             ? 'photorealistic video, live action footage, real human, natural skin texture, realistic motion blur, cinematic handheld camera, 8k ultra realistic, no animation, no cartoon, no anime style'
             : 'high quality anime animation, smooth anime motion, consistent anime art style';
+        // 逻辑连贯：只演最后一刻的单一连贯动作，单镜头无剪辑，人物/背景稳定不变形
+        const coherenceTags = 'single continuous shot, no scene cuts, no jump cuts, focus on the final moment of the conversation, one smooth continuous physical action only, natural physically plausible movement, no teleporting, no morphing, no extra limbs, no duplicated body parts, no fused characters, stable consistent background, furniture and objects remain fixed in place, characters stay at their position, consistent identity and outfit throughout';
         const motionTags = isDualMode
-            ? `, exactly 2 people, natural subtle motion, gentle breathing, hair and clothes softly moving, smooth slow cinematic camera movement, both characters keep consistent appearance and face, ${styleMotion}`
-            : `, only one person, natural subtle motion, gentle breathing, hair and clothes softly moving, smooth slow cinematic camera movement, character keeps consistent face and outfit, ${styleMotion}`;
+            ? `, exactly 2 people, ${coherenceTags}, both characters keep consistent appearance and face, ${styleMotion}`
+            : `, only one person, ${coherenceTags}, character keeps consistent face and outfit, ${styleMotion}`;
         videoPrompt += motionTags;
 
         // 智能时长：默认8秒（动作舒展不加速）；用户说长/慢→10秒，短/快→4秒；纯前端判断零延迟
