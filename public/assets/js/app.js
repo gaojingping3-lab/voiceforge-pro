@@ -4277,7 +4277,7 @@ const IMAGE_PROMPT_OPTIMIZER = `You are a world-class AI Image Prompt Engineer f
 1. DECODE METAPHORS INTO VISUALS: The chat contains literary metaphors (e.g., "scalding breath", "temperature rising"). DO NOT use these in the image prompt. Translate them into literal physical actions (e.g., "face to face", "extremely close up", "intense eye contact", "pinning to wall").
 2. STRICT CHARACTER ACCURACY: You MUST extract the exact physical appearance (hair color, eye color, clothing, gender) from the provided Character Card. If there are two characters, explicitly separate them (e.g., "1girl with black hair and red dress, 1boy with blonde hair"). DO NOT alter their established looks.
 3. PRECISE POSING & COMPOSITION: Describe exactly where their hands are, their body language, and their spatial relationship based on the chat's context.
-4. CINEMATIC PHOTOREALISM: Force the style to be ultra-realistic. Append these tags to the end: "masterpiece, ultra detailed, photorealistic, cinematic lighting, 8k resolution, shot on DSLR, realistic skin texture".
+4. CINEMATIC PHOTOREALISM: Force the style to be ultra-realistic and attractive. Append these tags to the end: "masterpiece, best quality, photorealistic, soft cinematic lighting, 8k resolution, shot on DSLR, smooth healthy flawless skin, natural beauty, delicate attractive facial features". Do NOT describe visible pores, blemishes, wrinkles or rough skin texture; keep skin smooth, natural and good-looking.
 
 [OUTPUT FORMAT]
 Output ONLY a comma-separated list of English visual tags and descriptive phrases. NO explanations. NO conversational text.
@@ -4550,7 +4550,7 @@ async function optimizePromptManual() {
             messages.push({ role: 'system', content: customSystem });
         }
         // 再加优化提示词的指令
-        messages.push({ role: 'system', content: '你是AI绘画提示词大师。把用户输入的简单描述扩展成细节丰富的英文生图提示词。要求：1.只用英文输出 2.包含人物外貌、服装、动作、表情、环境、光线、氛围 3.写实照片风格：photorealistic, shot on DSLR, natural skin texture, detailed background 4.不要输出任何解释或前缀，直接输出提示词 5.长度100-180个单词' });
+        messages.push({ role: 'system', content: '你是AI绘画提示词大师。把用户输入的简单描述扩展成细节丰富的英文生图提示词。要求：1.只用英文输出 2.包含人物外貌、服装、动作、表情、环境、光线、氛围 3.写实照片风格：photorealistic, shot on DSLR, smooth healthy flawless skin, natural beauty, soft natural lighting, simple clean background 4.不要刻意描述毛孔、瑕疵、皱纹，皮肤柔和自然好看 5.不要输出任何解释或前缀，直接输出提示词 6.长度100-180个单词' });
         messages.push({ role: 'user', content: `优化这个生图提示词：${prompt}` });
 
         const fetchPromise = fetch('/api/chat', {
@@ -4760,13 +4760,13 @@ async function generateImage() {
 // ============================================
 
 // 固定风格前缀：每次生图都强制加上，锁死画风不漂移（保留兼容，实际生图用getFixedStyleByMode）
-const FIXED_IMAGE_STYLE = 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, natural lighting, realistic skin texture, visible pores, low saturation, lifelike, candid photo, no makeup filter, no anime, no illustration, no overexposure, anatomically correct, correct hands, five fingers per hand, natural posture, proper anatomy';
+const FIXED_IMAGE_STYLE = 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, soft natural lighting, smooth healthy flawless skin, natural beauty, delicate attractive facial features, lifelike, candid photo, natural skin texture, no anime, no illustration, no overexposure, anatomically correct, correct hands, five fingers per hand, natural posture, proper anatomy';
 
 // ============================================
 // 画风选择器（6种，设置里切换，聊天生图和AI生图页统一生效）
 // ============================================
 const IMAGE_STYLES = {
-    photorealistic: { name: '写实照片', prefix: 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, natural lighting, realistic skin texture, visible pores, low saturation, lifelike, candid photo, no makeup filter, simple clean background, no extra objects' },
+    photorealistic: { name: '写实照片', prefix: 'photorealistic, shot on Canon EOS R5, 50mm f/1.8 lens, soft natural lighting, smooth healthy flawless skin, natural beauty, delicate attractive facial features, lifelike, candid photo, natural skin texture, simple clean background, no extra objects' },
     anime: { name: '动漫二次元', prefix: 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality, simple clean background, no extra objects' },
     japanese_anime: { name: '日系动漫插画', prefix: 'anime style, semi-realistic, cel shading, clean lineart, vibrant colors, soft natural lighting, cinematic composition, high quality, masterpiece, studio anime key visual, simple clean background, no extra objects' }
 };
