@@ -4439,6 +4439,10 @@ async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimiz
     if (preOptimizedPrompt) {
         optimizedPrompt = preOptimizedPrompt;
         if (onStatusUpdate) onStatusUpdate('角色AI已整理画面描述，正在生成图片...');
+    } else if (getPromptLang() === 'zh') {
+        // 中文直接生成模式：不调DeepSeek扩写，原提示词+固定画风前缀直接出图（文生图/图生图都最快）
+        optimizedPrompt = getFixedStyleByMode() + ', ' + prompt;
+        if (onStatusUpdate) onStatusUpdate('中文直接生成，正在出图...');
     } else {
         if (onStatusUpdate) onStatusUpdate('正在优化提示词细节...');
         optimizedPrompt = await optimizeImagePrompt(prompt);
