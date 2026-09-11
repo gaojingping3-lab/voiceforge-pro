@@ -5524,9 +5524,9 @@ async function generateAgnesVideoDirect(prompt, onProgress) {
                 body: JSON.stringify({
                     model: 'agnes-video-v2.0',
                     prompt: prompt,
-                    width: 768,
-                    height: 1152,
-                    num_frames: 121,
+                    width: 448,
+                    height: 672,
+                    num_frames: 81,
                     frame_rate: 24
                 })
             });
@@ -5582,12 +5582,12 @@ async function generateAgnesVideoDirect(prompt, onProgress) {
                 return null;
             };
 
-            // 2. 轮询任务结果（每3秒一次，最多等3分钟）
+            // 2. 轮询任务结果（每2秒一次，最多等3分钟）
             const startTime = Date.now();
             const MAX_WAIT = 180000;
             let completedNoUrlCount = 0;
             while (Date.now() - startTime < MAX_WAIT) {
-                await new Promise(r => setTimeout(r, 3000));
+                await new Promise(r => setTimeout(r, 2000));
                 let pollData = null;
                 try {
                     const pollRes = await fetch(`${base}/agnesapi?video_id=${encodeURIComponent(videoId)}&model_name=agnes-video-v2.0`, {
