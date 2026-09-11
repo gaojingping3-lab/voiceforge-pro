@@ -5510,11 +5510,15 @@ async function generateAgnesVideoDirect(prompt, onProgress) {
         { base: 'https://apihub.agnes-ai.cn', name: '.cn' },
         { base: 'https://apihub.agnes-ai.com', name: '.com' }
     ];
+    // 优先尝试新版 2.5-flash（更写实），不可用自动回退 v2.0
+    const videoModels = ['agnes-video-2.5-flash', 'agnes-video-v2.0'];
     let lastError = null;
 
-    for (const { base, name: epName } of endpoints) {
+    for (const videoModel of videoModels) {
+        let modelUnavailable = false; // 当前模型不支持时，换下一个模型
+        for (const { base, name: epName } of endpoints) {
         try {
-            // 1. 创建视频任务（竖屏 9:16，约5秒：121帧/24fps）
+            // 1. 创建视频任务（竖屏，约3秒：81帧/24fps，480p快速档）
             const createRes = await fetch(`${base}/v1/videos`, {
                 method: 'POST',
                 headers: {
@@ -5522,7 +5526,7 @@ async function generateAgnesVideoDirect(prompt, onProgress) {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: 'agnes-video-v2.0',
+                    model: videoModel,
                     prompt: prompt,
                     width: 448,
                     height: 672,
@@ -5537,8 +5541,14 @@ async function generateAgnesVideoDirect(prompt, onProgress) {
                     const d = await createRes.json();
                     detail = d.error?.message || d.message || JSON.stringify(d).substring(0, 200);
                 } catch (e) {}
-                lastError = new Error(`[Agnes视频 ${epName}] HTTP ${createRes.status}: ${detail}`);
-                if (createRes.status === 429) break; // 限流不试另一域名
+                lastError = new Error(`[Agnes视频 ${videoModel} ${epName}] HTTP ${createRes.status}: ${detail}`);
+                if (createRes.status === 429) throw lastError; // 限流：所有模型共享，直接终止
+                // 模型不存在/不支持：换下一个模型（不再试另一域名）
+                if ((createRes.status === 400 || createRes.status === 404) && /model|not.*(exist|support|available)|unknown|invalid/i.test(detail)) {
+                    console.warn('[Agnes视频] 模型不可用，尝试回退:', videoModel, detail);
+                    modelUnavailable = true;
+                    break;
+                }
                 continue;
             }
 
@@ -5549,7 +5559,7 @@ async function generateAgnesVideoDirect(prompt, onProgress) {
                 lastError = new Error(`[Agnes视频 ${epName}] 创建任务成功但未返回 video_id`);
                 continue;
             }
-            console.log('[Agnes视频] 任务已创建:', videoId, createData);
+            console.log('[Agnes视频] 任务已创建，模型:', videoModel, '任务ID:', videoId, createData);
 
             // 从多种可能的响应结构里提取视频URL（兼容接口字段差异）
             const extractVideoUrl = (d) => {
@@ -5590,7 +5600,7 @@ async function generateAgnesVideoDirect(prompt, onProgress) {
                 await new Promise(r => setTimeout(r, 2000));
                 let pollData = null;
                 try {
-                    const pollRes = await fetch(`${base}/agnesapi?video_id=${encodeURIComponent(videoId)}&model_name=agnes-video-v2.0`, {
+                    const pollRes = await fetch(`${base}/agnesapi?video_id=${encodeURIComponent(videoId)}&model_name=${encodeURIComponent(videoModel)}`, {
                         headers: { 'Authorization': `Bearer ${agnesApiKey}` }
                     });
                     if (!pollRes.ok) continue; // 单次查询失败，下一轮继续
@@ -5606,7 +5616,7 @@ async function generateAgnesVideoDirect(prompt, onProgress) {
                 if (status === 'completed') {
                     let url = extractVideoUrl(pollData);
                     if (url) {
-                        console.log('[Agnes视频] 生成成功:', url);
+                        console.log('[Agnes视频] 生成成功，模型:', videoModel, url);
                         return url;
                     }
                     // completed 但元数据可能延迟，再试旧版接口
@@ -5637,13 +5647,18 @@ async function generateAgnesVideoDirect(prompt, onProgress) {
                 }
                 // queued / in_progress 继续轮询
             }
+            if (modelUnavailable) break;
             if (lastError) continue;
             lastError = new Error('视频生成超时（等待超过3分钟）');
         } catch (err) {
+            // 429 等硬错误直接向外抛
+            if (err && /429/.test(err.message || '')) throw err;
             // CORS/网络错误，试另一个 endpoint
-            lastError = new Error(`[Agnes视频 ${epName}] ${err.message || err}`);
+            lastError = new Error(`[Agnes视频 ${videoModel} ${epName}] ${err.message || err}`);
             continue;
         }
+        } // end endpoints
+        if (!modelUnavailable) break; // 当前模型走完了endpoint流程（无论成功失败），成功已return；失败则不必再换模型
     }
     throw lastError || new Error('Agnes 视频生成失败');
 }
