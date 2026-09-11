@@ -5726,9 +5726,14 @@ async function generateVideoFromChat(userInput = '') {
         }
 
         // 视频专属：自然动态运动描述（让角色"动起来"，同时保持脸部/服装稳定）
+        // 按当前画风区分：写实模式强制真人实拍感，动漫模式才用 animation 词
+        const isRealisticVideo = getImageStyle() === 'photorealistic';
+        const styleMotion = isRealisticVideo
+            ? 'photorealistic video, live action footage, real human, natural skin texture, realistic motion blur, cinematic handheld camera, 8k ultra realistic, no animation, no cartoon, no anime style'
+            : 'high quality anime animation, smooth anime motion, consistent anime art style';
         const motionTags = isDualMode
-            ? ', exactly 2 people, natural subtle motion, gentle breathing, hair and clothes softly moving, smooth slow cinematic camera movement, both characters keep consistent appearance and face, fluid realistic animation'
-            : ', only one person, natural subtle motion, gentle breathing, hair and clothes softly moving, smooth slow cinematic camera movement, character keeps consistent face and outfit, fluid realistic animation';
+            ? `, exactly 2 people, natural subtle motion, gentle breathing, hair and clothes softly moving, smooth slow cinematic camera movement, both characters keep consistent appearance and face, ${styleMotion}`
+            : `, only one person, natural subtle motion, gentle breathing, hair and clothes softly moving, smooth slow cinematic camera movement, character keeps consistent face and outfit, ${styleMotion}`;
         videoPrompt += motionTags;
 
         // 调用 Agnes 视频（创建+轮询），实时更新状态
