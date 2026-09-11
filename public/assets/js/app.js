@@ -5518,21 +5518,32 @@ async function generateAgnesVideoDirect(prompt, onProgress) {
         let modelUnavailable = false; // 当前模型不支持时，换下一个模型
         for (const { base, name: epName } of endpoints) {
         try {
-            // 1. 创建视频任务（竖屏，约3秒：81帧/24fps，480p快速档）
+            // 1. 创建视频任务。2.5-flash 与 v2.0 参数体系不同：
+            // 2.5-flash: mode/seconds/size/aspect_ratio（Flash固定720P，4-12秒）
+            // v2.0: width/height/num_frames/frame_rate
+            const isV25 = videoModel.includes('2.5');
+            const reqBody = isV25 ? {
+                model: videoModel,
+                prompt: prompt,
+                mode: 'text',
+                seconds: '5',
+                size: '720P',
+                aspect_ratio: '9:16'
+            } : {
+                model: videoModel,
+                prompt: prompt,
+                width: 448,
+                height: 672,
+                num_frames: 81,
+                frame_rate: 24
+            };
             const createRes = await fetch(`${base}/v1/videos`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${agnesApiKey}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    model: videoModel,
-                    prompt: prompt,
-                    width: 448,
-                    height: 672,
-                    num_frames: 81,
-                    frame_rate: 24
-                })
+                body: JSON.stringify(reqBody)
             });
 
             if (!createRes.ok) {
