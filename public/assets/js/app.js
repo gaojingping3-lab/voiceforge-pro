@@ -2627,6 +2627,15 @@ async function sendChatMessage() {
     const text = input.value.trim();
     if (!text) return;
 
+    // 检测生视频关键词（必须先于照片判断）：视频/录像/动起来
+    const videoRegex = /视频|录像|动起来/;
+    if (videoRegex.test(text)) {
+        input.value = '';
+        input.style.height = 'auto';
+        await generateVideoFromChat(text);
+        return;
+    }
+
     // 检测生图关键词：只要包含"照片"，或"拍/发/画"+"照/图"就触发生图
     const photoRegex = /照片|拍.*(照|图)|发.*(照片|图)|画.*(图|图片)|生成图片|看看照片/;
     const isPhotoRequest = photoRegex.test(text);
@@ -5483,5 +5492,228 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         } else {
             alert('生成失败: ' + errMsg + '\n\n可能原因：\n1. 生图免费额度已用完（每天重置）\n2. 网络问题，请重试\n3. 请求太频繁，稍后再试');
         }
+    }
+}
+
+// ============================================
+// 聊天生视频（Agnes Video V2.0，前端直连，异步任务+轮询）
+// ============================================
+let isGeneratingChatVideo = false;
+
+// 前端直连 Agnes 视频：创建任务 -> 轮询 -> 返回 mp4 URL
+async function generateAgnesVideoDirect(prompt, onProgress) {
+    const agnesApiKey = getAgnesApiKey();
+    if (!agnesApiKey) {
+        throw new Error('未配置 Agnes API Key（视频和图片共用同一个 Key）');
+    }
+    const endpoints = [
+        { base: 'https://apihub.agnes-ai.cn', name: '.cn' },
+        { base: 'https://apihub.agnes-ai.com', name: '.com' }
+    ];
+    let lastError = null;
+
+    for (const { base, name: epName } of endpoints) {
+        try {
+            // 1. 创建视频任务（竖屏 9:16，约5秒：121帧/24fps）
+            const createRes = await fetch(`${base}/v1/videos`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${agnesApiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'agnes-video-v2.0',
+                    prompt: prompt,
+                    width: 768,
+                    height: 1152,
+                    num_frames: 121,
+                    frame_rate: 24
+                })
+            });
+
+            if (!createRes.ok) {
+                let detail = '';
+                try {
+                    const d = await createRes.json();
+                    detail = d.error?.message || d.message || JSON.stringify(d).substring(0, 200);
+                } catch (e) {}
+                lastError = new Error(`[Agnes视频 ${epName}] HTTP ${createRes.status}: ${detail}`);
+                if (createRes.status === 429) break; // 限流不试另一域名
+                continue;
+            }
+
+            const createData = await createRes.json();
+            const videoId = createData.video_id || createData.task_id || createData.id;
+            if (!videoId) {
+                lastError = new Error(`[Agnes视频 ${epName}] 创建任务成功但未返回 video_id`);
+                continue;
+            }
+
+            // 2. 轮询任务结果（每3秒一次，最多等3分钟）
+            const startTime = Date.now();
+            const MAX_WAIT = 180000;
+            while (Date.now() - startTime < MAX_WAIT) {
+                await new Promise(r => setTimeout(r, 3000));
+                let pollData = null;
+                try {
+                    const pollRes = await fetch(`${base}/agnesapi?video_id=${encodeURIComponent(videoId)}&model_name=agnes-video-v2.0`, {
+                        headers: { 'Authorization': `Bearer ${agnesApiKey}` }
+                    });
+                    if (!pollRes.ok) continue; // 单次查询失败，下一轮继续
+                    pollData = await pollRes.json();
+                } catch (pollErr) {
+                    continue; // 网络抖动，继续轮询
+                }
+
+                const status = pollData.status;
+                const progress = typeof pollData.progress === 'number' ? pollData.progress : 0;
+                if (onProgress) onProgress(status, progress);
+
+                if (status === 'completed') {
+                    const url = pollData.metadata?.url;
+                    if (!url) {
+                        lastError = new Error('视频任务已完成，但响应中没有视频 URL');
+                        break;
+                    }
+                    return url;
+                }
+                if (status === 'failed') {
+                    lastError = new Error('视频生成失败: ' + JSON.stringify(pollData.error || pollData).substring(0, 200));
+                    break;
+                }
+                // queued / in_progress 继续轮询
+            }
+            if (lastError) continue;
+            lastError = new Error('视频生成超时（等待超过3分钟）');
+        } catch (err) {
+            // CORS/网络错误，试另一个 endpoint
+            lastError = new Error(`[Agnes视频 ${epName}] ${err.message || err}`);
+            continue;
+        }
+    }
+    throw lastError || new Error('Agnes 视频生成失败');
+}
+
+// 聊天里发"拍段视频"触发：复用聊天生图的角色卡/聊天记录提示词链路，最终走视频模型
+async function generateVideoFromChat(userInput = '') {
+    if (isGeneratingChatVideo || isGeneratingChatImage) return;
+
+    const isDualMode = localStorage.getItem('DUAL_ROLE_MODE') === '1';
+    const effectiveCount = isDualMode ? 4 : 2;
+    const recentMessages = chatHistory.slice(-effectiveCount);
+    if (recentMessages.length < 2) {
+        alert('至少需要一轮对话才能生成视频');
+        return;
+    }
+    isGeneratingChatVideo = true;
+
+    // 加载气泡
+    const container = document.getElementById('chat-messages');
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'chat chat-start relative gap-2';
+    const role = getCurrentRole();
+    loadingDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
+    const loadingBubble = document.createElement('div');
+    loadingBubble.className = 'chat-bubble bg-base-200 text-base-content';
+    loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在根据对话生成视频...</span></div>';
+    loadingDiv.appendChild(loadingBubble);
+    container.appendChild(loadingDiv);
+    smartScroll(container);
+
+    try {
+        const roleAId = document.getElementById('dual-role-a')?.value;
+        const roleBId = document.getElementById('dual-role-b')?.value;
+        const roleA = roleAId ? getRoleList().find(r => r.id == roleAId) : null;
+        const roleB = roleBId ? getRoleList().find(r => r.id == roleBId) : null;
+
+        let videoPrompt;
+
+        if (getPromptLang() === 'zh') {
+            // 中文模式：直接用中文构造（最快），和聊天生图保持同一套角色外貌/人数锁
+            loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在用中文提示词生成视频...</span></div>';
+            const stylePrefix = getFixedStyleByMode();
+            if (isDualMode && roleA && roleB) {
+                const appA = extractAppearanceFromRoleCard(roleA.desc) || roleA.desc;
+                const appB = extractAppearanceFromRoleCard(roleB.desc) || roleB.desc;
+                const chatText = recentMessages.map(m => m.role === 'user' ? `我: ${m.content}` : m.content).join('；');
+                videoPrompt = `${stylePrefix}, ${roleA.name}（${appA}）和${roleB.name}（${appB}），画面中有两个人，2girls, exactly 2 people, only two characters, ${chatText}`;
+            } else {
+                const cur = getCurrentRole();
+                const app = cur ? (extractAppearanceFromRoleCard(cur.desc) || cur.desc) : '';
+                const chatText = recentMessages.map(m => `${m.role === 'user' ? '我' : cur?.name || 'AI'}: ${m.content}`).join('；');
+                videoPrompt = cur ? `${stylePrefix}, ${cur.name}，${app}，画面中只有一个人，solo, 1girl, only one person, no other people, single character, ${chatText}` : `${stylePrefix}, ${chatText}`;
+            }
+            if (userInput) videoPrompt += `，${userInput}`;
+        } else {
+            // 英文模式：复用角色AI翻译链路
+            loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理视频画面描述...</span></div>';
+            let roleInfo = '';
+            if (isDualMode && roleA && roleB) {
+                roleInfo = `角色A：${roleA.name}\n角色A设定（包含外貌特征）：${roleA.desc}\n\n角色B：${roleB.name}\n角色B设定（包含外貌特征）：${roleB.desc}\n\n`;
+            } else {
+                const currentRole = getCurrentRole();
+                roleInfo = currentRole ? `角色名：${currentRole.name}\n角色设定（包含外貌特征）：${currentRole.desc}\n\n` : '';
+            }
+            const conversationText = roleInfo + recentMessages.map(m =>
+                m.role === 'user' ? `我: ${m.content}` : m.content
+            ).join('\n') + (userInput ? `\n\n【用户拍摄要求】${userInput}` : '');
+
+            let identityOpts = {}, genders = {};
+            if (isDualMode && roleA && roleB) {
+                const [blockA, blockB] = await Promise.all([ensureIdentityBlock(roleA), ensureIdentityBlock(roleB)]);
+                identityOpts = { A: blockA, B: blockB };
+                genders = { A: getRoleGender(roleA.desc), B: getRoleGender(roleB.desc) };
+            } else {
+                const cur = getCurrentRole();
+                identityOpts = { single: await ensureIdentityBlock(cur) };
+                genders = { single: cur ? getRoleGender(cur.desc) : '' };
+            }
+            videoPrompt = await generatePromptWithRoleAI(conversationText, isDualMode, { roleA, roleB }, false, { identity: identityOpts, genders, cameraView: null, splitRear: false });
+        }
+
+        // 视频专属：自然动态运动描述（让角色"动起来"，同时保持脸部/服装稳定）
+        const motionTags = isDualMode
+            ? ', exactly 2 people, natural subtle motion, gentle breathing, hair and clothes softly moving, smooth slow cinematic camera movement, both characters keep consistent appearance and face, fluid realistic animation'
+            : ', only one person, natural subtle motion, gentle breathing, hair and clothes softly moving, smooth slow cinematic camera movement, character keeps consistent face and outfit, fluid realistic animation';
+        videoPrompt += motionTags;
+
+        // 调用 Agnes 视频（创建+轮询），实时更新状态
+        const videoUrl = await generateAgnesVideoDirect(videoPrompt, (status, progress) => {
+            const statusText = status === 'queued' ? '排队中...'
+                : status === 'in_progress' ? `视频生成中 ${progress}%`
+                : '处理中...';
+            loadingBubble.innerHTML = `<div class="flex flex-col gap-1"><div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${statusText}</span></div><progress class="progress progress-primary w-48 h-2" value="${progress}" max="100"></progress></div>`;
+        });
+
+        // 渲染视频气泡
+        loadingDiv.remove();
+        const videoDiv = document.createElement('div');
+        videoDiv.className = 'chat chat-start relative gap-2';
+        videoDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
+        const videoBubble = document.createElement('div');
+        videoBubble.className = 'chat-bubble bg-base-200 text-base-content p-1 max-w-[80%]';
+        videoBubble.innerHTML = `
+            <video src="${videoUrl}" controls playsinline preload="metadata" class="rounded-lg w-full bg-black"></video>
+            <div class="flex gap-2 mt-2 px-1 pb-1">
+                <a href="${videoUrl}" target="_blank" rel="noopener" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-up-right-from-square"></i> 新窗口打开</a>
+                <a href="${videoUrl}" download="chat-generated.mp4" class="btn btn-primary btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
+            </div>
+        `;
+        videoDiv.appendChild(videoBubble);
+        container.appendChild(videoDiv);
+        smartScroll(container);
+    } catch (error) {
+        console.error('对话生视频失败:', error);
+        if (loadingDiv && loadingDiv.parentNode) loadingDiv.remove();
+        const errMsg = error.message || '';
+        if (errMsg.includes('429')) {
+            alert('视频生成失败：请求太频繁被限流了。\n\n视频每分钟最多5次，请等1分钟再试。');
+        } else if (errMsg.includes('401') || errMsg.includes('Agnes视频')) {
+            alert('Agnes 视频生成失败：\n\n' + errMsg + '\n\n建议：检查 Agnes API Key 是否正确，或稍后再试。');
+        } else {
+            alert('视频生成失败: ' + errMsg);
+        }
+    } finally {
+        isGeneratingChatVideo = false;
     }
 }
