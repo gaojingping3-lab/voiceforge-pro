@@ -5501,11 +5501,15 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
 let isGeneratingChatVideo = false;
 
 // 前端直连 Agnes 视频：创建任务 -> 轮询 -> 返回 mp4 URL
-async function generateAgnesVideoDirect(prompt, onProgress) {
+// seconds: 视频秒数（2.5-flash支持4-12秒字符串；v2.0按24fps+8n+1规则换算帧数）
+async function generateAgnesVideoDirect(prompt, onProgress, seconds = '8') {
     const agnesApiKey = getAgnesApiKey();
     if (!agnesApiKey) {
         throw new Error('未配置 Agnes API Key（视频和图片共用同一个 Key）');
     }
+    // v2.0 帧数换算：秒数*24fps，再取最接近的 8n+1
+    const secNum = parseInt(seconds) || 8;
+    const v20Frames = Math.round(secNum * 24 / 8) * 8 + 1;
     const endpoints = [
         { base: 'https://apihub.agnes-ai.cn', name: '.cn' },
         { base: 'https://apihub.agnes-ai.com', name: '.com' }
@@ -5526,7 +5530,7 @@ async function generateAgnesVideoDirect(prompt, onProgress) {
                 model: videoModel,
                 prompt: prompt,
                 mode: 'text',
-                seconds: '5',
+                seconds: String(seconds),
                 size: '720P',
                 aspect_ratio: '9:16'
             } : {
@@ -5534,7 +5538,7 @@ async function generateAgnesVideoDirect(prompt, onProgress) {
                 prompt: prompt,
                 width: 448,
                 height: 672,
-                num_frames: 81,
+                num_frames: v20Frames,
                 frame_rate: 24
             };
             const createRes = await fetch(`${base}/v1/videos`, {
@@ -5762,6 +5766,19 @@ async function generateVideoFromChat(userInput = '') {
             : `, only one person, natural subtle motion, gentle breathing, hair and clothes softly moving, smooth slow cinematic camera movement, character keeps consistent face and outfit, ${styleMotion}`;
         videoPrompt += motionTags;
 
+        // 智能时长：默认8秒（动作舒展不加速）；用户说长/慢→10秒，短/快→4秒；纯前端判断零延迟
+        let videoSeconds = '8';
+        const durText = userInput || '';
+        const mLong = durText.match(/(\d{1,2})\s*秒/);
+        if (mLong) {
+            const n = Math.min(12, Math.max(4, parseInt(mLong[1]))); // 钳制在4-12秒
+            videoSeconds = String(n);
+        } else if (/长一点|久一点|慢一点|长视频|慢慢/.test(durText)) {
+            videoSeconds = '10';
+        } else if (/短一点|快一点|短视频/.test(durText)) {
+            videoSeconds = '4';
+        }
+
         // 调用 Agnes 视频（创建+轮询），实时更新状态
         const videoStartTs = Date.now();
         const videoUrl = await generateAgnesVideoDirect(videoPrompt, (status, progress) => {
@@ -5771,7 +5788,7 @@ async function generateVideoFromChat(userInput = '') {
                 statusText = `排队中，已等待 ${waited}s...`;
                 bar = '<progress class="progress progress-primary w-48 h-2"></progress>'; // 无value=循环动画
             } else if (status === 'in_progress') {
-                statusText = `视频渲染中，已等待 ${waited}s（约需1分钟，进度数字可能暂时不动，请勿离开页面）`;
+                statusText = `视频渲染中（${videoSeconds}秒），已等待 ${waited}s，进度数字可能暂时不动，请勿离开页面`;
                 // 服务器进度是粗粒度(常见0/30/100)，有值就显示，否则循环动画
                 bar = progress > 0
                     ? `<progress class="progress progress-primary w-48 h-2" value="${progress}" max="100"></progress>`
@@ -5781,7 +5798,7 @@ async function generateVideoFromChat(userInput = '') {
                 bar = '<progress class="progress progress-primary w-48 h-2"></progress>';
             }
             loadingBubble.innerHTML = `<div class="flex flex-col gap-1"><div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${statusText}</span></div>${bar}</div>`;
-        });
+        }, videoSeconds);
 
         // 渲染视频气泡
         loadingDiv.remove();
