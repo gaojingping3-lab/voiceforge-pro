@@ -5347,6 +5347,7 @@ let isGeneratingAnime = false;
 // 把图片 + 对话合成一张"漫画格"（对话气泡烙在图片上）
 function composeComicPanel(imageUrl, lines, panelWidth) {
     return new Promise((resolve) => {
+        if (!panelWidth || panelWidth < 100) panelWidth = 320; // 容器宽度异常时用默认
         const img = new Image();
         img.onload = () => {
             try {
@@ -5574,7 +5575,8 @@ ${chatText}`;
                 const comicUrl = await composeComicPanel(url, lines, panelW);
                 const frameDiv = document.createElement('div');
                 frameDiv.className = 'mb-2';
-                const src = comicUrl || url;
+                // 合成失败时把原图转 base64 兜底（不用会被 revoke 的 blob URL，避免问号图）
+                const src = comicUrl || (await blobToDataURL(res.blob));
                 frameDiv.innerHTML = `<img src="${src}" alt="漫画格${i + 1}" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />`;
                 wrap.appendChild(frameDiv);
                 URL.revokeObjectURL(url);
