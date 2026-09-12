@@ -1566,7 +1566,7 @@ async function restoreChatImages() {
         const imageBubble = document.createElement('div');
         imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-1 max-w-[80%]';
         imageBubble.innerHTML = `
-            <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
+            <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />
             <div class="flex gap-2 mt-2 px-1 pb-1">
                 <button class="btn btn-primary btn-xs flex-1 regenerate-btn"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
                 <a href="${imageUrl}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
@@ -1579,19 +1579,11 @@ async function restoreChatImages() {
                 btn.disabled = true;
                 btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中...';
                 try {
-                    const response = await fetch('/api/image/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: item.prompt, model: getImageModel(), agnesApiKey: getAgnesApiKey(), negative_prompt: NEGATIVE_PROMPT })
-                    });
-                    if (!response.ok) {
-                        let errorMsg = '生成失败';
-                        try { const errData = await response.json(); errorMsg = errData.error || errorMsg; } catch (e) {}
-                        throw new Error(errorMsg);
-                    }
-                    const blob = await response.blob();
-                    const newImageUrl = URL.createObjectURL(blob);
+                    // 复用直连生图链路：用原提示词、原比例(1:1)，不再走后端慢通道、不重新优化
+                    const result = await generateImageWithSafety(item.prompt, getImageModel(), null, item.prompt, null, '1:1');
+                    const newImageUrl = URL.createObjectURL(result.blob);
                     imageBubble.querySelector('img').src = newImageUrl;
+                    imageBubble.querySelector('img').onclick = () => openImageLightbox(newImageUrl);
                     imageBubble.querySelector('a[download]').href = newImageUrl;
                 } catch (err) {
                     alert('重新生成失败，图片未更新（仍是原图）: ' + (err.message || err));
@@ -4353,6 +4345,20 @@ const AUTO_MODEL_QUEUE = ['pollinations-flux-realism', 'pollinations-seedream', 
 // 前端直连 Agnes（绕过Cloudflare IP限流）
 // 失败时自动降级走后端 /api/image/generate
 // ============================================
+// 点图全屏查看（点任意处关闭）
+function openImageLightbox(src) {
+    let lb = document.getElementById('img-lightbox');
+    if (!lb) {
+        lb = document.createElement('div');
+        lb.id = 'img-lightbox';
+        lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:99999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+        lb.onclick = () => { lb.style.display = 'none'; };
+        document.body.appendChild(lb);
+    }
+    lb.innerHTML = `<img src="${src}" style="max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;" />`;
+    lb.style.display = 'flex';
+}
+
 async function generateAgnesDirect(prompt, ratio = '1:1', inputImage = null) {
     const agnesApiKey = getAgnesApiKey();
     if (!agnesApiKey) {
@@ -5434,7 +5440,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         const imageBubble = document.createElement('div');
         imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-1 max-w-[80%]';
         imageBubble.innerHTML = `
-            <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
+            <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />
             <div class="flex gap-2 mt-2 px-1 pb-1">
                 <button class="btn btn-primary btn-xs flex-1 regenerate-btn"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
                 <a href="${imageUrl}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
@@ -5442,29 +5448,16 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         `;
         // 保存优化后的提示词，用于重新生成（直接用，不再优化）
         imageBubble.dataset.savedPrompt = savedPrompt;
-        // 重新生成按钮事件：用保存的提示词直接生成，不再优化
+        // 重新生成按钮事件：用保存的提示词直连生成，走和原图一致的快通道
         imageBubble.querySelector('.regenerate-btn').onclick = async function() {
             const btn = this;
             btn.disabled = true;
             btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中...';
             try {
-                // 直接调用后端，用保存的优化后提示词，不经过optimizeImagePrompt
-                const response = await fetch('/api/image/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: savedPrompt, model: getImageModel(), agnesApiKey: getAgnesApiKey(), negative_prompt: NEGATIVE_PROMPT })
-                });
-                if (!response.ok) {
-                    let errorMsg = '生成失败';
-                    try {
-                        const errData = await response.json();
-                        errorMsg = errData.error || errorMsg;
-                    } catch (e) {}
-                    throw new Error(errorMsg);
-                }
-                const blob = await response.blob();
-                const newImageUrl = URL.createObjectURL(blob);
+                const result = await generateImageWithSafety(savedPrompt, getImageModel(), null, savedPrompt, null, '1:1');
+                const newImageUrl = URL.createObjectURL(result.blob);
                 imageBubble.querySelector('img').src = newImageUrl;
+                imageBubble.querySelector('img').onclick = () => openImageLightbox(newImageUrl);
                 imageBubble.querySelector('a[download]').href = newImageUrl;
             } catch (err) {
                 alert('重新生成失败，图片未更新（仍是原图）: ' + (err.message || err));
