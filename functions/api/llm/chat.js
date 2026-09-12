@@ -4,8 +4,23 @@ export async function onRequestPost(context) {
     try {
         const body = await request.json();
         const apiKey = env.LLM_API_KEY || request.headers.get('X-Local-LLM-Key');
-        const baseUrl = body.baseUrl || 'https://api.deepseek.com';
+        let baseUrl = body.baseUrl || 'https://api.deepseek.com';
         const model = body.model || 'deepseek-v4-flash';
+
+        // 安全校验：防止公开站点被当任意代理（SSRF）——只放行 https 公网域名，拒绝内网/本机/裸 IP
+        try {
+            const u = new URL(baseUrl);
+            if (u.protocol !== 'https:') throw new Error('protocol');
+            const host = u.hostname.toLowerCase();
+            if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) throw new Error('raw-ip');
+            if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) throw new Error('localhost');
+            if (/^(10\.|127\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) throw new Error('private-ip');
+        } catch (e) {
+            return new Response(JSON.stringify({ error: `baseUrl 不合法或已被阻止（${e.message}）：仅支持 https 公网域名` }), {
+                status: 400,
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+            });
+        }
 
         if (!apiKey) {
             return new Response(JSON.stringify({ error: "Missing LLM API Key" }), {

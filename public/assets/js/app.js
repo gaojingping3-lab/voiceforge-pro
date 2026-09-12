@@ -5075,10 +5075,10 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
         const splitRear = opts.splitRear === true;
         const backMode = !splitRear && (isBackView || cameraView?.type === 'rear');
 
-        // 单人起手式标签（性别确定则写死，不让AI猜）
-        const singleTag = genders.single === 'female' ? '1girl' : (genders.single === 'male' ? '1boy' : '1girl或1boy（按角色性别判断）');
+        // 单人起手式标签（性别确定则写死，不让AI猜；不确定时用英文兜底，绝不让中文进生图prompt）
+        const singleTag = genders.single === 'female' ? '1girl' : (genders.single === 'male' ? '1boy' : 'single character');
         // 双角色起手式
-        let dualTag = '按两个角色性别判断（2girls / 2boys / 1girl 1boy）';
+        let dualTag = 'two characters';
         const ga = genders.A, gb = genders.B;
         if (ga && gb) {
             if (ga === 'female' && gb === 'female') dualTag = '2girls';
@@ -5352,12 +5352,23 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
                 const appA = extractAppearanceFromRoleCard(roleA.desc) || roleA.desc;
                 const appB = extractAppearanceFromRoleCard(roleB.desc) || roleB.desc;
                 const chatText = recentMessages.map(m => m.role === 'user' ? `我: ${m.content}` : m.content).join('；');
-                rolePrompt = `${stylePrefix}, ${roleA.name}（${appA}）和${roleB.name}（${appB}），画面中有两个人，2girls, exactly 2 people, only two characters, ${chatText}`;
+                // 按A/B角色卡性别确定人数标签，不再固定2girls（一男一女会被画成两个女孩）
+                const ga = getRoleGender(roleA.desc), gb = getRoleGender(roleB.desc);
+                let dualTag = 'two characters';
+                if (ga && gb) {
+                    if (ga === 'female' && gb === 'female') dualTag = '2girls';
+                    else if (ga === 'male' && gb === 'male') dualTag = '2boys';
+                    else dualTag = '1girl, 1boy';
+                }
+                rolePrompt = `${stylePrefix}, ${roleA.name}（${appA}）和${roleB.name}（${appB}），画面中有两个人，${dualTag}, exactly 2 people, only two characters, ${chatText}`;
             } else {
                 const cur = getCurrentRole();
                 const app = cur ? (extractAppearanceFromRoleCard(cur.desc) || cur.desc) : '';
                 const chatText = recentMessages.map(m => `${m.role === 'user' ? '我' : cur?.name || 'AI'}: ${m.content}`).join('；');
-                rolePrompt = cur ? `${stylePrefix}, ${cur.name}，${app}，画面中只有一个人，solo, 1girl, only one person, no other people, single character, ${chatText}` : `${stylePrefix}, ${chatText}`;
+                // 按角色卡性别确定人数标签，不再固定1girl（男角色会画成女孩）
+                const curGender = cur ? getRoleGender(cur.desc) : '';
+                const soloTag = curGender === 'female' ? '1girl' : (curGender === 'male' ? '1boy' : 'single character');
+                rolePrompt = cur ? `${stylePrefix}, ${cur.name}，${app}，画面中只有一个人，solo, ${soloTag}, only one person, no other people, single character, ${chatText}` : `${stylePrefix}, ${chatText}`;
             }
             if (userInput) rolePrompt += `，${userInput}`;
         } else {
@@ -5717,12 +5728,22 @@ async function generateVideoFromChat(userInput = '') {
                 const appA = extractAppearanceFromRoleCard(roleA.desc) || roleA.desc;
                 const appB = extractAppearanceFromRoleCard(roleB.desc) || roleB.desc;
                 const chatText = recentMessages.map(m => m.role === 'user' ? `我: ${m.content}` : m.content).join('；');
-                videoPrompt = `${stylePrefix}, ${roleA.name}（${appA}）和${roleB.name}（${appB}），画面中有两个人，2girls, exactly 2 people, only two characters, ${chatText}`;
+                // 按A/B性别确定人数标签（与聊天生图保持一致）
+                const ga = getRoleGender(roleA.desc), gb = getRoleGender(roleB.desc);
+                let dualTag = 'two characters';
+                if (ga && gb) {
+                    if (ga === 'female' && gb === 'female') dualTag = '2girls';
+                    else if (ga === 'male' && gb === 'male') dualTag = '2boys';
+                    else dualTag = '1girl, 1boy';
+                }
+                videoPrompt = `${stylePrefix}, ${roleA.name}（${appA}）和${roleB.name}（${appB}），画面中有两个人，${dualTag}, exactly 2 people, only two characters, ${chatText}`;
             } else {
                 const cur = getCurrentRole();
                 const app = cur ? (extractAppearanceFromRoleCard(cur.desc) || cur.desc) : '';
                 const chatText = recentMessages.map(m => `${m.role === 'user' ? '我' : cur?.name || 'AI'}: ${m.content}`).join('；');
-                videoPrompt = cur ? `${stylePrefix}, ${cur.name}，${app}，画面中只有一个人，solo, 1girl, only one person, no other people, single character, ${chatText}` : `${stylePrefix}, ${chatText}`;
+                const curGender = cur ? getRoleGender(cur.desc) : '';
+                const soloTag = curGender === 'female' ? '1girl' : (curGender === 'male' ? '1boy' : 'single character');
+                videoPrompt = cur ? `${stylePrefix}, ${cur.name}，${app}，画面中只有一个人，solo, ${soloTag}, only one person, no other people, single character, ${chatText}` : `${stylePrefix}, ${chatText}`;
             }
             if (userInput) videoPrompt += `，${userInput}`;
             // 中文模式补视频连贯约束：只演最后一刻的单一动作，避免多动作堆叠导致逻辑混乱

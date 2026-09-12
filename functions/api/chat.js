@@ -23,9 +23,24 @@ export async function onRequest(context) {
     const body = JSON.parse(bodyText);
 
     // 2. 从请求体读取动态 Base URL（支持切换任意 OpenAI 兼容接口）
-    const baseUrl = body.baseUrl || "https://api.deepseek.com";
+    let baseUrl = body.baseUrl || "https://api.deepseek.com";
     // 移除 baseUrl 字段，不转发给目标 API
     delete body.baseUrl;
+
+    // 2.2 安全校验：防止公开站点被当任意代理（SSRF）——只放行 https 公网域名，拒绝内网/本机/裸 IP
+    try {
+      const u = new URL(baseUrl);
+      if (u.protocol !== "https:") throw new Error("protocol");
+      const host = u.hostname.toLowerCase();
+      if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) throw new Error("raw-ip");
+      if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) throw new Error("localhost");
+      if (/^(10\.|127\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) throw new Error("private-ip");
+    } catch (e) {
+      return new Response(JSON.stringify({ error: `baseUrl 不合法或已被阻止（${e.message}）：仅支持 https 公网域名` }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
 
     // 2.5 滑动窗口截断：system人设永久保留，聊天历史只保留最近8条（4轮对话）
     if (body.useSlideWindow === true && Array.isArray(body.messages)) {
