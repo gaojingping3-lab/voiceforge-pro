@@ -2964,7 +2964,12 @@ function getRoleList() {
 }
 
 function saveRoleList(list) {
-    localStorage.setItem('ROLE_LIST', JSON.stringify(list));
+    try {
+        localStorage.setItem('ROLE_LIST', JSON.stringify(list));
+    } catch (e) {
+        alert('保存失败：本地存储空间不足（角色卡或头像过大）。\n\n建议：精简角色卡内容，或重新上传小尺寸头像。');
+        console.error('[RoleList] 保存失败:', e);
+    }
 }
 
 function getCurrentRoleId() {
@@ -3065,17 +3070,17 @@ function uploadAvatar(name, isUser, callback) {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const base64 = ev.target.result;
+        try {
+            const base64 = await compressImageFile(file);
             const key = isUser ? 'AVATAR_USER' : 'AVATAR_' + name;
             localStorage.setItem(key, base64);
             if (callback) callback(base64);
-        };
-        reader.readAsDataURL(file);
+        } catch (err) {
+            alert('头像压缩失败: ' + (err.message || err));
+        }
     };
     input.click();
 }
@@ -3083,20 +3088,49 @@ function uploadAvatar(name, isUser, callback) {
 // 角色卡编辑中的临时头像
 let editingRoleAvatar = null;
 
+// 图片压缩：最长边限制+JPEG压缩，避免头像base64撑爆localStorage（5MB上限）
+function compressImageFile(file, maxEdge = 512, quality = 0.8) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.onload = () => {
+                let { width, height } = img;
+                if (width > maxEdge || height > maxEdge) {
+                    const scale = Math.min(maxEdge / width, maxEdge / height);
+                    width = Math.round(width * scale);
+                    height = Math.round(height * scale);
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = () => reject(new Error('图片解析失败'));
+            img.src = ev.target.result;
+        };
+        reader.onerror = () => reject(new Error('文件读取失败'));
+        reader.readAsDataURL(file);
+    });
+}
+
 // 上传角色卡编辑弹窗里的头像
 function uploadRoleEditAvatar() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            editingRoleAvatar = ev.target.result;
-            updateRoleEditAvatarPreview(editingRoleAvatar);
-        };
-        reader.readAsDataURL(file);
+        try {
+            const compressed = await compressImageFile(file);
+            editingRoleAvatar = compressed;
+            updateRoleEditAvatarPreview(compressed);
+        } catch (err) {
+            alert('头像压缩失败: ' + (err.message || err));
+        }
     };
     input.click();
 }
