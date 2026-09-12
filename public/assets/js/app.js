@@ -5328,6 +5328,175 @@ document.addEventListener('click', function () {
     document.getElementById('magic-dual-menu')?.classList.add('hidden');
 });
 
+// ============ 魔法棒：聊天变动漫（手动触发，4格动漫分镜） ============
+let isGeneratingAnime = false;
+const ANIME_STYLE_PREFIX = 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality, masterpiece, high quality, detailed background, no text, no watermark, no speech bubble';
+
+async function magicAnimeGenerate() {
+    if (isGeneratingAnime) {
+        alert('正在生成动漫分镜中，请稍候...');
+        return;
+    }
+    document.getElementById('magic-view-menu')?.classList.add('hidden');
+    document.getElementById('magic-dual-menu')?.classList.add('hidden');
+    const isDualMode = localStorage.getItem('DUAL_ROLE_MODE') === '1';
+    const recent = chatHistory.slice(-12);
+    if (recent.length < 2) {
+        alert('至少需要一轮对话才能生成动漫分镜');
+        return;
+    }
+    isGeneratingAnime = true;
+
+    const container = document.getElementById('chat-messages');
+    const role = getCurrentRole();
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'chat chat-start relative gap-2';
+    loadingDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
+    const loadingBubble = document.createElement('div');
+    loadingBubble.className = 'chat-bubble bg-base-200 text-base-content';
+    loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在把这段聊天变成动漫分镜（共4格，每格约1分钟）...</span></div>';
+    loadingDiv.appendChild(loadingBubble);
+    container.appendChild(loadingDiv);
+    smartScroll(container);
+
+    try {
+        const roleAId = document.getElementById('dual-role-a')?.value;
+        const roleBId = document.getElementById('dual-role-b')?.value;
+        const roleA = roleAId ? getRoleList().find(r => r.id == roleAId) : null;
+        const roleB = roleBId ? getRoleList().find(r => r.id == roleBId) : null;
+        const cur = getCurrentRole();
+
+        // 1. DeepSeek 把最近12条聊天拆成4格分镜JSON
+        const chatText = recent.map(m => {
+            if (m.role === 'user') return `【用户】${m.content}`;
+            return m.content;
+        }).join('\n');
+        loadingBubble.querySelector('span.text-xs').textContent = '分镜编剧整理剧情中...';
+
+        let frames = null;
+        try {
+            const storyPrompt = `你是动漫分镜编剧。把下面的聊天记录改写成4格动画分镜。
+要求：
+- 按剧情推进分成4格，每格画面只出现说话的角色（谁说话画谁，用户说话时画用户角色对应的形象）
+- action/scene/camera 用英文视觉描述（anime风格）
+- text 用中文原话节选，最多20字
+只输出JSON数组，不要任何解释、不要代码块标记，严格格式：
+[{"speaker":"角色名","text":"中文台词","action":"英文动作","scene":"英文场景","camera":"英文景别"}]
+聊天记录：
+${chatText}`;
+            const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+            const llmKey = localStorage.getItem('LLM_KEY') || '';
+            const resp = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmKey}` },
+                body: JSON.stringify({
+                    baseUrl: llmUrl,
+                    model: localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash',
+                    messages: [
+                        { role: 'system', content: '你是动漫分镜编剧，严格只输出JSON数组。' },
+                        { role: 'user', content: storyPrompt }
+                    ],
+                    temperature: 0.7,
+                    top_p: 0.9,
+                    stream: false,
+                    thinking: { type: 'disabled' }
+                })
+            });
+            const j = await resp.json();
+            const raw = (j.choices?.[0]?.message?.content) || '';
+            const cleaned = raw.replace(/```json|```/g, '').trim();
+            const start = cleaned.indexOf('[');
+            const end = cleaned.lastIndexOf(']');
+            if (start >= 0 && end > start) {
+                frames = JSON.parse(cleaned.slice(start, end + 1));
+            }
+        } catch (e) {
+            console.warn('[动漫] 分镜解析失败，降级均分:', e);
+        }
+
+        // 降级：解析失败按聊天均分4段
+        if (!frames || !Array.isArray(frames) || frames.length === 0) {
+            frames = [];
+            const chunk = Math.ceil(recent.length / 4);
+            for (let i = 0; i < 4; i++) {
+                const seg = recent.slice(i * chunk, (i + 1) * chunk);
+                if (!seg.length) break;
+                const lastMsg = seg[seg.length - 1];
+                const nm = lastMsg.role === 'user' ? '用户' : (lastMsg.content.match(/^\[([^\]]+)\]/)?.[1] || (cur?.name || 'AI'));
+                frames.push({
+                    speaker: nm,
+                    text: lastMsg.content.replace(/^\[[^\]]+\]\s*/, '').slice(0, 20),
+                    action: 'natural pose, looking at camera',
+                    scene: 'colorful anime background, cozy room',
+                    camera: 'medium shot'
+                });
+            }
+        }
+        frames = frames.slice(0, 4);
+
+        // 2. 插入分镜卡片容器
+        const animeCard = document.createElement('div');
+        animeCard.className = 'chat chat-start relative gap-2';
+        animeCard.appendChild(createChatAvatar('动漫', false));
+        const cardBubble = document.createElement('div');
+        cardBubble.className = 'chat-bubble bg-base-200 text-base-content p-2 max-w-[92%]';
+        cardBubble.innerHTML = '<div class="text-xs font-bold mb-2"><i class="fa-solid fa-clapperboard"></i> 聊天变动漫（4格）</div><div id="anime-frames-wrap"></div>';
+        animeCard.appendChild(cardBubble);
+        container.appendChild(animeCard);
+        smartScroll(container);
+        const wrap = cardBubble.querySelector('#anime-frames-wrap');
+
+        // 3. 逐格生图（参考说话角色的头像，动漫风）
+        const q = getImageQuality();
+        for (let i = 0; i < frames.length; i++) {
+            const f = frames[i];
+            loadingBubble.querySelector('span.text-xs').textContent = `动漫分镜生成中 ${i + 1}/${frames.length}（每格约1分钟）...`;
+            let refImg = null;
+            let identity = '';
+            if (isDualMode && roleA && roleB) {
+                const isA = f.speaker === roleA.name || f.speaker === 'A';
+                const target = isA ? roleA : roleB;
+                refImg = target.avatar || localStorage.getItem('AVATAR_' + target.name) || null;
+                const app = extractAppearanceFromRoleCard(target.desc) || target.desc;
+                const tag = getRoleGender(target.desc) === 'female' ? '1girl' : (getRoleGender(target.desc) === 'male' ? '1boy' : 'one character');
+                identity = `${target.name}, ${app}, ${tag}, solo, only one character, no other people`;
+            } else {
+                refImg = cur ? (cur.avatar || localStorage.getItem('AVATAR_' + cur.name) || null) : null;
+                if (cur) {
+                    const app = extractAppearanceFromRoleCard(cur.desc) || cur.desc;
+                    const tag = getRoleGender(cur.desc) === 'female' ? '1girl' : (getRoleGender(cur.desc) === 'male' ? '1boy' : 'one character');
+                    identity = `${cur.name}, ${app}, ${tag}, solo, only one character, no other people`;
+                }
+            }
+            const framePrompt = `${ANIME_STYLE_PREFIX}, ${identity}, ${f.action}, ${f.scene}, ${f.camera}, solo, only one character, no other people`;
+            try {
+                const res = await generateImageWithSafety(framePrompt, 'agnes-2.1', null, framePrompt, refImg ? [refImg] : null, '1:1', q);
+                const url = URL.createObjectURL(res.blob);
+                const frameDiv = document.createElement('div');
+                frameDiv.className = 'mb-2';
+                frameDiv.innerHTML = `
+                    <img src="${url}" alt="分镜${i + 1}" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" style="aspect-ratio:1/1;object-fit:cover;" />
+                    <div class="mt-1 text-xs bg-base-300/70 rounded-lg px-2 py-1">
+                        <span class="font-bold">${escapeHtml(f.speaker || '')}</span>：${escapeHtml((f.text || '').slice(0, 30))}
+                    </div>`;
+                wrap.appendChild(frameDiv);
+            } catch (err) {
+                const errDiv = document.createElement('div');
+                errDiv.className = 'text-xs text-error mb-2';
+                errDiv.textContent = `第${i + 1}格生成失败: ${(err.message || err).substring(0, 100)}`;
+                wrap.appendChild(errDiv);
+            }
+        }
+        loadingDiv.remove();
+    } catch (error) {
+        console.error('动漫分镜失败:', error);
+        if (loadingDiv && loadingDiv.parentNode) loadingDiv.remove();
+        alert('动漫分镜生成失败: ' + (error.message || error));
+    } finally {
+        isGeneratingAnime = false;
+    }
+}
+
 async function generateImageFromChat(userInput = '', messageCount = 2) {
     // 防重复：正在生成时静默返回，不弹alert打扰用户
     if (isGeneratingChatImage) {
