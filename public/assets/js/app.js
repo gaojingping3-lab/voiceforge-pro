@@ -3611,7 +3611,13 @@ async function dualChatNext(isUserInterruption = false) {
 
 你现在扮演的是【${currentRole.name}】（角色${dualCurrentSpeaker}）。
 你只能以${currentRole.name}的身份说话，和${otherRole.name}自然交流。
-${isUserInterruption ? '⚠️ 现在有用户（角色C）在插话，请直接回应用户。' : ''}` },
+${isUserInterruption ? '⚠️ 现在有用户（角色C）在插话，请直接回应用户。' : ''}
+
+【角色隔离守则】（非常重要，违反即OOC）
+- 你的说话风格、语气、口头禅、用词习惯，只许来自【你的角色卡】，和其他角色无关。
+- 禁止模仿或借用${otherRole.name}的说话方式、句式、口头禅——对方的话只是你回应的内容，不是你可以借鉴的风格。
+- 即使对方改变说话风格，你也必须保持自己角色卡里的风格不变。
+- 你只对你的角色卡负责，人设冲突时以你的角色卡为准。` },
     ];
 
     // 用户插话时，才加入用户设定和身份强调
