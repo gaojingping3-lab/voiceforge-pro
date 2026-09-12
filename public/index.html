@@ -1184,6 +1184,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="text-xs text-base-content/40 mt-2">点击头像可从相册上传图片；AI角色头像请在「编辑角色卡」中设置</div>
                 </div>
+                <!-- 我的外貌描述：用于「聊天变动漫」里的用户形象 -->
+                <div class="form-control mb-4">
+                    <label class="label py-1">
+                        <span class="label-text text-sm">我的外貌描述（动漫分镜里的我）</span>
+                    </label>
+                    <textarea id="my-appearance-input" class="textarea textarea-bordered textarea-sm w-full" rows="3" placeholder="例：黑色短发，戴黑框眼镜，穿黑色卫衣和深色工装裤，身高175，偏瘦。留空则用默认：白色T恤+深蓝牛仔裤" onchange="saveMyAppearance()"></textarea>
+                    <span class="text-xs text-base-content/50 mt-1">填写后「聊天变动漫」里你的形象按此生成；留空用默认服装</span>
+                </div>
                 <div class="form-control mb-4">
                     <label class="label py-1 cursor-pointer" onclick="toggleRoleConstraint()">
                         <span class="label-text text-sm">角色扮演强约束</span>
@@ -1383,6 +1391,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260913n"></script>
+    <script src="assets/js/app.js?v=20260913o"></script>
 </body>
 </html>

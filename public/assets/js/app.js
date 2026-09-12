@@ -1030,6 +1030,9 @@ function syncModalInputs() {
     document.getElementById('role-constraint-toggle').checked = constraintOn !== '0';
     // 加载音效开关
     document.getElementById('sound-toggle').checked = soundEnabled();
+    // 加载我的外貌描述（动漫分镜用户形象）
+    const myAppearanceInput = document.getElementById('my-appearance-input');
+    if (myAppearanceInput) myAppearanceInput.value = localStorage.getItem('USER_APPEARANCE') || '';
     // 加载双角色模式开关
     const dualToggle = document.getElementById('dual-role-toggle');
     if (dualToggle) {
@@ -3066,6 +3069,15 @@ function createChatAvatar(name, isUser) {
 }
 
 // 上传头像处理
+// 保存"我的外貌描述"（动漫分镜用户形象）
+function saveMyAppearance() {
+    const v = document.getElementById('my-appearance-input')?.value || '';
+    localStorage.setItem('USER_APPEARANCE', v.trim());
+    const hint = document.getElementById('my-appearance-input');
+    if (hint) hint.style.borderColor = '#22c55e';
+    setTimeout(() => { if (hint) hint.style.borderColor = ''; }, 1200);
+}
+
 function uploadAvatar(name, isUser, callback) {
     const input = document.createElement('input');
     input.type = 'file';
@@ -5495,7 +5507,10 @@ ${chatText}`;
         const q = getImageQuality();
         // 用户形象（单人/双人共用：用户说话人永远是"用户"）
         const userAvatar = localStorage.getItem('AVATAR_USER') || null;
-        const userIdentity = 'the user wearing a plain white t-shirt, dark blue jeans and white sneakers, natural pose';
+        const userAppearance = (localStorage.getItem('USER_APPEARANCE') || '').trim();
+        const userIdentity = userAppearance
+            ? `the user, ${userAppearance}`
+            : 'the user wearing a plain white t-shirt, dark blue jeans and white sneakers, natural pose';
         // 背景固定：首格生成后作为后续格的背景/画风参考
         let firstFrameRef = null;
         const blobToDataURL = (blob) => new Promise((resolve, reject) => {
