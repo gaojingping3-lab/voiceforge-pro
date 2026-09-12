@@ -1033,6 +1033,9 @@ function syncModalInputs() {
     // 加载我的外貌描述（动漫分镜用户形象）
     const myAppearanceInput = document.getElementById('my-appearance-input');
     if (myAppearanceInput) myAppearanceInput.value = localStorage.getItem('USER_APPEARANCE') || '';
+    // 加载生图提示词确认开关
+    const promptConfirmToggle = document.getElementById('prompt-confirm-toggle');
+    if (promptConfirmToggle) promptConfirmToggle.checked = localStorage.getItem('IMG_CONFIRM_PROMPT') !== '0';
     // 加载双角色模式开关
     const dualToggle = document.getElementById('dual-role-toggle');
     if (dualToggle) {
@@ -4871,6 +4874,32 @@ function getFixedStyleByMode() {
     return style.prefix + ', ' + ANATOMY_LOCK;
 }
 
+// 生图提示词确认弹窗：返回 {confirmed, text}
+function awaitPromptConfirm(defaultText) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('prompt-confirm-modal');
+        const ta = document.getElementById('prompt-confirm-text');
+        const okBtn = document.getElementById('prompt-confirm-ok');
+        const cancelBtn = document.getElementById('prompt-confirm-cancel');
+        if (!modal || !ta || !okBtn || !cancelBtn) { resolve({ confirmed: true, text: defaultText || '' }); return; }
+        ta.value = defaultText || '';
+        const cleanup = () => {
+            modal.close();
+            okBtn.onclick = null;
+            cancelBtn.onclick = null;
+        };
+        okBtn.onclick = () => { const text = ta.value; cleanup(); resolve({ confirmed: true, text }); };
+        cancelBtn.onclick = () => { cleanup(); resolve({ confirmed: false, text: '' }); };
+        modal.showModal();
+    });
+}
+
+// 设置：聊天生图前确认提示词
+function savePromptConfirmSetting() {
+    const el = document.getElementById('prompt-confirm-toggle');
+    localStorage.setItem('IMG_CONFIRM_PROMPT', el && el.checked ? '1' : '0');
+}
+
 // 保存生图画风（AI生图页面下拉框onchange直接调用，无需点保存按钮）
 function saveImageStyle() {
     const sel = document.getElementById('modal-image-style');
@@ -5776,6 +5805,17 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
             console.log('[严格执行] 已强制加入视角/拍摄要求:', finalKeywords);
         }
 
+        // 生图前确认提示词（可检查修改；取消则中止本次生成）
+        if (localStorage.getItem('IMG_CONFIRM_PROMPT') !== '0') {
+            const conf = await awaitPromptConfirm(rolePrompt);
+            if (!conf.confirmed) {
+                if (loadingDiv && loadingDiv.parentNode) loadingDiv.remove();
+                isGeneratingChatImage = false;
+                return;
+            }
+            rolePrompt = (conf.text || '').trim() || rolePrompt;
+        }
+
         // 第二步：用角色AI生成的提示词直接生图（跳过独立的提示词优化）
         const result = await generateImageWithSafety(conversationText, getImageModel(), (msg) => {
             loadingBubble.innerHTML = `<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${msg}</span></div>`;
@@ -5810,7 +5850,13 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
             btn.disabled = true;
             btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中...';
             try {
-                const result = await generateImageWithSafety(savedPrompt, getImageModel(), null, savedPrompt, refImages, '1:1', getImageQuality());
+                let finalSaved = savedPrompt;
+                if (localStorage.getItem('IMG_CONFIRM_PROMPT') !== '0') {
+                    const conf = await awaitPromptConfirm(savedPrompt);
+                    if (!conf.confirmed) return;
+                    finalSaved = (conf.text || '').trim() || savedPrompt;
+                }
+                const result = await generateImageWithSafety(finalSaved, getImageModel(), null, finalSaved, refImages, '1:1', getImageQuality());
                 const newImageUrl = URL.createObjectURL(result.blob);
                 imageBubble.querySelector('img').src = newImageUrl;
                 imageBubble.querySelector('img').onclick = () => window.open(newImageUrl);

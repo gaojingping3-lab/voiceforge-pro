@@ -1207,6 +1207,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="text-xs text-base-content/50">关闭后所有操作音效静音</span>
                 </div>
                 <div class="form-control mb-4">
+                    <label class="label py-1">
+                        <span class="label-text text-sm">聊天生图前确认提示词</span>
+                        <input type="checkbox" id="prompt-confirm-toggle" class="toggle toggle-primary toggle-sm" onchange="savePromptConfirmSetting()" />
+                    </label>
+                    <span class="text-xs text-base-content/50">开启后聊天生图会先弹出提示词，可检查修改再生成</span>
+                </div>
+                <div class="form-control mb-4">
                     <label class="label py-1 cursor-pointer">
                         <span class="label-text text-sm">双角色互聊模式</span>
                         <input type="checkbox" id="dual-role-toggle" class="toggle toggle-primary toggle-sm" onchange="toggleDualRoleMode()" />
@@ -1345,6 +1352,19 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </dialog>
 
+    <!-- 生图提示词确认（可检查修改） -->
+    <dialog id="prompt-confirm-modal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box bg-base-100 max-w-2xl">
+            <h3 class="font-bold text-lg mb-1 flex items-center gap-2"><i class="fa-solid fa-eye text-primary"></i> 检查生图提示词</h3>
+            <p class="text-xs text-base-content/60 mb-3">下面是将要发送给生图模型的提示词，可直接修改，确认后按修改内容生成；不需要改直接点「确认生成」。</p>
+            <textarea id="prompt-confirm-text" class="textarea textarea-bordered w-full h-56 text-xs font-mono leading-relaxed mb-3"></textarea>
+            <div class="modal-action mt-0">
+                <button class="btn btn-ghost btn-sm" id="prompt-confirm-cancel">取消</button>
+                <button class="btn btn-primary btn-sm" id="prompt-confirm-ok"><i class="fa-solid fa-wand-magic-sparkles"></i> 确认生成</button>
+            </div>
+        </div>
+    </dialog>
+
     <!-- 全屏图片查看器 -->
     <div id="image-viewer" class="hidden fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center" onclick="closeImageViewer()">
         <button class="absolute top-4 right-4 btn btn-ghost btn-circle text-white text-xl z-10" onclick="closeImageViewer()">
@@ -1391,6 +1411,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260913q"></script>
+    <script src="assets/js/app.js?v=20260913r"></script>
 </body>
 </html>
