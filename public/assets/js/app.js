@@ -5111,6 +5111,36 @@ function stripAppearanceFromRoleCard(roleDesc) {
 }
 
 // 用AI把用户的动作/景别要求翻译成英文，强制加入提示词（不用固定词库，更灵活）
+// 中文直生成模式的动作提炼：把聊天记录提炼成精简画面描述（中文输出，不再发聊天原文）
+async function extractActionSummaryZH(conversationText, userInput, isDualMode) {
+    try {
+        const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+        const llmKey = localStorage.getItem('LLM_KEY') || '';
+        const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+        const resp = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmKey}` },
+            body: JSON.stringify({
+                baseUrl: llmUrl, model: llmModel,
+                messages: [
+                    { role: 'system', content: '你是生图画面提炼师。从聊天记录中提炼生成图片所需的画面描述：只提取人物的动作、姿势、所处场景、表情、镜头景别（全身/半身/特写/背面等）和正在发生的事。用简洁中文输出，一两句话即可。严禁复述聊天原文、严禁输出对话内容、严禁语气词和内心独白。' },
+                    { role: 'user', content: `聊天记录：\n${conversationText}\n\n${userInput ? '用户拍摄要求：' + userInput : ''}\n请提炼画面描述。` }
+                ],
+                temperature: 0.3,
+                stream: false,
+                thinking: { type: 'disabled' }
+            })
+        });
+        if (!resp.ok) return '';
+        const data = await resp.json();
+        const t = (data.choices?.[0]?.message?.content || '').trim();
+        return t.length > 2 ? t : '';
+    } catch (e) {
+        console.warn('[中文提炼] 失败，降级用聊天原文:', e);
+        return '';
+    }
+}
+
 async function translateUserActionToEnglish(userInput) {
     if (!userInput) return '';
 
@@ -5720,7 +5750,10 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
 
         // 中文直接生成模式：跳过DeepSeek翻译和身份块，直接用中文构造提示词（最快）
         if (getPromptLang() === 'zh') {
-            loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在用中文提示词生成图片...</span></div>';
+            loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在提炼画面动作...</span></div>';
+            // 中文直生成：也先提炼动作/画面描述，不直接把聊天记录原文发给生图模型
+            const actionDesc = await extractActionSummaryZH(conversationText, userInput, isDualMode);
+            if (actionDesc) console.log('[中文提炼] 画面描述:', actionDesc.slice(0, 100));
             const stylePrefix = getFixedStyleByMode();
             if (isDualMode && roleA && roleB) {
                 const appA = extractAppearanceFromRoleCard(roleA.desc) || roleA.desc;
@@ -5734,7 +5767,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
                     else if (ga === 'male' && gb === 'male') dualTag = '2boys';
                     else dualTag = '1girl, 1boy';
                 }
-                rolePrompt = `${stylePrefix}, ${roleA.name}（${appA}）和${roleB.name}（${appB}），画面中有两个人，${dualTag}, exactly 2 people, only two characters, ${chatText}`;
+                rolePrompt = `${stylePrefix}, ${roleA.name}（${appA}）和${roleB.name}（${appB}），画面中有两个人，${dualTag}, exactly 2 people, only two characters, ${actionDesc || chatText}`;
             } else {
                 const cur = getCurrentRole();
                 const app = cur ? (extractAppearanceFromRoleCard(cur.desc) || cur.desc) : '';
@@ -5742,7 +5775,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
                 // 按角色卡性别确定人数标签，不再固定1girl（男角色会画成女孩）
                 const curGender = cur ? getRoleGender(cur.desc) : '';
                 const soloTag = curGender === 'female' ? '1girl' : (curGender === 'male' ? '1boy' : 'single character');
-                rolePrompt = cur ? `${stylePrefix}, ${cur.name}，${app}，画面中只有一个人，solo, ${soloTag}, only one person, no other people, single character, ${chatText}` : `${stylePrefix}, ${chatText}`;
+                rolePrompt = cur ? `${stylePrefix}, ${cur.name}，${app}，画面中只有一个人，solo, ${soloTag}, only one person, no other people, single character, ${actionDesc || chatText}` : `${stylePrefix}, ${actionDesc || chatText}`;
             }
             if (userInput) rolePrompt += `，${userInput}`;
         } else {
