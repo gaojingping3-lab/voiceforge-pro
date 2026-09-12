@@ -72,7 +72,7 @@ export async function onRequestPost(context) {
           const requestBody = {
             model: agnesModel,
             prompt: prompt,
-            size: '2K',
+            size: inputImage ? '1K' : '2K',
             ratio: ratio,
             n: 1,
             response_format: 'b64_json',
