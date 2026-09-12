@@ -5496,6 +5496,14 @@ ${chatText}`;
         // 用户形象（单人/双人共用：用户说话人永远是"用户"）
         const userAvatar = localStorage.getItem('AVATAR_USER') || null;
         const userIdentity = 'the user, modern casual outfit, natural pose';
+        // 背景固定：首格生成后作为后续格的背景/画风参考
+        let firstFrameRef = null;
+        const blobToDataURL = (blob) => new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(fr.result);
+            fr.onerror = reject;
+            fr.readAsDataURL(blob);
+        });
         for (let i = 0; i < frames.length; i++) {
             const f = frames[i];
             const lines = (f.lines && f.lines.length ? f.lines : [{ speaker: '用户', text: '……' }]);
@@ -5530,9 +5538,21 @@ ${chatText}`;
                 }
             }
 
-            const framePrompt = `exactly 2 people, only 2 people in the image, ${ANIME_STYLE_PREFIX}, ${identity}, ${f.action || 'talking naturally'}, ${f.scene || 'colorful anime background'}, ${f.camera || 'medium shot'}, exactly 2 people and only 2 people in the entire image, absolutely no third person, no extra characters, no strangers, no bystanders, no background figures, no duplicate character, no additional figure anywhere in the frame, background must be empty of people, no crowd, no text, no watermark, no speech bubble`;
+            const HARD_2P = 'exactly 2 people and only 2 people in the entire image, absolutely no third person, no extra characters, no strangers, no bystanders, no background figures, no duplicate character, no additional figure anywhere in the frame, background must be empty of people, no crowd, no text, no watermark, no speech bubble';
+            let framePrompt;
+            if (i === 0 || !firstFrameRef) {
+                // 首格（或首格失败时）：正常生成
+                framePrompt = `exactly 2 people, only 2 people in the image, ${ANIME_STYLE_PREFIX}, ${identity}, ${f.action || 'talking naturally'}, ${f.scene || 'colorful anime background'}, ${f.camera || 'medium shot'}, ${HARD_2P}`;
+            } else {
+                // 后续格：背景/画风与第一格完全一致，只改人物动作表情
+                framePrompt = `keep the exact same background, same scene, same location and same environment as the reference image, identical setting, identical art style and visual style, do not change or redesign the background, only change the characters' poses and expressions, ${ANIME_STYLE_PREFIX}, ${identity}, ${f.action || 'talking naturally'}, ${f.camera || 'medium shot'}, ${HARD_2P}`;
+            }
             try {
-                const res = await generateImageWithSafety(framePrompt, 'agnes-2.1', null, framePrompt, refImgs.length ? refImgs : null, '1:1', q);
+                const refForGen = (i === 0 || !firstFrameRef) ? (refImgs.length ? refImgs : null) : [firstFrameRef];
+                const res = await generateImageWithSafety(framePrompt, 'agnes-2.1', null, framePrompt, refForGen, '1:1', q);
+                if (i === 0 && !firstFrameRef) {
+                    firstFrameRef = await blobToDataURL(res.blob);
+                }
                 const url = URL.createObjectURL(res.blob);
                 // 合成漫画对话框
                 const comicUrl = await composeComicPanel(url, lines, panelW);
