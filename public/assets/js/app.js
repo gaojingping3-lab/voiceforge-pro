@@ -5461,8 +5461,14 @@ ${chatText}`;
                 const tag = getRoleGender(target.desc) === 'female' ? '1girl' : (getRoleGender(target.desc) === 'male' ? '1boy' : 'one character');
                 identity = `${target.name}, ${app}, ${tag}, solo, only one character, no other people`;
             } else {
-                refImg = cur ? (cur.avatar || localStorage.getItem('AVATAR_' + cur.name) || null) : null;
-                if (cur) {
+                // 用户说话 → 用用户自己的形象（参考用户头像 + 中性描述）
+                const isUserFrame = f.speaker === '用户' || f.speaker === '我' || f.speaker === 'user' || f.speaker === 'User';
+                if (isUserFrame) {
+                    const userAvatar = localStorage.getItem('AVATAR_USER');
+                    refImg = userAvatar || null;
+                    identity = 'the user, modern casual outfit, natural pose, one character, solo, only one character, no other people';
+                } else if (cur) {
+                    refImg = cur.avatar || localStorage.getItem('AVATAR_' + cur.name) || null;
                     const app = extractAppearanceFromRoleCard(cur.desc) || cur.desc;
                     const tag = getRoleGender(cur.desc) === 'female' ? '1girl' : (getRoleGender(cur.desc) === 'male' ? '1boy' : 'one character');
                     identity = `${cur.name}, ${app}, ${tag}, solo, only one character, no other people`;
