@@ -1566,7 +1566,7 @@ async function restoreChatImages() {
         const imageBubble = document.createElement('div');
         imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-1 max-w-[80%]';
         imageBubble.innerHTML = `
-            <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />
+            <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
             <div class="flex gap-2 mt-2 px-1 pb-1">
                 <button class="btn btn-primary btn-xs flex-1 regenerate-btn"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
                 <a href="${imageUrl}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
@@ -1583,7 +1583,7 @@ async function restoreChatImages() {
                     const result = await generateImageWithSafety(item.prompt, getImageModel(), null, item.prompt, null, '1:1');
                     const newImageUrl = URL.createObjectURL(result.blob);
                     imageBubble.querySelector('img').src = newImageUrl;
-                    imageBubble.querySelector('img').onclick = () => openImageLightbox(newImageUrl);
+                    imageBubble.querySelector('img').onclick = () => window.open(newImageUrl);
                     imageBubble.querySelector('a[download]').href = newImageUrl;
                 } catch (err) {
                     alert('重新生成失败，图片未更新（仍是原图）: ' + (err.message || err));
@@ -5440,7 +5440,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         const imageBubble = document.createElement('div');
         imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-1 max-w-[80%]';
         imageBubble.innerHTML = `
-            <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />
+            <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
             <div class="flex gap-2 mt-2 px-1 pb-1">
                 <button class="btn btn-primary btn-xs flex-1 regenerate-btn"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
                 <a href="${imageUrl}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
@@ -5457,7 +5457,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
                 const result = await generateImageWithSafety(savedPrompt, getImageModel(), null, savedPrompt, null, '1:1');
                 const newImageUrl = URL.createObjectURL(result.blob);
                 imageBubble.querySelector('img').src = newImageUrl;
-                imageBubble.querySelector('img').onclick = () => openImageLightbox(newImageUrl);
+                imageBubble.querySelector('img').onclick = () => window.open(newImageUrl);
                 imageBubble.querySelector('a[download]').href = newImageUrl;
             } catch (err) {
                 alert('重新生成失败，图片未更新（仍是原图）: ' + (err.message || err));
