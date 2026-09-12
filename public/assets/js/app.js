@@ -4636,37 +4636,46 @@ function handleImageUpload(event) {
         alert('请选择图片文件');
         return;
     }
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        uploadedImageBase64 = e.target.result;
-        // 读取图片宽高比
-        const img = new Image();
-        img.onload = function() {
-            const w = img.width;
-            const h = img.height;
-            // 判断比例，映射到Agnes支持的比例
-            if (w > h * 1.2) {
-                uploadedImageRatio = '16:9'; // 横图
-            } else if (h > w * 1.2) {
-                uploadedImageRatio = '9:16'; // 竖图
-            } else {
-                uploadedImageRatio = '1:1'; // 正方形
-            }
-            console.log('[Img2Img] 图片比例:', w + 'x' + h, '->', uploadedImageRatio);
-        };
-        img.src = uploadedImageBase64;
-        // 显示预览
+    // 压缩上传图：最长边压到1536，JPEG质量0.85，减小传输体积和手机内存压力
+    const tmpUrl = URL.createObjectURL(file);
+    const tmpImg = new Image();
+    tmpImg.onload = function() {
+        let w = tmpImg.width, h = tmpImg.height;
+        const maxSide = 1536;
+        if (Math.max(w, h) > maxSide) {
+            const scale = maxSide / Math.max(w, h);
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(tmpImg, 0, 0, w, h);
+        const compressed = canvas.toDataURL('image/jpeg', 0.85);
+        URL.revokeObjectURL(tmpUrl);
+
+        uploadedImageBase64 = compressed;
+        // 根据原始宽高判断比例
+        if (tmpImg.width > tmpImg.height * 1.2) {
+            uploadedImageRatio = '16:9';
+        } else if (tmpImg.height > tmpImg.width * 1.2) {
+            uploadedImageRatio = '9:16';
+        } else {
+            uploadedImageRatio = '1:1';
+        }
+        console.log('[Img2Img] 原图压缩到', w + 'x' + h, '->', uploadedImageRatio);
+
         const preview = document.getElementById('uploaded-image-preview');
         const imgEl = document.getElementById('uploaded-image');
         const removeBtn = document.getElementById('remove-uploaded-img-btn');
         if (preview && imgEl && removeBtn) {
-            imgEl.src = uploadedImageBase64;
+            imgEl.src = compressed;
             preview.classList.remove('hidden');
             removeBtn.classList.remove('hidden');
         }
         sfxSuccess();
     };
-    reader.readAsDataURL(file);
+    tmpImg.onerror = function() { URL.revokeObjectURL(tmpUrl); alert('图片读取失败，请换一张'); };
+    tmpImg.src = tmpUrl;
 }
 
 // 移除上传的图片
@@ -5407,7 +5416,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         }
         if (strictKeywords) finalKeywords += (finalKeywords ? ', ' : '') + strictKeywords;
         if (!hasShotType) {
-            finalKeywords += (finalKeywords ? ', ' : '') + 'full body shot, full body, standing full figure, entire body visible from head to toe';
+            finalKeywords += (finalKeywords ? ', ' : '') + 'full body composition, entire character visible in frame, complete body in view, natural pose (seated or standing according to scene)';
         }
         // 人物数量硬锁：单人强制只有1人，双角色强制2人，前后各加一次强化
         if (isDualMode) {

@@ -49,7 +49,7 @@ export async function onRequestPost(context) {
         });
       }
 
-      const agnesModel = model === 'agnes-2.1' ? 'agnes-image-2.1-flash' : 'agnes-image-2.0-flash';
+      const agnesModel = actualModel === 'agnes-2.1' ? 'agnes-image-2.1-flash' : 'agnes-image-2.0-flash';
       console.log('[Agnes] model:', agnesModel);
       console.log('[Agnes] prompt length:', prompt.length);
 
