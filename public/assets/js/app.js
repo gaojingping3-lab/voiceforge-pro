@@ -5120,6 +5120,33 @@ function stripAppearanceFromRoleCard(roleDesc) {
 }
 
 // 用AI把用户的动作/景别要求翻译成英文，强制加入提示词（不用固定词库，更灵活）
+// 把参考头像裁剪成脸部特写（只传脸，避免参考图带出构图/姿势/背景）
+function cropAvatarToFace(dataUrl) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            try {
+                const c = document.createElement('canvas');
+                const w = img.width, h = img.height;
+                if (!w || !h) { resolve(dataUrl); return; }
+                const cw = Math.max(160, Math.round(w * 0.62));
+                const ch = Math.max(160, Math.round(h * 0.62));
+                const cx = Math.round((w - cw) / 2);
+                const cy = Math.round((h - ch) * 0.3); // 脸一般在画面中心偏上
+                c.width = cw; c.height = ch;
+                const ctx = c.getContext('2d');
+                ctx.drawImage(img, cx, cy, cw, ch, 0, 0, cw, ch);
+                resolve(c.toDataURL('image/jpeg', 0.88));
+            } catch (e) {
+                console.warn('[头像裁剪] 失败，用原图:', e);
+                resolve(dataUrl);
+            }
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
+    });
+}
+
 // 中文直生成模式的动作提炼：把聊天记录提炼成精简画面描述（中文输出，不再发聊天原文）
 async function extractActionSummaryZH(conversationText, userInput, isDualMode) {
     try {
@@ -5742,8 +5769,12 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
             const av = cur ? getRoleAvatar(cur) : null;
             if (av) refImages = [av];
         }
+        // 只参考面部：把头像裁剪成脸部特写再传给生图模型
         if (refImages && refImages.length) {
-            console.log('[头像参考] 已带入角色头像参考图:', refImages.length, '张');
+            refImages = (await Promise.all(refImages.map(r => cropAvatarToFace(r)))).filter(Boolean);
+        }
+        if (refImages && refImages.length) {
+            console.log('[头像参考] 已带入角色头像参考图(脸部特写):', refImages.length, '张');
         }
         // 设置开关：聊天生图是否参考角色头像（默认开；关闭后纯文字生成，与AI生图页一致）
         if (refImages && localStorage.getItem('IMG_REF_AVATAR') === '0') {
@@ -5854,7 +5885,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
 
         // 头像参考降级约束：参考图只看脸，画面完全按文字描述（避免参考图带节奏）
         if (refImages && refImages.length) {
-            const refConstraint = 'The reference image is ONLY for the character face and appearance. Do NOT copy its pose, composition, background, lighting or camera angle. All pose, composition, scene and lighting must follow the text description exactly.';
+            const refConstraint = 'ABSOLUTE RULE: The reference image may ONLY be used for the character face and facial features. It is FORBIDDEN to influence pose, body, clothing, hairstyle, background, scene, composition, lighting, colors, camera angle or framing. COMPLETELY IGNORE everything in the reference image except the face. All pose, body, clothing, background, scene, lighting and composition MUST be created entirely from the text description.';
             rolePrompt = rolePrompt + ', ' + refConstraint;
         }
 
