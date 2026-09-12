@@ -4780,7 +4780,7 @@ const IMAGE_STYLES = {
     anime: { name: '动漫二次元', prefix: 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality, simple clean background, no extra objects' },
     japanese_anime: { name: '日系动漫插画', prefix: 'anime style, semi-realistic, cel shading, clean lineart, vibrant colors, soft natural lighting, cinematic composition, high quality, masterpiece, studio anime key visual, simple clean background, no extra objects' }
 };
-const ANATOMY_LOCK = 'masterpiece, high quality, detailed, anatomically correct, correct hands, five fingers per hand, natural posture, proper anatomy';
+const ANATOMY_LOCK = 'masterpiece, high quality, detailed, anatomically correct, exactly two arms and two legs, correct hands and feet, five fingers per hand, correct number of limbs, no extra limbs, natural posture, proper anatomy';
 
 function getImageStyle() {
     const s = localStorage.getItem('IMAGE_STYLE') || 'photorealistic';
