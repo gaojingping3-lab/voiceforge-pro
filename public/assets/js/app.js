@@ -4392,14 +4392,22 @@ async function generateAgnesDirect(prompt, ratio = '1:1', inputImage = null) {
                 requestBody.extra_body.image = [inputImage];
             }
 
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${agnesApiKey}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
-            });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000);
+            let response;
+            try {
+                response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${agnesApiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody),
+                    signal: controller.signal
+                });
+            } finally {
+                clearTimeout(timeoutId);
+            }
 
             if (!response.ok) {
                 let errDetail = '';
@@ -4436,8 +4444,9 @@ async function generateAgnesDirect(prompt, ratio = '1:1', inputImage = null) {
             const blob = new Blob([bytes], { type: contentType });
             return { blob, model: 'agnes-2.1' };
         } catch (err) {
-            // CORS错误或网络错误，记录后试下一个endpoint
-            lastError = new Error(`[Agnes直连 ${epName}] ${err.message || err}`);
+            // 超时/CORS/网络错误，记录后试下一个endpoint
+            const errDetail = (err && err.name === 'AbortError') ? '请求超时（120秒未响应）' : (err && err.message) || err;
+            lastError = new Error(`[Agnes直连 ${epName}] ${errDetail}`);
             continue;
         }
     }
