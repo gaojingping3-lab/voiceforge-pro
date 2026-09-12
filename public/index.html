@@ -895,6 +895,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
 
+                <!-- 生图清晰度 -->
+                <div class="form-control w-full mb-4">
+                    <label class="label py-1"><span class="label-text font-bold">清晰度</span></label>
+                    <select id="image-quality-select" class="select select-bordered w-full text-sm" onchange="saveImageQuality()">
+                        <option value="1K">1K 标准（最快，约15-30秒）</option>
+                        <option value="2K" selected>2K 高清（推荐，约1分钟）</option>
+                        <option value="3K">3K 超清（很慢，约2-4分钟，易限流）</option>
+                        <option value="4K">4K 最高清（最慢，约3-5分钟，易限流）</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">聊天生图也会跟随此设置</p>
+                </div>
+
                 <!-- 生图画风选择 -->
                 <div class="form-control w-full mb-4">
                     <label class="label py-1"><span class="label-text font-bold">生图画风</span></label>
@@ -1365,6 +1377,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260913d"></script>
+    <script src="assets/js/app.js?v=20260913e"></script>
 </body>
 </html>

@@ -11,6 +11,7 @@ export async function onRequestPost(context) {
     const agnesApiKey = body.agnesApiKey || '';
     const inputImage = body.inputImage || ''; // 图生图：上传的参考图base64
     const ratio = body.ratio || '1:1'; // 图片比例
+    const quality = body.quality || '1K'; // 清晰度档位：1K/2K/3K/4K
     const negativePrompt = body.negative_prompt || ''; // 负面提示词（防人体扭曲/坏手）
 
     // 根据比例设置输出尺寸（Agnes 2K档位，仅用于日志；实际请求用 size:'2K'+ratio）
@@ -72,7 +73,7 @@ export async function onRequestPost(context) {
           const requestBody = {
             model: agnesModel,
             prompt: prompt,
-            size: '1K',
+            size: quality,
             ratio: ratio,
             n: 1,
             response_format: 'b64_json',

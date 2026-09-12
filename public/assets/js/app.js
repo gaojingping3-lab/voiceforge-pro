@@ -1580,7 +1580,7 @@ async function restoreChatImages() {
                 btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中...';
                 try {
                     // 复用直连生图链路：用原提示词、原比例(1:1)，不再走后端慢通道、不重新优化
-                    const result = await generateImageWithSafety(item.prompt, getImageModel(), null, item.prompt, null, '1:1');
+                    const result = await generateImageWithSafety(item.prompt, getImageModel(), null, item.prompt, null, '1:1', getImageQuality());
                     const newImageUrl = URL.createObjectURL(result.blob);
                     imageBubble.querySelector('img').src = newImageUrl;
                     imageBubble.querySelector('img').onclick = () => window.open(newImageUrl);
@@ -4257,6 +4257,17 @@ function saveImageModel() {
     }
 }
 
+function saveImageQuality() {
+    const select = document.getElementById('image-quality-select');
+    if (select) {
+        localStorage.setItem('IMG_QUALITY', select.value);
+    }
+}
+
+function getImageQuality() {
+    return localStorage.getItem('IMG_QUALITY') || '2K';
+}
+
 function getImageModel() {
     const model = localStorage.getItem('IMAGE_MODEL') || 'auto';
     // 兼容旧版本：已删除的模型自动转成auto
@@ -4300,6 +4311,8 @@ function loadImageModelSelect() {
         keyInput.value = getAgnesApiKey();
     }
     toggleAgnesKeyInput();
+    const qselect = document.getElementById('image-quality-select');
+    if (qselect) qselect.value = getImageQuality();
 }
 
 // 生图提示词优化：细节拉满，动作描写极致详细，不加安全限制
@@ -4399,7 +4412,7 @@ function openImageLightbox(src) {
     lb.style.display = 'flex';
 }
 
-async function generateAgnesDirect(prompt, ratio = '1:1', inputImage = null) {
+async function generateAgnesDirect(prompt, ratio = '1:1', inputImage = null, quality = '1K') {
     const agnesApiKey = getAgnesApiKey();
     if (!agnesApiKey) {
         throw new Error('未配置 Agnes API Key');
@@ -4416,7 +4429,7 @@ async function generateAgnesDirect(prompt, ratio = '1:1', inputImage = null) {
             const requestBody = {
                 model: agnesModel,
                 prompt: prompt,
-                size: '1K',
+                size: quality,
                 ratio: ratio,
                 n: 1,
                 response_format: 'b64_json',
@@ -4487,7 +4500,7 @@ async function generateAgnesDirect(prompt, ratio = '1:1', inputImage = null) {
     throw lastError || new Error('Agnes直连失败');
 }
 
-async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimizedPrompt, inputImage = null, ratio = '1:1') {
+async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimizedPrompt, inputImage = null, ratio = '1:1', quality = '1K') {
     // 第一步：优化提示词
     // 如果传入了 preOptimizedPrompt（聊天里用角色AI生成的），直接用，不再单独调用DeepSeek
     let optimizedPrompt;
@@ -4531,7 +4544,7 @@ async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimiz
             if (currentModel === 'agnes-2.1') {
                 try {
                     if (onStatusUpdate) onStatusUpdate('正在直连 Agnes 生成图片...');
-                    const directResult = await generateAgnesDirect(optimizedPrompt, ratio, inputImage);
+                    const directResult = await generateAgnesDirect(optimizedPrompt, ratio, inputImage, quality);
                     return { blob: directResult.blob, prompt: optimizedPrompt, model: currentModel };
                 } catch (directErr) {
                     console.warn('Agnes直连失败，降级走后端:', directErr.message);
@@ -4540,7 +4553,7 @@ async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimiz
                 }
             }
 
-            const requestBody = { prompt: optimizedPrompt, model: currentModel, agnesApiKey: getAgnesApiKey(), ratio: ratio, negative_prompt: NEGATIVE_PROMPT };
+            const requestBody = { prompt: optimizedPrompt, model: currentModel, agnesApiKey: getAgnesApiKey(), ratio: ratio, quality: quality, negative_prompt: NEGATIVE_PROMPT };
             if (inputImage) {
                 requestBody.inputImage = inputImage;
             }
@@ -4775,7 +4788,7 @@ async function generateImage() {
         const preOptimized = isPromptOptimized ? prompt : null;
         const result = await generateImageWithSafety(prompt, model, (msg) => {
             if (statusText) statusText.textContent = msg;
-        }, preOptimized, uploadedImageBase64, uploadedImageRatio);
+        }, preOptimized, uploadedImageBase64, uploadedImageRatio, getImageQuality());
 
         // 生成完成后重置优化标记，下次输入新提示词时重新优化
         isPromptOptimized = false;
@@ -5497,7 +5510,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         // 第二步：用角色AI生成的提示词直接生图（跳过独立的提示词优化）
         const result = await generateImageWithSafety(conversationText, getImageModel(), (msg) => {
             loadingBubble.innerHTML = `<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${msg}</span></div>`;
-        }, rolePrompt, refImages);
+        }, rolePrompt, refImages, '1:1', getImageQuality());
 
         // 3. 把图片插入聊天记录
         loadingDiv.remove();
@@ -5528,7 +5541,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
             btn.disabled = true;
             btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中...';
             try {
-                const result = await generateImageWithSafety(savedPrompt, getImageModel(), null, savedPrompt, refImages, '1:1');
+                const result = await generateImageWithSafety(savedPrompt, getImageModel(), null, savedPrompt, refImages, '1:1', getImageQuality());
                 const newImageUrl = URL.createObjectURL(result.blob);
                 imageBubble.querySelector('img').src = newImageUrl;
                 imageBubble.querySelector('img').onclick = () => window.open(newImageUrl);
