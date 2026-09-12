@@ -1214,6 +1214,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="text-xs text-base-content/50">开启后聊天生图会先弹出提示词，可检查修改再生成</span>
                 </div>
                 <div class="form-control mb-4">
+                    <label class="label py-1">
+                        <span class="label-text text-sm">聊天生图参考角色头像</span>
+                        <input type="checkbox" id="img-ref-avatar-toggle" class="toggle toggle-primary toggle-sm" onchange="saveImgRefAvatar()" />
+                    </label>
+                    <span class="text-xs text-base-content/50">开启后聊天生图参考角色头像（脸更还原）；出图不对时可关闭回到纯文字生成</span>
+                </div>
+                <div class="form-control mb-4">
                     <label class="label py-1 cursor-pointer">
                         <span class="label-text text-sm">双角色互聊模式</span>
                         <input type="checkbox" id="dual-role-toggle" class="toggle toggle-primary toggle-sm" onchange="toggleDualRoleMode()" />
@@ -1411,6 +1418,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260913s"></script>
+    <script src="assets/js/app.js?v=20260913t"></script>
 </body>
 </html>

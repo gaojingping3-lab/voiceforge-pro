@@ -1036,6 +1036,9 @@ function syncModalInputs() {
     // 加载生图提示词确认开关
     const promptConfirmToggle = document.getElementById('prompt-confirm-toggle');
     if (promptConfirmToggle) promptConfirmToggle.checked = localStorage.getItem('IMG_CONFIRM_PROMPT') !== '0';
+    // 加载聊天生图参考头像开关
+    const imgRefToggle = document.getElementById('img-ref-avatar-toggle');
+    if (imgRefToggle) imgRefToggle.checked = localStorage.getItem('IMG_REF_AVATAR') !== '0';
     // 加载双角色模式开关
     const dualToggle = document.getElementById('dual-role-toggle');
     if (dualToggle) {
@@ -4900,6 +4903,12 @@ function savePromptConfirmSetting() {
     localStorage.setItem('IMG_CONFIRM_PROMPT', el && el.checked ? '1' : '0');
 }
 
+// 设置：聊天生图是否参考角色头像
+function saveImgRefAvatar() {
+    const el = document.getElementById('img-ref-avatar-toggle');
+    localStorage.setItem('IMG_REF_AVATAR', el && el.checked ? '1' : '0');
+}
+
 // 保存生图画风（AI生图页面下拉框onchange直接调用，无需点保存按钮）
 function saveImageStyle() {
     const sel = document.getElementById('modal-image-style');
@@ -5736,6 +5745,11 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         if (refImages && refImages.length) {
             console.log('[头像参考] 已带入角色头像参考图:', refImages.length, '张');
         }
+        // 设置开关：聊天生图是否参考角色头像（默认开；关闭后纯文字生成，与AI生图页一致）
+        if (refImages && localStorage.getItem('IMG_REF_AVATAR') === '0') {
+            console.log('[头像参考] 已按设置关闭头像参考');
+            refImages = null;
+        }
 
         // 第一步：预取身份块/性别/视角，再用角色AI生成提示词
         loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理画面描述...</span></div>';
@@ -5836,6 +5850,12 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         if (finalKeywords) {
             rolePrompt = finalKeywords + ', ' + rolePrompt + ', ' + finalKeywords;
             console.log('[严格执行] 已强制加入视角/拍摄要求:', finalKeywords);
+        }
+
+        // 头像参考降级约束：参考图只看脸，画面完全按文字描述（避免参考图带节奏）
+        if (refImages && refImages.length) {
+            const refConstraint = 'The reference image is ONLY for the character face and appearance. Do NOT copy its pose, composition, background, lighting or camera angle. All pose, composition, scene and lighting must follow the text description exactly.';
+            rolePrompt = rolePrompt + ', ' + refConstraint;
         }
 
         // 生图前确认提示词（可检查修改；取消则中止本次生成）
