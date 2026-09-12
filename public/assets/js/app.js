@@ -5329,8 +5329,51 @@ document.addEventListener('click', function () {
 });
 
 // ============ 魔法棒：聊天变动漫（手动触发，4格动漫分镜） ============
-let isGeneratingAnime = false;
-const ANIME_STYLE_PREFIX = 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality, masterpiece, high quality, detailed background, no text, no watermark, no speech bubble';
+
+// 把图片 + 对话合成一张"漫画格"（对话气泡烙在图片上）
+function composeComicPanel(imageUrl, lines, panelWidth) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            try {
+                const scale = 2; // 2x 输出，手机上清晰
+                const W = panelWidth * scale;
+                const imgH = Math.round(W * (img.height / img.width));
+                let rowCount = 0;
+                lines.forEach(l => { rowCount += Math.max(1, Math.ceil((l.text || '').slice(0, 30).length / 13)); });
+                const bubbleH = Math.max(64, rowCount * 24 + 28) * scale;
+                const H = Math.round(imgH + bubbleH);
+                const canvas = document.createElement('canvas');
+                canvas.width = W; canvas.height = H;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, W, imgH);
+                // 底部漫画对话框白底
+                ctx.fillStyle = 'rgba(255,255,255,0.96)';
+                ctx.fillRect(0, imgH, W, bubbleH);
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2 * scale;
+                ctx.strokeRect(scale, imgH + scale, W - 2 * scale, bubbleH - 2 * scale);
+                ctx.font = '600 ' + (15 * scale) + 'px sans-serif';
+                ctx.textBaseline = 'middle';
+                let y = imgH + 14 * scale;
+                lines.forEach(l => {
+                    const speaker = (l.speaker || '') + '：';
+                    const isUser = l.speaker === '用户' || l.speaker === '我' || l.speaker === 'user' || l.speaker === 'User';
+                    ctx.fillStyle = isUser ? '#1a73e8' : '#d93025';
+                    ctx.fillText(speaker, 16 * scale, y + 8 * scale);
+                    ctx.font = '400 ' + (15 * scale) + 'px sans-serif';
+                    ctx.fillStyle = '#111';
+                    ctx.fillText((l.text || '').slice(0, 30), 16 * scale + ctx.measureText(speaker).width, y + 8 * scale);
+                    y += 24 * scale;
+                    ctx.font = '600 ' + (15 * scale) + 'px sans-serif';
+                });
+                resolve(canvas.toDataURL('image/png'));
+            } catch (err) { console.error('[动漫] 合成失败:', err); resolve(null); }
+        };
+        img.onerror = () => resolve(null);
+        img.src = imageUrl;
+    });
+}
 
 async function magicAnimeGenerate() {
     if (isGeneratingAnime) {
@@ -5354,7 +5397,7 @@ async function magicAnimeGenerate() {
     loadingDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
     const loadingBubble = document.createElement('div');
     loadingBubble.className = 'chat-bubble bg-base-200 text-base-content';
-    loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在把这段聊天变成动漫分镜（共4格，每格约1分钟）...</span></div>';
+    loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在把这段聊天变成4格漫画（每格约1分钟）...</span></div>';
     loadingDiv.appendChild(loadingBubble);
     container.appendChild(loadingDiv);
     smartScroll(container);
@@ -5366,22 +5409,23 @@ async function magicAnimeGenerate() {
         const roleB = roleBId ? getRoleList().find(r => r.id == roleBId) : null;
         const cur = getCurrentRole();
 
-        // 1. DeepSeek 把最近12条聊天拆成4格分镜JSON
+        // 1. DeepSeek 把最近12条聊天拆成4格漫画JSON（每格：场景/动作/镜头 + 该格对话lines）
         const chatText = recent.map(m => {
             if (m.role === 'user') return `【用户】${m.content}`;
             return m.content;
         }).join('\n');
-        loadingBubble.querySelector('span.text-xs').textContent = '分镜编剧整理剧情中...';
+        loadingBubble.querySelector('span.text-xs').textContent = '漫画编剧整理剧情中...';
 
         let frames = null;
         try {
-            const storyPrompt = `你是动漫分镜编剧。把下面的聊天记录改写成4格动画分镜。
+            const storyPrompt = `你是漫画分镜编剧。把下面的聊天记录改写成4格漫画。
 要求：
-- 按剧情推进分成4格，每格画面只出现说话的角色（谁说话画谁，用户说话时画用户角色对应的形象）
-- action/scene/camera 用英文视觉描述（anime风格）
+- 每格画面必须同时出现两个角色：说话者做主要动作，另一位在旁边自然反应（聆听/注视/微笑）
+- lines 是这一格内的对话，1-3条，按说话顺序，谁说话谁开口
+- scene/action/camera 用英文视觉描述（动漫风格）
 - text 用中文原话节选，最多20字
 只输出JSON数组，不要任何解释、不要代码块标记，严格格式：
-[{"speaker":"角色名","text":"中文台词","action":"英文动作","scene":"英文场景","camera":"英文景别"}]
+[{"scene":"英文场景","action":"英文动作","camera":"英文景别","lines":[{"speaker":"角色名","text":"中文台词"},{"speaker":"角色名","text":"中文台词"}]}]
 聊天记录：
 ${chatText}`;
             const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
@@ -5393,7 +5437,7 @@ ${chatText}`;
                     baseUrl: llmUrl,
                     model: localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash',
                     messages: [
-                        { role: 'system', content: '你是动漫分镜编剧，严格只输出JSON数组。' },
+                        { role: 'system', content: '你是漫画分镜编剧，严格只输出JSON数组。' },
                         { role: 'user', content: storyPrompt }
                     ],
                     temperature: 0.7,
@@ -5421,71 +5465,80 @@ ${chatText}`;
             for (let i = 0; i < 4; i++) {
                 const seg = recent.slice(i * chunk, (i + 1) * chunk);
                 if (!seg.length) break;
-                const lastMsg = seg[seg.length - 1];
-                const nm = lastMsg.role === 'user' ? '用户' : (lastMsg.content.match(/^\[([^\]]+)\]/)?.[1] || (cur?.name || 'AI'));
-                frames.push({
-                    speaker: nm,
-                    text: lastMsg.content.replace(/^\[[^\]]+\]\s*/, '').slice(0, 20),
-                    action: 'natural pose, looking at camera',
-                    scene: 'colorful anime background, cozy room',
-                    camera: 'medium shot'
+                const lines = seg.map(m => {
+                    if (m.role === 'user') return { speaker: '用户', text: m.content.replace(/^\[[^\]]+\]\s*/, '').slice(0, 20) };
+                    const nm = m.content.match(/^\[([^\]]+)\]/)?.[1] || (cur?.name || 'AI');
+                    return { speaker: nm, text: m.content.replace(/^\[[^\]]+\]\s*/, '').slice(0, 20) };
                 });
+                frames.push({ scene: 'colorful anime background, cozy room', action: 'talking naturally, looking at each other', camera: 'medium shot', lines });
             }
         }
         frames = frames.slice(0, 4);
 
-        // 2. 插入分镜卡片容器
+        // 2. 插入漫画卡片容器
         const animeCard = document.createElement('div');
         animeCard.className = 'chat chat-start relative gap-2';
-        animeCard.appendChild(createChatAvatar('动漫', false));
+        animeCard.appendChild(createChatAvatar('漫画', false));
         const cardBubble = document.createElement('div');
         cardBubble.className = 'chat-bubble bg-base-200 text-base-content p-2 max-w-[92%]';
-        cardBubble.innerHTML = '<div class="text-xs font-bold mb-2"><i class="fa-solid fa-clapperboard"></i> 聊天变动漫（4格）</div><div id="anime-frames-wrap"></div>';
+        cardBubble.innerHTML = '<div class="text-xs font-bold mb-2"><i class="fa-solid fa-book-open"></i> 聊天变动漫（4格漫画）</div><div id="anime-frames-wrap"></div>';
         animeCard.appendChild(cardBubble);
         container.appendChild(animeCard);
         smartScroll(container);
         const wrap = cardBubble.querySelector('#anime-frames-wrap');
+        const panelW = Math.min(container.clientWidth * 0.88, 420);
 
-        // 3. 逐格生图（参考说话角色的头像，动漫风）
+        // 3. 逐格生成"双人同框图"，再合成漫画对话框
         const q = getImageQuality();
+        // 用户形象（单人/双人共用：用户说话人永远是"用户"）
+        const userAvatar = localStorage.getItem('AVATAR_USER') || null;
+        const userIdentity = 'the user, modern casual outfit, natural pose';
         for (let i = 0; i < frames.length; i++) {
             const f = frames[i];
-            loadingBubble.querySelector('span.text-xs').textContent = `动漫分镜生成中 ${i + 1}/${frames.length}（每格约1分钟）...`;
-            let refImg = null;
+            const lines = (f.lines && f.lines.length ? f.lines : [{ speaker: '用户', text: '……' }]);
+            loadingBubble.querySelector('span.text-xs').textContent = `漫画格生成中 ${i + 1}/${frames.length}（每格约1分钟）...`;
+
             let identity = '';
+            let refImgs = [];
             if (isDualMode && roleA && roleB) {
-                const isA = f.speaker === roleA.name || f.speaker === 'A';
-                const target = isA ? roleA : roleB;
-                refImg = target.avatar || localStorage.getItem('AVATAR_' + target.name) || null;
-                const app = extractAppearanceFromRoleCard(target.desc) || target.desc;
-                const tag = getRoleGender(target.desc) === 'female' ? '1girl' : (getRoleGender(target.desc) === 'male' ? '1boy' : 'one character');
-                identity = `${target.name}, ${app}, ${tag}, solo, only one character, no other people`;
+                // 双角色：A/B 同框
+                const appA = extractAppearanceFromRoleCard(roleA.desc) || roleA.desc;
+                const appB = extractAppearanceFromRoleCard(roleB.desc) || roleB.desc;
+                const gA = getRoleGender(roleA.desc);
+                const gB = getRoleGender(roleB.desc);
+                let duoTag;
+                if (gA === 'female' && gB === 'female') duoTag = '2girls';
+                else if (gA === 'male' && gB === 'male') duoTag = '2boys';
+                else duoTag = '1girl 1boy';
+                identity = `${roleA.name}: ${appA}, ${roleB.name}: ${appB}, ${duoTag}, exactly 2 people, both characters in frame, one talking and the other listening`;
+                const avA = roleA.avatar || localStorage.getItem('AVATAR_' + roleA.name);
+                const avB = roleB.avatar || localStorage.getItem('AVATAR_' + roleB.name);
+                if (avA) refImgs.push(avA);
+                if (avB) refImgs.push(avB);
             } else {
-                // 用户说话 → 用用户自己的形象（参考用户头像 + 中性描述）
-                const isUserFrame = f.speaker === '用户' || f.speaker === '我' || f.speaker === 'user' || f.speaker === 'User';
-                if (isUserFrame) {
-                    const userAvatar = localStorage.getItem('AVATAR_USER');
-                    refImg = userAvatar || null;
-                    identity = 'the user, modern casual outfit, natural pose, one character, solo, only one character, no other people';
-                } else if (cur) {
-                    refImg = cur.avatar || localStorage.getItem('AVATAR_' + cur.name) || null;
-                    const app = extractAppearanceFromRoleCard(cur.desc) || cur.desc;
-                    const tag = getRoleGender(cur.desc) === 'female' ? '1girl' : (getRoleGender(cur.desc) === 'male' ? '1boy' : 'one character');
-                    identity = `${cur.name}, ${app}, ${tag}, solo, only one character, no other people`;
+                // 单角色：用户 + 角色 同框
+                const app = cur ? (extractAppearanceFromRoleCard(cur.desc) || cur.desc) : 'a cute anime girl';
+                const tag = cur ? (getRoleGender(cur.desc) === 'female' ? '1girl' : (getRoleGender(cur.desc) === 'male' ? '1boy' : 'one character')) : '1girl';
+                identity = `${userIdentity}, ${cur ? cur.name + ': ' + app : app}, ${tag} and the user, exactly 2 people, both characters in frame, one talking and the other listening`;
+                if (userAvatar) refImgs.push(userAvatar);
+                if (cur) {
+                    const avC = cur.avatar || localStorage.getItem('AVATAR_' + cur.name);
+                    if (avC) refImgs.push(avC);
                 }
             }
-            const framePrompt = `${ANIME_STYLE_PREFIX}, ${identity}, ${f.action}, ${f.scene}, ${f.camera}, solo, only one character, no other people`;
+
+            const framePrompt = `${ANIME_STYLE_PREFIX}, ${identity}, ${f.action || 'talking naturally'}, ${f.scene || 'colorful anime background'}, ${f.camera || 'medium shot'}, exactly 2 people, both characters in frame, no text, no watermark, no speech bubble`;
             try {
-                const res = await generateImageWithSafety(framePrompt, 'agnes-2.1', null, framePrompt, refImg ? [refImg] : null, '1:1', q);
+                const res = await generateImageWithSafety(framePrompt, 'agnes-2.1', null, framePrompt, refImgs.length ? refImgs : null, '1:1', q);
                 const url = URL.createObjectURL(res.blob);
+                // 合成漫画对话框
+                const comicUrl = await composeComicPanel(url, lines, panelW);
                 const frameDiv = document.createElement('div');
                 frameDiv.className = 'mb-2';
-                frameDiv.innerHTML = `
-                    <img src="${url}" alt="分镜${i + 1}" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" style="aspect-ratio:1/1;object-fit:cover;" />
-                    <div class="mt-1 text-xs bg-base-300/70 rounded-lg px-2 py-1">
-                        <span class="font-bold">${escapeHtml(f.speaker || '')}</span>：${escapeHtml((f.text || '').slice(0, 30))}
-                    </div>`;
+                const src = comicUrl || url;
+                frameDiv.innerHTML = `<img src="${src}" alt="漫画格${i + 1}" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />`;
                 wrap.appendChild(frameDiv);
+                URL.revokeObjectURL(url);
             } catch (err) {
                 const errDiv = document.createElement('div');
                 errDiv.className = 'text-xs text-error mb-2';
@@ -5495,9 +5548,9 @@ ${chatText}`;
         }
         loadingDiv.remove();
     } catch (error) {
-        console.error('动漫分镜失败:', error);
+        console.error('漫画分镜失败:', error);
         if (loadingDiv && loadingDiv.parentNode) loadingDiv.remove();
-        alert('动漫分镜生成失败: ' + (error.message || error));
+        alert('漫画分镜生成失败: ' + (error.message || error));
     } finally {
         isGeneratingAnime = false;
     }
