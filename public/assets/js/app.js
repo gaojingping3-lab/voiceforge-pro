@@ -4351,57 +4351,12 @@ function openImageLightbox(src) {
     if (!lb) {
         lb = document.createElement('div');
         lb.id = 'img-lightbox';
-        lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:99999;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none;';
+        lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:99999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+        lb.onclick = () => { lb.style.display = 'none'; };
         document.body.appendChild(lb);
     }
-    lb.innerHTML = `<img src="${src}" style="max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;transform-origin:center center;will-change:transform;" />`;
-    const img = lb.querySelector('img');
+    lb.innerHTML = `<img src="${src}" style="max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;" />`;
     lb.style.display = 'flex';
-
-    // 双指捏合放大 + 单指拖动看细节
-    let scale = 1, tx = 0, ty = 0;
-    let startDist = 0, startScale = 0, startX = 0, startY = 0, moved = false;
-    function apply() { img.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`; }
-    function reset() { scale = 1; tx = 0; ty = 0; apply(); }
-
-    lb.ontouchend = null;
-    lb.ontouchstart = null;
-    lb.ontouchmove = null;
-    lb.onclick = (e) => { if (!moved && scale === 1) lb.style.display = 'none'; };
-
-    lb.addEventListener('touchstart', (e) => {
-        moved = false;
-        if (e.touches.length === 2) {
-            startDist = Math.hypot(
-                e.touches[0].clientX - e.touches[1].clientX,
-                e.touches[0].clientY - e.touches[1].clientY);
-            startScale = scale;
-        } else if (e.touches.length === 1) {
-            startX = e.touches[0].clientX - tx;
-            startY = e.touches[0].clientY - ty;
-        }
-    }, { passive: true });
-
-    lb.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        if (e.touches.length === 2) {
-            const d = Math.hypot(
-                e.touches[0].clientX - e.touches[1].clientX,
-                e.touches[0].clientY - e.touches[1].clientY);
-            scale = Math.min(6, Math.max(1, startScale * d / startDist));
-            if (scale === 1) { tx = 0; ty = 0; }
-            moved = true;
-        } else if (e.touches.length === 1 && scale > 1) {
-            tx = e.touches[0].clientX - startX;
-            ty = e.touches[0].clientY - startY;
-            moved = true;
-        }
-        apply();
-    }, { passive: false });
-
-    lb.addEventListener('touchend', (e) => {
-        if (e.touches.length === 0 && scale < 1.05) reset();
-    });
 }
 
 async function generateAgnesDirect(prompt, ratio = '1:1', inputImage = null) {
