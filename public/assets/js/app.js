@@ -5085,9 +5085,9 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
         const backMode = !splitRear && (isBackView || cameraView?.type === 'rear');
 
         // 单人起手式标签（性别确定则写死，不让AI猜）
-        const singleTag = genders.single === 'female' ? '1girl' : (genders.single === 'male' ? '1boy' : '1girl或1boy（按角色性别判断）');
+        const singleTag = genders.single === 'female' ? '1girl' : (genders.single === 'male' ? '1boy' : 'single character');
         // 双角色起手式
-        let dualTag = '按两个角色性别判断（2girls / 2boys / 1girl 1boy）';
+        let dualTag = 'two characters, male or female determined by character card';
         const ga = genders.A, gb = genders.B;
         if (ga && gb) {
             if (ga === 'female' && gb === 'female') dualTag = '2girls';
