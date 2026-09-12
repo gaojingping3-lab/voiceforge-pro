@@ -5342,7 +5342,6 @@ document.addEventListener('click', function () {
 
 // ============ 魔法棒：聊天变动漫（手动触发，4格动漫分镜） ============
 let isGeneratingAnime = false;
-const ANIME_STYLE_PREFIX = 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality, masterpiece, high quality, detailed background, no text, no watermark, no speech bubble';
 
 
 // 把图片 + 对话合成一张"漫画格"（对话气泡烙在图片上）
@@ -5511,6 +5510,8 @@ ${chatText}`;
         const userIdentity = userAppearance
             ? `the user, ${userAppearance}`
             : 'the user wearing a plain white t-shirt, dark blue jeans and white sneakers, natural pose';
+        // 画风跟随 AI生图页的设置（写实/动漫/日系），不再固定动漫
+        const animeStylePrefix = getFixedStyleByMode() + ', no text, no watermark, no speech bubble';
         // 背景固定：首格生成后作为后续格的背景/画风参考
         let firstFrameRef = null;
         const blobToDataURL = (blob) => new Promise((resolve, reject) => {
@@ -5557,10 +5558,10 @@ ${chatText}`;
             let framePrompt;
             if (i === 0 || !firstFrameRef) {
                 // 首格（或首格失败时）：正常生成
-                framePrompt = `exactly 2 people, only 2 people in the image, ${ANIME_STYLE_PREFIX}, ${identity}, ${f.action || 'talking naturally'}, ${f.scene || 'colorful anime background'}, ${f.camera || 'medium shot'}, ${HARD_2P}, the clothing and outfits of both characters are fixed and identical in every panel, clothes never change`;
+                framePrompt = `exactly 2 people, only 2 people in the image, ${animeStylePrefix}, ${identity}, ${f.action || 'talking naturally'}, ${f.scene || 'colorful anime background'}, ${f.camera || 'medium shot'}, ${HARD_2P}, the clothing and outfits of both characters are fixed and identical in every panel, clothes never change`;
             } else {
                 // 后续格：背景/画风与第一格完全一致，只改人物动作表情
-                framePrompt = `keep the exact same background, same scene, same location and same environment as the reference image, identical setting, identical art style and visual style, keep the same clothing and same outfits as the reference image, identical clothes, do not change the background, do not change the characters' clothing, only change the characters' poses and expressions, ${ANIME_STYLE_PREFIX}, ${identity}, ${f.action || 'talking naturally'}, ${f.camera || 'medium shot'}, ${HARD_2P}, the clothing and outfits of both characters are fixed and identical in every panel, clothes never change`;
+                framePrompt = `keep the exact same background, same scene, same location and same environment as the reference image, identical setting, identical art style and visual style, keep the same clothing and same outfits as the reference image, identical clothes, do not change the background, do not change the characters' clothing, only change the characters' poses and expressions, ${animeStylePrefix}, ${identity}, ${f.action || 'talking naturally'}, ${f.camera || 'medium shot'}, ${HARD_2P}, the clothing and outfits of both characters are fixed and identical in every panel, clothes never change`;
             }
             try {
                 const refForGen = (i === 0 || !firstFrameRef) ? (refImgs.length ? refImgs : null) : [firstFrameRef];
