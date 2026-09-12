@@ -5329,6 +5329,9 @@ document.addEventListener('click', function () {
 });
 
 // ============ 魔法棒：聊天变动漫（手动触发，4格动漫分镜） ============
+let isGeneratingAnime = false;
+const ANIME_STYLE_PREFIX = 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality, masterpiece, high quality, detailed background, no text, no watermark, no speech bubble';
+
 
 // 把图片 + 对话合成一张"漫画格"（对话气泡烙在图片上）
 function composeComicPanel(imageUrl, lines, panelWidth) {
