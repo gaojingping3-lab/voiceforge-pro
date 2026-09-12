@@ -5423,7 +5423,7 @@ async function magicAnimeGenerate() {
         try {
             const storyPrompt = `你是漫画分镜编剧。把下面的聊天记录改写成6格漫画。
 要求：
-- 每格画面必须同时出现两个角色：说话者做主要动作，另一位在旁边自然反应（聆听/注视/微笑）
+- 每格画面必须且只能出现两个角色：说话者做主要动作，另一位在旁边自然反应（聆听/注视/微笑）；严禁出现第三个或更多人物，背景不允许有任何路人
 - lines 是这一格内的对话，1-3条，按说话顺序，谁说话谁开口
 - scene/action/camera 用英文视觉描述（动漫风格）
 - text 用中文原话节选，最多20字
@@ -5530,7 +5530,7 @@ ${chatText}`;
                 }
             }
 
-            const framePrompt = `exactly 2 people, only 2 people in the image, ${ANIME_STYLE_PREFIX}, ${identity}, ${f.action || 'talking naturally'}, ${f.scene || 'colorful anime background'}, ${f.camera || 'medium shot'}, exactly 2 people and only 2 people in the entire image, no third person, no extra characters, no background figures, no crowd, no text, no watermark, no speech bubble`;
+            const framePrompt = `exactly 2 people, only 2 people in the image, ${ANIME_STYLE_PREFIX}, ${identity}, ${f.action || 'talking naturally'}, ${f.scene || 'colorful anime background'}, ${f.camera || 'medium shot'}, exactly 2 people and only 2 people in the entire image, absolutely no third person, no extra characters, no strangers, no bystanders, no background figures, no duplicate character, no additional figure anywhere in the frame, background must be empty of people, no crowd, no text, no watermark, no speech bubble`;
             try {
                 const res = await generateImageWithSafety(framePrompt, 'agnes-2.1', null, framePrompt, refImgs.length ? refImgs : null, '1:1', q);
                 const url = URL.createObjectURL(res.blob);
