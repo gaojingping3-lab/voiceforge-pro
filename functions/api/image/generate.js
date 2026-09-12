@@ -83,8 +83,9 @@ export async function onRequestPost(context) {
 
           // 图生图模式：传入参考图（Agnes 2.1要求放在extra_body.image，是数组，保留Data URI前缀）
           if (inputImage) {
-            requestBody.extra_body.image = [inputImage]; // 数组，保留 data:image/png;base64, 前缀
-            console.log('[Img2Img] 已传入参考图，Data URI长度:', inputImage.length);
+            requestBody.extra_body.image = Array.isArray(inputImage) ? inputImage : [inputImage]; // 数组，保留 data:image/png;base64, 前缀（双角色可传多张）
+            const refLen = Array.isArray(inputImage) ? inputImage.map(x => x.length).join('/') : inputImage.length;
+            console.log('[Img2Img] 已传入参考图，Data URI长度:', refLen);
           }
 
           const response = await fetch(endpoint, {

@@ -4389,7 +4389,7 @@ async function generateAgnesDirect(prompt, ratio = '1:1', inputImage = null) {
                 extra_body: { response_format: 'b64_json' }
             };
             if (inputImage) {
-                requestBody.extra_body.image = [inputImage];
+                requestBody.extra_body.image = Array.isArray(inputImage) ? inputImage : [inputImage];
             }
 
             const controller = new AbortController();
@@ -5348,6 +5348,20 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
             conversationText += `\n\n【用户拍摄要求】${userInput}\n请根据以上拍摄要求生成画面，包含景别、角度、表情、动作等细节。`;
         }
 
+        // 角色头像参考：单人取当前角色头像，双角色取A/B头像（base64 data URI），有头像才传
+        const getRoleAvatar = (r) => { if (!r) return null; return r.avatar || localStorage.getItem('AVATAR_' + r.name) || null; };
+        let refImages = null;
+        if (isDualMode && roleA && roleB) {
+            refImages = [getRoleAvatar(roleA), getRoleAvatar(roleB)].filter(Boolean);
+        } else {
+            const cur = getCurrentRole();
+            const av = cur ? getRoleAvatar(cur) : null;
+            if (av) refImages = [av];
+        }
+        if (refImages && refImages.length) {
+            console.log('[头像参考] 已带入角色头像参考图:', refImages.length, '张');
+        }
+
         // 第一步：预取身份块/性别/视角，再用角色AI生成提示词
         loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理画面描述...</span></div>';
 
@@ -5449,7 +5463,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         // 第二步：用角色AI生成的提示词直接生图（跳过独立的提示词优化）
         const result = await generateImageWithSafety(conversationText, getImageModel(), (msg) => {
             loadingBubble.innerHTML = `<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${msg}</span></div>`;
-        }, rolePrompt);
+        }, rolePrompt, refImages);
 
         // 3. 把图片插入聊天记录
         loadingDiv.remove();
@@ -5480,7 +5494,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
             btn.disabled = true;
             btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中...';
             try {
-                const result = await generateImageWithSafety(savedPrompt, getImageModel(), null, savedPrompt, null, '1:1');
+                const result = await generateImageWithSafety(savedPrompt, getImageModel(), null, savedPrompt, refImages, '1:1');
                 const newImageUrl = URL.createObjectURL(result.blob);
                 imageBubble.querySelector('img').src = newImageUrl;
                 imageBubble.querySelector('img').onclick = () => window.open(newImageUrl);
