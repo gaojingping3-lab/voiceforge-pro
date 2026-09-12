@@ -5397,7 +5397,7 @@ async function magicAnimeGenerate() {
     loadingDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
     const loadingBubble = document.createElement('div');
     loadingBubble.className = 'chat-bubble bg-base-200 text-base-content';
-    loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在把这段聊天变成4格漫画（每格约1分钟）...</span></div>';
+    loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在把这段聊天变成6格漫画（每格约1分钟）...</span></div>';
     loadingDiv.appendChild(loadingBubble);
     container.appendChild(loadingDiv);
     smartScroll(container);
@@ -5418,7 +5418,7 @@ async function magicAnimeGenerate() {
 
         let frames = null;
         try {
-            const storyPrompt = `你是漫画分镜编剧。把下面的聊天记录改写成4格漫画。
+            const storyPrompt = `你是漫画分镜编剧。把下面的聊天记录改写成6格漫画。
 要求：
 - 每格画面必须同时出现两个角色：说话者做主要动作，另一位在旁边自然反应（聆听/注视/微笑）
 - lines 是这一格内的对话，1-3条，按说话顺序，谁说话谁开口
@@ -5461,8 +5461,8 @@ ${chatText}`;
         // 降级：解析失败按聊天均分4段
         if (!frames || !Array.isArray(frames) || frames.length === 0) {
             frames = [];
-            const chunk = Math.ceil(recent.length / 4);
-            for (let i = 0; i < 4; i++) {
+            const chunk = Math.ceil(recent.length / 6);
+            for (let i = 0; i < 6; i++) {
                 const seg = recent.slice(i * chunk, (i + 1) * chunk);
                 if (!seg.length) break;
                 const lines = seg.map(m => {
@@ -5473,7 +5473,7 @@ ${chatText}`;
                 frames.push({ scene: 'colorful anime background, cozy room', action: 'talking naturally, looking at each other', camera: 'medium shot', lines });
             }
         }
-        frames = frames.slice(0, 4);
+        frames = frames.slice(0, 6);
 
         // 2. 插入漫画卡片容器
         const animeCard = document.createElement('div');
@@ -5481,7 +5481,7 @@ ${chatText}`;
         animeCard.appendChild(createChatAvatar('漫画', false));
         const cardBubble = document.createElement('div');
         cardBubble.className = 'chat-bubble bg-base-200 text-base-content p-2 max-w-[92%]';
-        cardBubble.innerHTML = '<div class="text-xs font-bold mb-2"><i class="fa-solid fa-book-open"></i> 聊天变动漫（4格漫画）</div><div id="anime-frames-wrap"></div>';
+        cardBubble.innerHTML = '<div class="text-xs font-bold mb-2"><i class="fa-solid fa-book-open"></i> 聊天变动漫（6格漫画）</div><div id="anime-frames-wrap"></div>';
         animeCard.appendChild(cardBubble);
         container.appendChild(animeCard);
         smartScroll(container);
