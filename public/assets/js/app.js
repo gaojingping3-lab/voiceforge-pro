@@ -5522,7 +5522,7 @@ ${chatText}`;
                 // 单角色：用户 + 角色 同框
                 const app = cur ? (extractAppearanceFromRoleCard(cur.desc) || cur.desc) : 'a cute anime girl';
                 const tag = cur ? (getRoleGender(cur.desc) === 'female' ? '1girl' : (getRoleGender(cur.desc) === 'male' ? '1boy' : 'one character')) : '1girl';
-                identity = `${userIdentity}, ${cur ? cur.name + ': ' + app : app}, ${tag} and the user, exactly 2 people, both characters in frame, one talking and the other listening`;
+                identity = `character 1 is the user (${userIdentity}), character 2 is ${cur ? cur.name + ': ' + app : app}, ${tag} plus the user, exactly 2 people in total: the user and ${cur ? cur.name : 'the character'}, one talking and the other listening`;
                 if (userAvatar) refImgs.push(userAvatar);
                 if (cur) {
                     const avC = cur.avatar || localStorage.getItem('AVATAR_' + cur.name);
@@ -5530,7 +5530,7 @@ ${chatText}`;
                 }
             }
 
-            const framePrompt = `${ANIME_STYLE_PREFIX}, ${identity}, ${f.action || 'talking naturally'}, ${f.scene || 'colorful anime background'}, ${f.camera || 'medium shot'}, exactly 2 people, both characters in frame, no text, no watermark, no speech bubble`;
+            const framePrompt = `exactly 2 people, only 2 people in the image, ${ANIME_STYLE_PREFIX}, ${identity}, ${f.action || 'talking naturally'}, ${f.scene || 'colorful anime background'}, ${f.camera || 'medium shot'}, exactly 2 people and only 2 people in the entire image, no third person, no extra characters, no background figures, no crowd, no text, no watermark, no speech bubble`;
             try {
                 const res = await generateImageWithSafety(framePrompt, 'agnes-2.1', null, framePrompt, refImgs.length ? refImgs : null, '1:1', q);
                 const url = URL.createObjectURL(res.blob);
