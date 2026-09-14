@@ -1603,7 +1603,7 @@ function closeTypingDelSession() {
 // 返回本次输入的元数据描述（无显著行为返回null）
 function getTypingMeta() {
     closeTypingDelSession(); // 补完还没结束的删除会话
-    if (typingMaxPause < 5000 && typingDeletedChars < 15) return null;
+    if (typingMaxPause < 5000 && typingDeletedChars < 5) return null;
     const parts = [];
     const pauseSec = Math.round(typingMaxPause / 1000);
     if (pauseSec > 0) parts.push('停顿了约' + pauseSec + '秒');
@@ -2938,6 +2938,17 @@ async function sendChatMessage() {
     }
 
     appendChatMessage(text, 'user');
+    // 打字行为感知触发时，聊天内显示低调观测提示（便于确认抓取是否生效）
+    if (typingMetaRaw) {
+        const container = document.getElementById('chat-messages');
+        if (container) {
+            const tip = document.createElement('div');
+            tip.className = 'text-center text-[10px] opacity-40 py-0.5 select-none';
+            tip.textContent = '👁 观测：' + typingMetaRaw;
+            container.appendChild(tip);
+            smartScroll(container);
+        }
+    }
     scrollToBottom(); // 发消息后强制滚动到底部
     input.value = '';
     input.style.height = 'auto'; // 重置输入框高度
