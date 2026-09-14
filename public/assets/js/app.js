@@ -1576,7 +1576,7 @@ function extractDeletedText(prevValue, curValue) {
 }
 // 返回本次输入的元数据描述（无显著行为返回null）
 function getTypingMeta() {
-    if (typingMaxPause < 10000 && typingDeletedChars < 15) return null;
+    if (typingMaxPause < 5000 && typingDeletedChars < 15) return null;
     const parts = [];
     const pauseSec = Math.round(typingMaxPause / 1000);
     if (pauseSec > 0) parts.push('停顿了约' + pauseSec + '秒');
