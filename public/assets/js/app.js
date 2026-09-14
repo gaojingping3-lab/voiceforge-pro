@@ -1537,6 +1537,66 @@ function renderOfflineInboxBubble(text, roleName) {
 }
 
 // ============================================
+// 打字行为感知（规训玩法）
+// ============================================
+let typingStartTime = 0;       // 本次输入开始时间
+let typingLastEvent = 0;       // 上次输入事件时间
+let typingMaxPause = 0;        // 最长停顿(ms)
+let typingDeletedChars = 0;    // 累计删除字符数
+let typingPrevValueLen = 0;    // 上次value长度
+let typingComposing = false;   // 输入法组合期标志
+
+function getTypingSensorEnabled() {
+    return localStorage.getItem('TYPING_SENSOR') === '1';
+}
+function saveTypingSensorSetting() {
+    const el = document.getElementById('typing-sensor-toggle');
+    localStorage.setItem('TYPING_SENSOR', el && el.checked ? '1' : '0');
+    sfxSave();
+}
+function resetTypingMeta() {
+    typingStartTime = 0;
+    typingLastEvent = 0;
+    typingMaxPause = 0;
+    typingDeletedChars = 0;
+    typingPrevValueLen = 0;
+}
+// 返回本次输入的元数据描述（无显著行为返回null）
+function getTypingMeta() {
+    if (typingMaxPause < 10000 && typingDeletedChars < 15) return null;
+    const parts = [];
+    const pauseSec = Math.round(typingMaxPause / 1000);
+    if (pauseSec > 0) parts.push('停顿了约' + pauseSec + '秒');
+    if (typingDeletedChars > 0) parts.push('删除了约' + typingDeletedChars + '个字符');
+    return parts.join('，');
+}
+function initTypingSensor() {
+    const input = document.getElementById('chat-input');
+    if (!input) return;
+    input.addEventListener('compositionstart', () => { typingComposing = true; });
+    input.addEventListener('compositionend', () => {
+        typingComposing = false;
+        typingLastEvent = Date.now();
+        typingPrevValueLen = input.value.length;
+    });
+    input.addEventListener('input', () => {
+        if (typingComposing) return; // 输入法组合期忽略，避免拼音误判
+        const now = Date.now();
+        if (!typingStartTime) typingStartTime = now;
+        if (typingLastEvent) {
+            const pause = now - typingLastEvent;
+            if (pause > typingMaxPause) typingMaxPause = pause;
+        }
+        typingLastEvent = now;
+        const len = input.value.length;
+        if (typingPrevValueLen > 0 && len < typingPrevValueLen) {
+            typingDeletedChars += (typingPrevValueLen - len);
+        }
+        typingPrevValueLen = len;
+    });
+}
+
+// ============================================
 // AI 语音对话功能
 // ============================================
 
@@ -2092,6 +2152,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderChatHistory(); // 渲染历史消息
     checkOfflineInbox(); // 检查角色离线来信（离开超过间隔自动触发）
     initVoiceInput(); // 初始化语音输入
+    initTypingSensor(); // 初始化打字行为感知（规训玩法）
     initSmartScroll(); // 初始化智能滚动
     initPullToRefresh(); // 初始化下拉刷新
     initLongPressMenu(); // 初始化长按消息菜单
@@ -2762,11 +2823,15 @@ async function sendChatMessage() {
     const text = input.value.trim();
     if (!text) return;
 
+    // 打字行为感知：发送前捕获本次输入元数据（开关开启且有明显犹豫行为才有值）
+    const typingMetaRaw = getTypingSensorEnabled() ? getTypingMeta() : null;
+
     // 检测生视频关键词（必须先于照片判断）：视频/录像/动起来
     const videoRegex = /视频|录像|动起来/;
     if (videoRegex.test(text)) {
         input.value = '';
         input.style.height = 'auto';
+        resetTypingMeta();
         await generateVideoFromChat(text);
         return;
     }
@@ -2777,6 +2842,7 @@ async function sendChatMessage() {
     if (isPhotoRequest) {
         input.value = '';
         input.style.height = 'auto';
+        resetTypingMeta();
         await generateImageFromChat(text); // 把当前用户输入传过去，用于景别识别
         return;
     }
@@ -2821,6 +2887,7 @@ async function sendChatMessage() {
     scrollToBottom(); // 发消息后强制滚动到底部
     input.value = '';
     input.style.height = 'auto'; // 重置输入框高度
+    resetTypingMeta(); // 清空后重置打字行为计数（避免把清空误记为删除）
     sfxSend();
 
     // 发送新消息时，停止上一条AI回复的朗读
@@ -2914,6 +2981,11 @@ async function sendChatMessage() {
             messages.push({ role: 'system', content: roleConstraints });
         }
         messages.push(...chatHistory);
+
+        // 打字行为感知：把输入元数据注入给模型（仅单角色聊天，双角色分支已提前return）
+        if (typingMetaRaw) {
+            messages.push({ role: 'system', content: `[输入行为观察] 用户在输入这条消息时${typingMetaRaw}，可能有犹豫或伪装。你可以选择在角色扮演中自然察觉并提及这一点（例如拆穿TA的犹豫或试探），也可以选择忽略。不要向用户解释这是系统数据，保持角色人设。` });
+        }
 
         // 通过 Cloudflare Pages Functions 同源中转，规避浏览器 CORS 预检挂起问题
         // 带自动重试的请求（失败时重试一次，应对网络波动和临时限流）
