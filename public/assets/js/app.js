@@ -1543,7 +1543,8 @@ let typingStartTime = 0;       // 本次输入开始时间
 let typingLastEvent = 0;       // 上次输入事件时间
 let typingMaxPause = 0;        // 最长停顿(ms)
 let typingDeletedChars = 0;    // 累计删除字符数
-let typingPrevValueLen = 0;    // 上次value长度
+let typingPrevValue = '';      // 上次完整value
+let typingDeletedTexts = [];   // 被删除的内容片段（每段截断20字，最多3段）
 let typingComposing = false;   // 输入法组合期标志
 
 function getTypingSensorEnabled() {
@@ -1559,7 +1560,19 @@ function resetTypingMeta() {
     typingLastEvent = 0;
     typingMaxPause = 0;
     typingDeletedChars = 0;
-    typingPrevValueLen = 0;
+    typingPrevValue = '';
+    typingDeletedTexts = [];
+}
+// 对比前后value，提取被删除的文本（公共前缀+公共后缀法）
+function extractDeletedText(prevValue, curValue) {
+    if (!prevValue || curValue.length >= prevValue.length) return '';
+    let i = 0;
+    const maxLen = Math.min(prevValue.length, curValue.length);
+    while (i < maxLen && prevValue[i] === curValue[i]) i++;
+    let j = 0;
+    while (j < prevValue.length - i && j < curValue.length - i &&
+           prevValue[prevValue.length - 1 - j] === curValue[curValue.length - 1 - j]) j++;
+    return prevValue.slice(i, prevValue.length - j);
 }
 // 返回本次输入的元数据描述（无显著行为返回null）
 function getTypingMeta() {
@@ -1568,6 +1581,11 @@ function getTypingMeta() {
     const pauseSec = Math.round(typingMaxPause / 1000);
     if (pauseSec > 0) parts.push('停顿了约' + pauseSec + '秒');
     if (typingDeletedChars > 0) parts.push('删除了约' + typingDeletedChars + '个字符');
+    // 附带被删除的具体内容片段（如果记录到）
+    if (typingDeletedTexts.length > 0) {
+        const joined = typingDeletedTexts.map(t => '“' + t + '”').join('、');
+        parts.push('删除的内容片段包括：' + joined);
+    }
     return parts.join('，');
 }
 function initTypingSensor() {
@@ -1577,7 +1595,7 @@ function initTypingSensor() {
     input.addEventListener('compositionend', () => {
         typingComposing = false;
         typingLastEvent = Date.now();
-        typingPrevValueLen = input.value.length;
+        typingPrevValue = input.value;
     });
     input.addEventListener('input', () => {
         if (typingComposing) return; // 输入法组合期忽略，避免拼音误判
@@ -1588,11 +1606,17 @@ function initTypingSensor() {
             if (pause > typingMaxPause) typingMaxPause = pause;
         }
         typingLastEvent = now;
-        const len = input.value.length;
-        if (typingPrevValueLen > 0 && len < typingPrevValueLen) {
-            typingDeletedChars += (typingPrevValueLen - len);
+        const curValue = input.value;
+        // 检测删除：提取被删内容并累计
+        const deleted = extractDeletedText(typingPrevValue, curValue);
+        if (deleted) {
+            typingDeletedChars += deleted.length;
+            const trimmed = deleted.trim();
+            if (trimmed && typingDeletedTexts.length < 3) {
+                typingDeletedTexts.push(trimmed.length > 20 ? trimmed.slice(0, 20) + '…' : trimmed);
+            }
         }
-        typingPrevValueLen = len;
+        typingPrevValue = curValue;
     });
 }
 
@@ -2984,7 +3008,7 @@ async function sendChatMessage() {
 
         // 打字行为感知：把输入元数据注入给模型（仅单角色聊天，双角色分支已提前return）
         if (typingMetaRaw) {
-            messages.push({ role: 'system', content: `[输入行为观察] 用户在输入这条消息时${typingMetaRaw}，可能有犹豫或伪装。你可以选择在角色扮演中自然察觉并提及这一点（例如拆穿TA的犹豫或试探），也可以选择忽略。不要向用户解释这是系统数据，保持角色人设。` });
+            messages.push({ role: 'system', content: `[输入行为观察] 用户在输入这条消息时${typingMetaRaw}，可能有犹豫或伪装。你可以选择在角色扮演中自然察觉并提及这一点，甚至可以引用或暗示TA删除的内容，也可以选择忽略。不要向用户解释这是系统数据，保持角色人设。` });
         }
 
         // 通过 Cloudflare Pages Functions 同源中转，规避浏览器 CORS 预检挂起问题
