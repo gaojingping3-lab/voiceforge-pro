@@ -1621,7 +1621,7 @@ function initTypingSensor() {
     input.addEventListener('compositionstart', () => { typingComposing = true; });
     input.addEventListener('compositionend', () => {
         typingComposing = false;
-        typingLastEvent = Date.now();
+        // 注意：不重置 typingLastEvent——否则"删除→停顿→拼音重打"的停顿会被清零
         typingPrevValue = input.value;
     });
     input.addEventListener('input', () => {
