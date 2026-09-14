@@ -3008,7 +3008,7 @@ async function sendChatMessage() {
 
         // 打字行为感知：把输入元数据注入给模型（仅单角色聊天，双角色分支已提前return）
         if (typingMetaRaw) {
-            messages.push({ role: 'system', content: `[输入行为观察] 用户在输入这条消息时${typingMetaRaw}，可能有犹豫或伪装。你可以选择在角色扮演中自然察觉并提及这一点，甚至可以引用或暗示TA删除的内容，也可以选择忽略。不要向用户解释这是系统数据，保持角色人设。` });
+            messages.push({ role: 'system', content: `[输入行为观察] 用户在输入这条消息时${typingMetaRaw}，可能有犹豫或伪装。你必须在角色扮演中自然察觉并提及这一点（例如以角色口吻点破TA的犹豫或试探），可以引用或暗示TA删除的内容。不要向用户解释这是系统数据，保持角色人设。` });
         }
 
         // 通过 Cloudflare Pages Functions 同源中转，规避浏览器 CORS 预检挂起问题
