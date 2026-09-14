@@ -1404,6 +1404,139 @@ function clearHistory() {
 }
 
 // ============================================
+// 角色主动来信（离线消息）
+// ============================================
+function getOfflineInboxEnabled() {
+    return localStorage.getItem('OFFLINE_INBOX_ENABLED') !== '0';
+}
+function saveOfflineInboxSetting() {
+    const el = document.getElementById('offline-inbox-toggle');
+    localStorage.setItem('OFFLINE_INBOX_ENABLED', el && el.checked ? '1' : '0');
+    sfxSave();
+}
+function getOfflineInboxGapMin() {
+    return parseInt(localStorage.getItem('OFFLINE_INBOX_GAP') || '60', 10);
+}
+function saveOfflineInboxGap() {
+    const el = document.getElementById('offline-gap');
+    if (!el) return;
+    localStorage.setItem('OFFLINE_INBOX_GAP', el.value);
+    const label = document.getElementById('offline-gap-value');
+    if (label) label.innerText = el.value + '分钟';
+    sfxSave();
+}
+function getTodayOfflineCount() {
+    const today = new Date().toLocaleDateString('sv'); // YYYY-MM-DD
+    if (localStorage.getItem('OFFLINE_MSG_DATE') !== today) return 0;
+    return parseInt(localStorage.getItem('OFFLINE_MSG_COUNT') || '0', 10);
+}
+function bumpOfflineCount() {
+    const today = new Date().toLocaleDateString('sv');
+    localStorage.setItem('OFFLINE_MSG_DATE', today);
+    localStorage.setItem('OFFLINE_MSG_COUNT', String(getTodayOfflineCount() + 1));
+}
+function markVisit() {
+    localStorage.setItem('LAST_VISIT_AT', String(Date.now()));
+}
+
+// 页面打开时检查：离开超过间隔 → 角色主动来信
+async function checkOfflineInbox() {
+    try {
+        // 双角色互聊模式下不触发（避免角色归属混乱）
+        if (typeof dualRoleA !== 'undefined' && dualRoleA && typeof dualRoleB !== 'undefined' && dualRoleB) { markVisit(); return; }
+        if (!getOfflineInboxEnabled()) { markVisit(); return; }
+        const lastVisit = parseInt(localStorage.getItem('LAST_VISIT_AT') || '0', 10);
+        markVisit(); // 先记录本次访问，再判断上次离开时长
+        if (!lastVisit) return; // 首次使用，只记录时间
+        if (Date.now() - lastVisit < getOfflineInboxGapMin() * 60 * 1000) return; // 离开不够久
+        if (getTodayOfflineCount() >= 3) return; // 每日上限3条
+        const currentRole = getCurrentRole();
+        if (!currentRole || !currentRole.name) return;
+        if (!chatHistory || chatHistory.length === 0) return; // 没聊过天就不打扰
+        await generateOfflineMessage(currentRole);
+    } catch (e) {
+        console.log('[离线来信] 检查失败:', e && e.message ? e.message : e);
+    }
+}
+
+// 让 LLM 扮演角色生成一条"离开期间的心里话"
+async function generateOfflineMessage(role) {
+    const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+    const llmKey = localStorage.getItem('LLM_KEY') || '';
+    const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+    if (!llmKey) return;
+    // 最近6条聊天作为上下文
+    const recent = (chatHistory || []).slice(-6);
+    const recentText = recent.map(m => (m.role === 'user' ? '用户' : role.name) + ': ' + String(m.content || '').slice(0, 200)).join('\n');
+    const messages = [
+        { role: 'system', content: `你是角色「${role.name}」。这是一个私人虚构陪伴空间。请完全沉浸在这个角色中，用符合人设的方式回应，不要AI腔，不要解释，不要客套。` },
+    ];
+    if (role.desc && role.desc !== DEFAULT_ROLE_DESC) {
+        messages.push({ role: 'system', content: '【角色卡】\n' + role.desc });
+    }
+    messages.push({ role: 'user', content: `用户刚才还在和你聊天，现在离开了（不在线）。请你以「${role.name}」的身份，说一句你在用户离开的这段时间里，最想对TA说的话——可以是自言自语、突然想起TA、或者一句期待TA回来的话。
+
+要求：
+1. 第一人称，完全代入角色，口语化，像真人突然发来一条消息
+2. 1~2句话，短一点
+3. 必须契合上面角色卡的人设和最近的聊天氛围
+4. 只输出这句话本身，不要加任何前缀、引号或解释
+
+最近的聊天记录：
+${recentText || '（刚认识不久，还没有太多聊天）'}` });
+    const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
+        body: JSON.stringify({
+            baseUrl: llmUrl,
+            model: llmModel,
+            messages: messages,
+            temperature: 0.9,
+            max_tokens: 120,
+            stream: false
+        })
+    });
+    if (!res.ok) {
+        let msg = 'HTTP ' + res.status;
+        try { const d = await res.json(); msg = (d.error && (d.error.message || d.error)) || msg; } catch (e) { /* ignore */ }
+        throw new Error('LLM ' + msg);
+    }
+    const data = await res.json();
+    let text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+    text = String(text).trim().replace(/^["'「『]+|["'」』]+$/g, '');
+    if (!text) return;
+    // 存入永久聊天记录，刷新不丢失
+    chatHistory.push({ role: 'assistant', content: text });
+    saveChatHistory();
+    bumpOfflineCount();
+    // 渲染成角色气泡（带"离线来信"角标）
+    renderOfflineInboxBubble(text, role.name);
+    sfxReceive();
+}
+
+function renderOfflineInboxBubble(text, roleName) {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+    const div = document.createElement('div');
+    div.className = 'chat chat-start relative msg-enter gap-2';
+    div.appendChild(createChatAvatar(roleName, false));
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
+    const roleColor = '#3b82f6';
+    bubble.innerHTML = `<span class="text-xs font-bold block mb-1 opacity-80" style="color:${roleColor}">${escapeHtml(roleName)}</span>
+        <span class="inline-block text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary mb-1">📩 离线来信</span>` + formatChatText(text);
+    const playBtn = document.createElement('button');
+    playBtn.className = 'absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
+    playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
+    playBtn.title = '播放语音';
+    playBtn.onclick = () => playChatMessage(bubble);
+    div.appendChild(bubble);
+    div.appendChild(playBtn);
+    container.appendChild(div);
+    smartScroll(container);
+}
+
+// ============================================
 // AI 语音对话功能
 // ============================================
 
@@ -1957,6 +2090,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initRoleCard();
     loadChatHistory(); // 恢复永久记忆
     renderChatHistory(); // 渲染历史消息
+    checkOfflineInbox(); // 检查角色离线来信（离开超过间隔自动触发）
     initVoiceInput(); // 初始化语音输入
     initSmartScroll(); // 初始化智能滚动
     initPullToRefresh(); // 初始化下拉刷新

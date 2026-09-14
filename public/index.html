@@ -1229,6 +1229,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="form-control mb-4">
                     <label class="label py-1">
+                        <span class="label-text text-sm">角色主动来信</span>
+                        <input type="checkbox" id="offline-inbox-toggle" class="toggle toggle-primary toggle-sm" onchange="saveOfflineInboxSetting()" checked />
+                    </label>
+                    <span class="text-xs text-base-content/50">你离开一段时间后，角色会给你发一条离线消息（每日最多3条）</span>
+                </div>
+                <div class="form-control mb-4">
+                    <label class="label py-1">
+                        <span class="label-text text-sm">来信间隔</span>
+                        <span class="label-text text-sm" id="offline-gap-value">60分钟</span>
+                    </label>
+                    <input type="range" id="offline-gap" min="10" max="480" value="60" step="10" class="range range-primary range-sm" oninput="document.getElementById('offline-gap-value').innerText = this.value + '分钟'" onchange="saveOfflineInboxGap()" />
+                    <span class="text-xs text-base-content/50 mt-1">离开超过这个时间，角色才会来信（10分钟~8小时，双角色互聊模式不触发）</span>
+                </div>
+                <div class="form-control mb-4">
+                    <label class="label py-1">
                         <span class="label-text text-sm">双角色对话间隔</span>
                         <span class="label-text text-sm" id="dual-interval-value">6秒</span>
                     </label>
@@ -1418,6 +1433,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260913u"></script>
+    <script src="assets/js/app.js?v=20260915a"></script>
 </body>
 </html>
