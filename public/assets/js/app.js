@@ -1603,7 +1603,8 @@ function closeTypingDelSession() {
 // 返回本次输入的元数据描述（无显著行为返回null）
 function getTypingMeta() {
     closeTypingDelSession(); // 补完还没结束的删除会话
-    if (typingMaxPause < 2000 && typingDeletedChars < 5) return null;
+    // 精确触发：必须"删除≥5字" 且 "停顿≥2秒" 同时满足（删除+犹豫才触发，普通停顿不触发）
+    if (typingMaxPause < 2000 || typingDeletedChars < 5) return null;
     const parts = [];
     const pauseSec = Math.round(typingMaxPause / 1000);
     if (pauseSec > 0) parts.push('停顿了约' + pauseSec + '秒');
