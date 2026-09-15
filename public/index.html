@@ -1251,6 +1251,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="form-control mb-4">
                     <label class="label py-1">
+                        <span class="label-text text-sm">镜子凝视</span>
+                        <input type="checkbox" id="mirror-gaze-toggle" class="toggle toggle-primary toggle-sm" onchange="saveMirrorGazeSetting()" />
+                    </label>
+                    <span class="text-xs text-base-content/50">开启后，在支配/羞辱剧情中，AI可以说"看看你现在这副样子"，把聊天背景切换成你的前置摄像头实时画面（仅在你手机本地显示，绝不上传），你必须看着自己的狼狈样子继续打字。可随时手动关闭。默认关闭。</span>
+                </div>
+                <div class="form-control mb-4">
+                    <label class="label py-1">
                         <span class="label-text text-sm">双角色对话间隔</span>
                         <span class="label-text text-sm" id="dual-interval-value">6秒</span>
                     </label>
@@ -1440,6 +1447,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260915n"></script>
+    <script src="assets/js/app.js?v=20260916o"></script>
 </body>
 </html>

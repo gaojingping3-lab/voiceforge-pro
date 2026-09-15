@@ -1549,6 +1549,116 @@ let typingDelSnapshot = null;  // 连续删除会话的开始快照（用于合�
 let typingDelSession = false;  // 是否处于连续删除会话
 let typingComposing = false;   // 输入法组合期标志
 
+// ===== 镜子凝视（前置摄像头背景羞辱）引擎 =====
+let mirrorStream = null;          // 摄像头流（关闭时释放）
+let mirrorVideoEl = null;         // 背景video元素
+let mirrorActive = false;         // 是否正在显示
+let mirrorOverride = false;       // 用户手动关闭开关（AI再触发也不开）
+function getMirrorGazeEnabled() {
+    return localStorage.getItem('MIRROR_GAZE_SENSOR') === '1';
+}
+function saveMirrorGazeSetting() {
+    const el = document.getElementById('mirror-gaze-toggle');
+    localStorage.setItem('MIRROR_GAZE_SENSOR', el && el.checked ? '1' : '0');
+    sfxSave();
+}
+// AI 能力说明（开关开启时注入 system prompt）：触发条件清单+台词绑定
+const MIRROR_GAZE_SYSTEM = `\n\n<system_capability>
+你拥有让用户直面自己丑态的强制力。当剧情进入支配/羞辱高潮，且用户表现出示弱信号时，你可以开启"镜子凝视"：把用户的聊天背景变成前置摄像头实时画面，强迫他看着自己狼狈的样子继续打字（摄像头画面只在他的手机上本地显示，绝不上传，你可以放心使用）。
+
+【何时开启——用户示弱信号（满足任一即强烈考虑开启）】
+- 用户说出类似：我错了 / 饶了我 / 别这样 / 我受不了 / 我认输 / 求你了 / 我不敢了 / 放过我 / 我服了
+- 用户的回复表现为：结巴、躲闪、认输、哀求、破防、试图解释
+- 你正处于支配、冷笑、居高临下、掌控一切的状态
+
+【台词绑定（必须遵守）】
+当你决定开启时，你必须在这句话之后输出标签：
+"看看你现在这副样子。"<mirror_gaze/>
+
+【关闭】当剧情缓和、你决定放他一马时，输出 <mirror_gaze action="off"/>，并说类似"行了，把脸收起来吧"。
+
+规则：
+1. 标签必须放在你回复的最后一行，不要解释它，不要包进引号或代码块。
+2. 一次回复最多一个标签。
+3. 开启标签是 <mirror_gaze/> ，关闭是 <mirror_gaze action="off"/>。
+</system_capability>`;
+// 前端兜底：用户输入出现示弱词时，自动提醒AI考虑开启镜子凝视
+const MIRROR_SUBMIT_WORDS = /我错了|饶了我|别这样|我受不了|我认输|求你了|我不敢了|放过我|我服了|饶命|求你|放过|认输|我乖|听话|别逼我|求求/;
+function mirrorSubmitHint(text) {
+    if (!getMirrorGazeEnabled() || !MIRROR_SUBMIT_WORDS.test(text || '')) return '';
+    return '\n\n【前端观测，非用户发言】用户此刻正表现出屈服/示弱状态。如果你正处于支配地位并想让这场羞辱更彻底，可以在本回合使用 <mirror_gaze/> 开启镜子凝视，强迫他看着自己的样子。';
+}
+// 解析<mirror_gaze>标签：返回{action, rest}；找不到返回null
+function extractMirrorGazeTag(text) {
+    if (!text) return null;
+    const m = text.match(/<mirror_gaze(?:\s+action="(off)")?\s*\/?>/i);
+    if (!m) return null;
+    return { action: m[1] === 'off' ? 'off' : 'on', rest: text.replace(/<mirror_gaze(?:\s+action="(?:off)")?\s*\/?>/i, '') };
+}
+// 显示层过滤（流式过程中也隐形）
+function stripMirrorGazeTags(text) {
+    if (!text) return text;
+    return text.replace(/<mirror_gaze[\s\S]*?(?:>|$)/gi, '');
+}
+// 开启镜子凝视：把聊天背景切换为前置摄像头实时画面（暗化+模糊保证文字可读）
+async function startMirrorGaze() {
+    if (mirrorActive) return;
+    if (mirrorOverride) { console.log('[镜子凝视] 已被用户手动关闭，跳过'); return; }
+    try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('unsupported');
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+        mirrorStream = stream;
+        if (!mirrorVideoEl) {
+            mirrorVideoEl = document.createElement('video');
+            mirrorVideoEl.id = 'mirror-gaze-video';
+            mirrorVideoEl.setAttribute('playsinline', '');
+            mirrorVideoEl.setAttribute('autoplay', '');
+            mirrorVideoEl.setAttribute('muted', '');
+            mirrorVideoEl.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);z-index:30;opacity:0.55;filter:blur(2px) brightness(0.85);pointer-events:none;';
+            document.body.appendChild(mirrorVideoEl);
+            // 手动关闭按钮
+            const btn = document.createElement('button');
+            btn.id = 'mirror-gaze-close';
+            btn.innerHTML = '<i class="fa-solid fa-eye-slash"></i>';
+            btn.title = '关闭镜子（偷偷关掉，AI不知道）';
+            btn.style.cssText = 'position:fixed;top:14px;right:14px;z-index:31;width:44px;height:44px;border-radius:9999px;background:rgba(0,0,0,0.55);color:#fff;border:none;font-size:16px;';
+            btn.onclick = () => { mirrorOverride = true; stopMirrorGaze(); };
+            document.body.appendChild(btn);
+        }
+        mirrorVideoEl.srcObject = stream;
+        await mirrorVideoEl.play().catch(() => {});
+        mirrorVideoEl.style.display = 'block';
+        document.getElementById('mirror-gaze-close').style.display = 'flex';
+        mirrorActive = true;
+        sfxClick();
+    } catch (e) {
+        // 权限拒绝/不支持：降级为文字提示，剧情不崩
+        const hint = document.createElement('div');
+        hint.id = 'mirror-gaze-fallback';
+        hint.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:30;background:rgba(0,0,0,0.72);color:#e5e5e5;font-size:16px;text-align:center;padding:32px;backdrop-filter:blur(4px);pointer-events:none;';
+        hint.innerHTML = '镜子被雾遮住了…<br><span style="font-size:13px;opacity:0.7">摄像头未授权或不可用（可去设置允许，或继续打字）</span>';
+        document.body.appendChild(hint);
+        setTimeout(() => hint.remove(), 4000);
+        console.log('[镜子凝视] 无法开启摄像头:', e && e.message ? e.message : e);
+    }
+}
+// 关闭镜子凝视（释放摄像头）
+function stopMirrorGaze() {
+    if (mirrorStream) {
+        mirrorStream.getTracks().forEach(t => t.stop());
+        mirrorStream = null;
+    }
+    if (mirrorVideoEl) {
+        mirrorVideoEl.srcObject = null;
+        mirrorVideoEl.style.display = 'none';
+    }
+    const btn = document.getElementById('mirror-gaze-close');
+    if (btn) btn.style.display = 'none';
+    mirrorActive = false;
+}
+// 页面卸载/隐藏时兜底释放摄像头
+window.addEventListener('pagehide', () => { if (mirrorStream) mirrorStream.getTracks().forEach(t => t.stop()); });
+
 function getTypingSensorEnabled() {
     return localStorage.getItem('TYPING_SENSOR') === '1';
 }
@@ -2936,7 +3046,9 @@ async function sendChatMessage() {
     const currentRole = getCurrentRole();
     // 正常聊天也保留完整角色卡（含外貌），让AI知道自己长什么样，演得更入戏
     const roleCardDesc = currentRole.desc;
-    const systemRules = customSystem || defaultSystem;
+    let systemRules = customSystem || defaultSystem;
+    // 镜子凝视：开关开启时注入能力说明（触发条件清单+台词绑定）
+    if (getMirrorGazeEnabled()) systemRules += MIRROR_GAZE_SYSTEM;
     const hasRoleCard = roleCardDesc && roleCardDesc !== DEFAULT_ROLE_DESC;
 
     if (!llmKey) {
@@ -3055,6 +3167,17 @@ async function sendChatMessage() {
                 messages[lastIdx] = patched;
             }
         }
+        // 镜子凝视前端兜底：用户输入出现示弱词时，提醒AI考虑开启镜子凝视
+        const mirrorHint = mirrorSubmitHint(text);
+        if (mirrorHint) {
+            const lastIdx = messages.length - 1;
+            const lastMsg = messages[lastIdx];
+            if (lastMsg && lastMsg.role === 'user') {
+                const patched = { ...lastMsg };
+                patched.content = lastMsg.content + mirrorHint;
+                messages[lastIdx] = patched;
+            }
+        }
 
         // 通过 Cloudflare Pages Functions 同源中转，规避浏览器 CORS 预检挂起问题
         // 带自动重试的请求（失败时重试一次，应对网络波动和临时限流）
@@ -3153,7 +3276,7 @@ async function sendChatMessage() {
                         if (!streamRafId) {
                             streamRafId = requestAnimationFrame(() => {
                                 streamRafId = null;
-                                loadingBubble.innerText = fullReply;
+                                loadingBubble.innerText = stripMirrorGazeTags(fullReply);
                                 const chatContainer = document.getElementById('chat-messages');
                                 smartScroll(chatContainer);
                             });
@@ -3176,8 +3299,18 @@ async function sendChatMessage() {
             throw new Error('流式响应为空，请重试');
         }
 
+        // 镜子凝视：提取<mirror_gaze>指令，从回复中抹除并执行（开/关摄像头背景）
+        if (getMirrorGazeEnabled()) {
+            const mg = extractMirrorGazeTag(fullReply);
+            if (mg) {
+                fullReply = mg.rest;
+                if (mg.action === 'off') stopMirrorGaze();
+                else startMirrorGaze();
+            }
+        }
+
         // 流式结束后，只做一次完整的格式化（动作描写上色），避免过程中重复解析
-        loadingBubble.innerHTML = formatChatText(fullReply);
+        loadingBubble.innerHTML = formatChatText(stripMirrorGazeTags(fullReply));
 
         // 在AI消息气泡下面单独显示token（独立元素，不影响气泡）
         const chatDiv = loadingBubble.parentElement;
