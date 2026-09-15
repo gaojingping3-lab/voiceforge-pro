@@ -1683,38 +1683,44 @@ function groupColorOf(name) {
     return idx >= 0 ? GROUP_COLORS[idx % GROUP_COLORS.length] : '#94a3b8';
 }
 // 群聊开关：显示/隐藏群聊栏
-let switchingRoleMode = false; // 防止双角色/群聊互斥递归
+// 关闭群聊模式（只清群聊状态，不碰单人/双角色栏）
+function closeGroupChatMode() {
+    stopGroupChat();
+    groupChatActive = false;
+    const bar = document.getElementById('group-role-bar');
+    if (bar) bar.classList.add('hidden');
+    localStorage.setItem('GROUP_ROLE_MODE', '0');
+}
 function toggleGroupRoleMode() {
-    if (switchingRoleMode) return;
     const el = document.getElementById('group-role-toggle');
     const bar = document.getElementById('group-role-bar');
     const enabled = el && el.checked;
-    if (bar) bar.classList.toggle('hidden', !enabled);
-    groupChatActive = enabled;
-    if (!enabled) stopGroupChat();
-    if (enabled) populateGroupMembers();
-    // 群聊模式：隐藏单人无关元素，与双角色互斥
     const singleVoiceBar = document.getElementById('single-voice-bar');
     const modeHint = document.getElementById('mode-hint');
     const roleCard = document.getElementById('role-card');
     if (enabled) {
+        if (bar) bar.classList.remove('hidden');
+        groupChatActive = true;
+        populateGroupMembers();
         if (singleVoiceBar) singleVoiceBar.classList.add('hidden');
         if (modeHint) modeHint.classList.add('hidden');
         if (roleCard) roleCard.classList.add('hidden');
-        // 自动关闭双角色模式（互斥）
+        // 互斥：自动关闭双角色模式
         const dualToggle = document.getElementById('dual-role-toggle');
         if (dualToggle && dualToggle.checked) {
-            switchingRoleMode = true;
             dualToggle.checked = false;
-            toggleDualRoleMode();
-            switchingRoleMode = false;
+            closeDualChatMode();
         }
+        localStorage.setItem('GROUP_ROLE_MODE', '1');
     } else {
-        if (singleVoiceBar) singleVoiceBar.classList.remove('hidden');
-        if (modeHint) modeHint.classList.remove('hidden');
-        if (roleCard) roleCard.classList.remove('hidden');
+        closeGroupChatMode();
+        // 恢复单人元素（仅当双角色也没开时）
+        if (localStorage.getItem('DUAL_ROLE_MODE') !== '1') {
+            if (singleVoiceBar) singleVoiceBar.classList.remove('hidden');
+            if (modeHint) modeHint.classList.remove('hidden');
+            if (roleCard) roleCard.classList.remove('hidden');
+        }
     }
-    localStorage.setItem('GROUP_ROLE_MODE', enabled ? '1' : '0');
     sfxSave();
 }
 function toggleGroupRoleBar() {
@@ -2723,8 +2729,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dualToggle) dualToggle.checked = true;
         toggleDualRoleMode();
     }
-    // 恢复群聊室模式状态
-    if (localStorage.getItem('GROUP_ROLE_MODE') === '1') {
+    // 恢复群聊室模式状态（与双角色互斥：双角色优先，脏数据双开时只开双角色）
+    if (localStorage.getItem('GROUP_ROLE_MODE') === '1' && localStorage.getItem('DUAL_ROLE_MODE') !== '1') {
         const groupToggle = document.getElementById('group-role-toggle');
         if (groupToggle) groupToggle.checked = true;
         toggleGroupRoleMode();
@@ -4262,8 +4268,17 @@ function initSingleVoiceSelect() {
 }
 
 // 切换双角色模式
+// 关闭双角色模式（只清双角色状态，不碰单人/群聊栏）
+function closeDualChatMode() {
+    stopDualChat();
+    isDualMode = false;
+    dualRoleA = null;
+    dualRoleB = null;
+    const bar = document.getElementById('dual-role-bar');
+    if (bar) bar.classList.add('hidden');
+    localStorage.setItem('DUAL_ROLE_MODE', '0');
+}
 function toggleDualRoleMode() {
-    if (switchingRoleMode) return;
     const toggle = document.getElementById('dual-role-toggle');
     const bar = document.getElementById('dual-role-bar');
     const singleVoiceBar = document.getElementById('single-voice-bar');
@@ -4279,23 +4294,19 @@ function toggleDualRoleMode() {
         // 隐藏单角色卡，避免混淆
         document.getElementById('role-card').classList.add('hidden');
         localStorage.setItem('DUAL_ROLE_MODE', '1');
-        // 自动关闭群聊室模式（互斥）
+        // 互斥：自动关闭群聊室模式
         const groupToggle = document.getElementById('group-role-toggle');
         if (groupToggle && groupToggle.checked) {
-            switchingRoleMode = true;
             groupToggle.checked = false;
-            toggleGroupRoleMode();
-            switchingRoleMode = false;
+            closeGroupChatMode();
         }
     } else {
-        bar.classList.add('hidden');
-        if (singleVoiceBar) singleVoiceBar.classList.remove('hidden');
-        stopDualChat();
-        // 关键：清空角色引用，防止关闭后 sendChatMessage 仍走双角色逻辑
-        dualRoleA = null;
-        dualRoleB = null;
-        document.getElementById('role-card').classList.remove('hidden');
-        localStorage.setItem('DUAL_ROLE_MODE', '0');
+        closeDualChatMode();
+        // 恢复单人元素（仅当群聊也没开时）
+        if (localStorage.getItem('GROUP_ROLE_MODE') !== '1') {
+            if (singleVoiceBar) singleVoiceBar.classList.remove('hidden');
+            document.getElementById('role-card').classList.remove('hidden');
+        }
     }
 
     // 加载新模式的聊天记录并重新渲染
