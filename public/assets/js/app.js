@@ -1683,7 +1683,9 @@ function groupColorOf(name) {
     return idx >= 0 ? GROUP_COLORS[idx % GROUP_COLORS.length] : '#94a3b8';
 }
 // 群聊开关：显示/隐藏群聊栏
+let switchingRoleMode = false; // 防止双角色/群聊互斥递归
 function toggleGroupRoleMode() {
+    if (switchingRoleMode) return;
     const el = document.getElementById('group-role-toggle');
     const bar = document.getElementById('group-role-bar');
     const enabled = el && el.checked;
@@ -1691,6 +1693,27 @@ function toggleGroupRoleMode() {
     groupChatActive = enabled;
     if (!enabled) stopGroupChat();
     if (enabled) populateGroupMembers();
+    // 群聊模式：隐藏单人无关元素，与双角色互斥
+    const singleVoiceBar = document.getElementById('single-voice-bar');
+    const modeHint = document.getElementById('mode-hint');
+    const roleCard = document.getElementById('role-card');
+    if (enabled) {
+        if (singleVoiceBar) singleVoiceBar.classList.add('hidden');
+        if (modeHint) modeHint.classList.add('hidden');
+        if (roleCard) roleCard.classList.add('hidden');
+        // 自动关闭双角色模式（互斥）
+        const dualToggle = document.getElementById('dual-role-toggle');
+        if (dualToggle && dualToggle.checked) {
+            switchingRoleMode = true;
+            dualToggle.checked = false;
+            toggleDualRoleMode();
+            switchingRoleMode = false;
+        }
+    } else {
+        if (singleVoiceBar) singleVoiceBar.classList.remove('hidden');
+        if (modeHint) modeHint.classList.remove('hidden');
+        if (roleCard) roleCard.classList.remove('hidden');
+    }
     localStorage.setItem('GROUP_ROLE_MODE', enabled ? '1' : '0');
     sfxSave();
 }
@@ -1710,7 +1733,7 @@ function populateGroupMembers() {
     wrap.innerHTML = '';
     list.forEach(r => {
         const label = document.createElement('label');
-        label.className = 'flex items-center gap-1 text-xs bg-base-100 rounded-lg px-2 py-1 cursor-pointer';
+        label.className = 'flex items-center gap-1 text-[11px] bg-base-100 rounded-md px-1.5 py-0.5 cursor-pointer shrink-0';
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.value = r.id;
@@ -4240,6 +4263,7 @@ function initSingleVoiceSelect() {
 
 // 切换双角色模式
 function toggleDualRoleMode() {
+    if (switchingRoleMode) return;
     const toggle = document.getElementById('dual-role-toggle');
     const bar = document.getElementById('dual-role-bar');
     const singleVoiceBar = document.getElementById('single-voice-bar');
@@ -4255,6 +4279,14 @@ function toggleDualRoleMode() {
         // 隐藏单角色卡，避免混淆
         document.getElementById('role-card').classList.add('hidden');
         localStorage.setItem('DUAL_ROLE_MODE', '1');
+        // 自动关闭群聊室模式（互斥）
+        const groupToggle = document.getElementById('group-role-toggle');
+        if (groupToggle && groupToggle.checked) {
+            switchingRoleMode = true;
+            groupToggle.checked = false;
+            toggleGroupRoleMode();
+            switchingRoleMode = false;
+        }
     } else {
         bar.classList.add('hidden');
         if (singleVoiceBar) singleVoiceBar.classList.remove('hidden');

@@ -763,13 +763,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div id="group-role-details" class="px-3 overflow-hidden transition-all duration-300 ease-in-out" style="max-height: 500px;">
                         <div class="pb-2">
                             <div class="mb-2">
-                                <div class="text-xs font-bold mb-1">选择群成员（勾选 3~5 个角色，加上你最多 6 方）</div>
-                                <div id="group-members" class="flex flex-wrap gap-2"></div>
+                                <div class="text-xs font-bold mb-1">群成员（勾选 3~5 个，加你最多 6 方）</div>
+                                <div id="group-members" class="flex flex-wrap gap-1.5"></div>
                             </div>
                             <div class="flex items-center gap-2 mb-2">
                                 <span class="text-xs font-bold whitespace-nowrap">发言模式</span>
                                 <select id="group-mode" class="select select-bordered select-xs flex-1">
-                                    <option value="relay">接话模式（省token，像真人群）</option>
+                                    <option value="relay">接话（省token，像真人群）</option>
                                     <option value="round">全员轮流（热闹，费token）</option>
                                 </select>
                             </div>
@@ -785,7 +785,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </button>
                             </div>
                             <div class="text-xs text-gray-500 mt-2">
-                                <i class="fa-solid fa-info-circle"></i> 群聊室：你和多个AI在一个群里聊天。接话模式下每轮只有1-2人说话（AI自己决定谁接话），像真实群聊；全员轮流模式按顺序每人说一条（更热闹但费token）。你可以随时在输入框打字插话。
+                                <i class="fa-solid fa-info-circle"></i> 接话模式每轮1-2人说话像真人群；全员轮流每人一条更热闹但费token。可随时打字插话。
                             </div>
                         </div>
                     </div>
@@ -1499,6 +1499,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260916u"></script>
+    <script src="assets/js/app.js?v=20260916v"></script>
 </body>
 </html>
