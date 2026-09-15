@@ -1714,8 +1714,8 @@ function toggleGroupRoleMode() {
         localStorage.setItem('GROUP_ROLE_MODE', '1');
     } else {
         closeGroupChatMode();
-        // 恢复单人元素（仅当双角色也没开时）
-        if (localStorage.getItem('DUAL_ROLE_MODE') !== '1') {
+        // 恢复单人元素（仅当双角色也没开时；用运行时状态判断，避免 localStorage 脏数据误判）
+        if (!isDualMode) {
             if (singleVoiceBar) singleVoiceBar.classList.remove('hidden');
             if (modeHint) modeHint.classList.remove('hidden');
             if (roleCard) roleCard.classList.remove('hidden');
@@ -2728,6 +2728,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const dualToggle = document.getElementById('dual-role-toggle');
         if (dualToggle) dualToggle.checked = true;
         toggleDualRoleMode();
+        // 清理脏数据：双角色优先时，残留的群聊开关状态一并清掉
+        if (localStorage.getItem('GROUP_ROLE_MODE') === '1') {
+            localStorage.setItem('GROUP_ROLE_MODE', '0');
+        }
     }
     // 恢复群聊室模式状态（与双角色互斥：双角色优先，脏数据双开时只开双角色）
     if (localStorage.getItem('GROUP_ROLE_MODE') === '1' && localStorage.getItem('DUAL_ROLE_MODE') !== '1') {
@@ -4302,8 +4306,8 @@ function toggleDualRoleMode() {
         }
     } else {
         closeDualChatMode();
-        // 恢复单人元素（仅当群聊也没开时）
-        if (localStorage.getItem('GROUP_ROLE_MODE') !== '1') {
+        // 恢复单人元素（仅当群聊也没开时；用运行时状态判断，避免 localStorage 脏数据误判）
+        if (!groupChatActive) {
             if (singleVoiceBar) singleVoiceBar.classList.remove('hidden');
             document.getElementById('role-card').classList.remove('hidden');
         }
