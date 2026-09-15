@@ -1728,8 +1728,8 @@ function getSelectedGroupRoles() {
     const list = getRoleList();
     const checks = document.querySelectorAll('#group-members input[type="checkbox"]:checked');
     const ids = new Set();
-    checks.forEach(c => ids.add(c.value));
-    return list.filter(r => ids.has(r.id));
+    checks.forEach(c => ids.add(String(c.value)));
+    return list.filter(r => ids.has(String(r.id)));
 }
 function startGroupChat() {
     if (groupRunning) return;
