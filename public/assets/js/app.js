@@ -3306,6 +3306,9 @@ async function sendChatMessage() {
                 fullReply = mg.rest;
                 if (mg.action === 'off') stopMirrorGaze();
                 else startMirrorGaze();
+            } else if (/看看你现在这副样子/.test(fullReply)) {
+                // 台词兜底：AI说了台词但忘了带标签，也自动开镜子
+                startMirrorGaze();
             }
         }
 
