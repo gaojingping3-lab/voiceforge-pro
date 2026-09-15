@@ -3467,12 +3467,17 @@ async function sendChatMessage() {
 
         // 打字行为感知：把输入元数据注入给模型（仅单角色聊天，双角色分支已提前return）
         // 注意：拼进最后一条用户消息的拷贝（不污染chatHistory），比单独system消息更可靠，模型必然看到
+        // 硬性要求：有具体删除片段时必须引用具体文字，防止模型偷懒只提"删了几个字"
         if (typingMetaRaw) {
             const lastIdx = messages.length - 1;
             const lastMsg = messages[lastIdx];
             if (lastMsg && lastMsg.role === 'user') {
+                const hasSnippet = typingMetaRaw.includes('片段');
+                const demand = hasSnippet
+                    ? `这是必须利用的关键信息：用户在输入这条消息时${typingMetaRaw}。你必须在角色扮演中直接点破TA删掉的这段具体内容，用角色口吻戳穿或嘲讽（例如："你把'开心啊'删掉，是怕我看到？"）。禁止只笼统说'删了几个字'或'你犹豫了'而不引用具体文字。`
+                    : `这是必须利用的关键信息：用户在输入这条消息时${typingMetaRaw}。你必须在角色扮演中自然察觉并点破这次删除与犹豫（例如以角色口吻说："字删了又重打，你在犹豫什么？"）。`;
                 const patched = { ...lastMsg };
-                patched.content = lastMsg.content + `\n\n【系统观测，非用户发言】用户在输入这条消息时${typingMetaRaw}，可能有犹豫或伪装。你必须在角色扮演中自然察觉并提及这一点（例如以角色口吻点破TA的犹豫或试探），可以引用或暗示TA删除的内容。不要向用户解释这是系统数据，保持角色人设。`;
+                patched.content = lastMsg.content + `\n\n【系统观测，非用户发言】${demand}不要向用户解释这是系统数据，保持角色人设。`;
                 messages[lastIdx] = patched;
             }
         }
