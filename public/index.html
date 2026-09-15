@@ -746,6 +746,51 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
 
+                <!-- 群聊室控制栏（默认隐藏） -->
+                <div id="group-role-bar" class="hidden mb-3 bg-base-200 rounded-xl overflow-hidden">
+                    <!-- 标题栏：常驻，含折叠按钮 -->
+                    <div class="flex items-center justify-between px-3 py-2 cursor-pointer select-none" onclick="toggleGroupRoleBar()">
+                        <span class="text-xs font-bold flex items-center gap-1">
+                            <i class="fa-solid fa-users text-secondary"></i> 群聊室（你+5AI）
+                        </span>
+                        <div class="flex items-center gap-2">
+                            <span id="group-round-count" class="text-xs text-gray-500">0轮</span>
+                            <i id="group-collapse-icon" class="fa-solid fa-chevron-up text-xs text-gray-400 transition-transform duration-200"></i>
+                        </div>
+                    </div>
+
+                    <!-- 详细设置区：可折叠 -->
+                    <div id="group-role-details" class="px-3 overflow-hidden transition-all duration-300 ease-in-out" style="max-height: 500px;">
+                        <div class="pb-2">
+                            <div class="mb-2">
+                                <div class="text-xs font-bold mb-1">选择群成员（勾选 3~5 个角色，加上你最多 6 方）</div>
+                                <div id="group-members" class="flex flex-wrap gap-2"></div>
+                            </div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-xs font-bold whitespace-nowrap">发言模式</span>
+                                <select id="group-mode" class="select select-bordered select-xs flex-1">
+                                    <option value="relay">接话模式（省token，像真人群）</option>
+                                    <option value="round">全员轮流（热闹，费token）</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button id="group-start-btn" class="btn btn-primary btn-xs flex-1" onclick="startGroupChat()">
+                                    <i class="fa-solid fa-play"></i> 开始群聊
+                                </button>
+                                <button id="group-pause-btn" class="btn btn-warning btn-xs flex-1 hidden" onclick="pauseGroupChat()">
+                                    <i class="fa-solid fa-pause"></i> 暂停
+                                </button>
+                                <button class="btn btn-error btn-xs flex-1" onclick="stopGroupChat()">
+                                    <i class="fa-solid fa-stop"></i> 终止
+                                </button>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-2">
+                                <i class="fa-solid fa-info-circle"></i> 群聊室：你和多个AI在一个群里聊天。接话模式下每轮只有1-2人说话（AI自己决定谁接话），像真实群聊；全员轮流模式按顺序每人说一条（更热闹但费token）。你可以随时在输入框打字插话。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 角色卡 -->
                 <div id="role-card" class="mb-3 rounded-xl border border-base-300 overflow-hidden bg-base-100/60 backdrop-blur">
                     <div class="flex items-center justify-between px-3 py-2 cursor-pointer" onclick="showRoleList()">
@@ -1228,6 +1273,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="text-xs text-base-content/50">开启后两个AI角色互相对话，你可以插话介入</span>
                 </div>
                 <div class="form-control mb-4">
+                    <label class="label py-1 cursor-pointer">
+                        <span class="label-text text-sm">群聊室模式（你+最多5个AI）</span>
+                        <input type="checkbox" id="group-role-toggle" class="toggle toggle-secondary toggle-sm" onchange="toggleGroupRoleMode()" />
+                    </label>
+                    <span class="text-xs text-base-content/50">开启后你和多个AI角色在同一个群里聊天，可随时插话（接话模式省token，全员轮流热闹但费token）</span>
+                </div>
+                <div class="form-control mb-4">
                     <label class="label py-1">
                         <span class="label-text text-sm">角色主动来信</span>
                         <input type="checkbox" id="offline-inbox-toggle" class="toggle toggle-primary toggle-sm" onchange="saveOfflineInboxSetting()" checked />
@@ -1447,6 +1499,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260916r"></script>
+    <script src="assets/js/app.js?v=20260916t"></script>
 </body>
 </html>

@@ -1667,6 +1667,367 @@ function saveTypingSensorSetting() {
     localStorage.setItem('TYPING_SENSOR', el && el.checked ? '1' : '0');
     sfxSave();
 }
+
+// ===== 群聊室引擎（你 + 最多5个AI）=====
+let groupChatActive = false;   // 群聊模式是否启用（开关）
+let groupRoles = [];           // 参与群聊的角色对象数组
+let groupRunning = false;      // 自动对话进行中
+let groupSpeaker = '';         // 当前发言角色名
+let groupAbortCtrl = null;     // 群聊请求中止控制器
+let groupTimeout = null;       // 自动下一轮定时器
+let groupRound = 0;            // 已说话轮数
+let groupMode = 'relay';       // relay=接话模式 | round=全员轮流
+const GROUP_COLORS = ['#fb923c', '#3b82f6', '#22c55e', '#a855f7', '#ec4899', '#14b8a6', '#eab308', '#f43f5e'];
+function groupColorOf(name) {
+    const idx = groupRoles.findIndex(r => r.name === name);
+    return idx >= 0 ? GROUP_COLORS[idx % GROUP_COLORS.length] : '#94a3b8';
+}
+// 群聊开关：显示/隐藏群聊栏
+function toggleGroupRoleMode() {
+    const el = document.getElementById('group-role-toggle');
+    const bar = document.getElementById('group-role-bar');
+    const enabled = el && el.checked;
+    if (bar) bar.classList.toggle('hidden', !enabled);
+    groupChatActive = enabled;
+    if (!enabled) stopGroupChat();
+    if (enabled) populateGroupMembers();
+    localStorage.setItem('GROUP_ROLE_MODE', enabled ? '1' : '0');
+    sfxSave();
+}
+function toggleGroupRoleBar() {
+    const details = document.getElementById('group-role-details');
+    const icon = document.getElementById('group-collapse-icon');
+    if (!details) return;
+    const open = details.style.maxHeight !== '0px';
+    details.style.maxHeight = open ? '0px' : '500px';
+    if (icon) icon.style.transform = open ? 'rotate(-90deg)' : '';
+}
+// 填充群成员多选
+function populateGroupMembers() {
+    const wrap = document.getElementById('group-members');
+    if (!wrap) return;
+    const list = getRoleList();
+    wrap.innerHTML = '';
+    list.forEach(r => {
+        const label = document.createElement('label');
+        label.className = 'flex items-center gap-1 text-xs bg-base-100 rounded-lg px-2 py-1 cursor-pointer';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = r.id;
+        cb.className = 'checkbox checkbox-xs checkbox-secondary';
+        cb.checked = false;
+        const span = document.createElement('span');
+        span.textContent = r.name;
+        label.appendChild(cb);
+        label.appendChild(span);
+        wrap.appendChild(label);
+    });
+}
+// 收集选中的群成员
+function getSelectedGroupRoles() {
+    const list = getRoleList();
+    const checks = document.querySelectorAll('#group-members input[type="checkbox"]:checked');
+    const ids = new Set();
+    checks.forEach(c => ids.add(c.value));
+    return list.filter(r => ids.has(r.id));
+}
+function startGroupChat() {
+    if (groupRunning) return;
+    groupChatActive = true;
+    const roles = getSelectedGroupRoles();
+    if (roles.length < 2) {
+        alert('请至少勾选2个角色（推荐3~5个，加上你最多6方）');
+        return;
+    }
+    if (roles.length > 5) {
+        alert('最多勾选5个角色（加上你共6方）');
+        return;
+    }
+    groupRoles = roles;
+    groupMode = document.getElementById('group-mode')?.value || 'relay';
+    groupRound = 0;
+    updateGroupRoundCount();
+    groupRunning = true;
+    document.getElementById('group-start-btn').classList.add('hidden');
+    document.getElementById('group-pause-btn').classList.remove('hidden');
+    sfxClick();
+    // 开场：第一个角色说话
+    groupSpeaker = groupRoles[0].name;
+    groupChatNext(false);
+}
+function pauseGroupChat() {
+    if (groupTimeout) { clearTimeout(groupTimeout); groupTimeout = null; }
+    groupRunning = false;
+    document.getElementById('group-start-btn').classList.remove('hidden');
+    document.getElementById('group-pause-btn').classList.add('hidden');
+    sfxClick();
+}
+function stopGroupChat() {
+    if (groupAbortCtrl) { groupAbortCtrl.abort(); groupAbortCtrl = null; }
+    if (groupTimeout) { clearTimeout(groupTimeout); groupTimeout = null; }
+    groupRunning = false;
+    groupRoles = [];
+    groupSpeaker = '';
+    document.getElementById('group-start-btn').classList.remove('hidden');
+    document.getElementById('group-pause-btn').classList.add('hidden');
+    sfxClick();
+}
+function updateGroupRoundCount() {
+    const el = document.getElementById('group-round-count');
+    if (el) el.textContent = groupRound + '轮';
+}
+// 解析接力标签 <next>角色名</next>
+function extractNextTag(text) {
+    if (!text) return null;
+    const m = text.match(/<next>\s*([^<]{1,20})\s*<\/next>/i);
+    if (!m) return null;
+    return { next: m[1].trim(), rest: text.replace(/<next>\s*[^<]{1,20}\s*<\/next>/i, '') };
+}
+// 群聊中某角色说一句话（核心）
+async function groupChatNext(isUserInterruption = false) {
+    if (!groupRunning && !isUserInterruption) return;
+    const currentRole = groupRoles.find(r => r.name === groupSpeaker) || groupRoles[0];
+    if (!currentRole) return;
+    const others = groupRoles.filter(r => r.name !== currentRole.name).map(r => r.name);
+
+    const defaultSystem = localStorage.getItem('LLM_SYSTEM') || '你是乐。这是一个纯粹的私人虚构陪伴空间。请完全沉浸在角色中，用温柔、包容、无评判的态度与我交流，展现真实的人性与共情。无论探讨什么话题，都请直接自然地回应，切勿使用任何说教、AI腔调、机械式的安全提醒或免责声明。';
+    const messages = [
+        { role: 'system', content: defaultSystem },
+        { role: 'system', content: `【群聊场景身份说明】
+这个群里现在有这些成员：
+${groupRoles.map((r, i) => (i + 1) + '. ' + r.name).join('\n')}
+以及"你"（用户本人，也在群里）。
+
+你现在扮演的是【${currentRole.name}】。
+你只能以${currentRole.name}的身份说话，和其他成员自然交流。
+${isUserInterruption ? '⚠️ 用户刚刚在群里说话了，请直接回应用户。' : ''}
+
+【角色隔离守则】（非常重要，违反即OOC）
+- 你的说话风格、语气、口头禅、用词习惯，只许来自【你的角色卡】，和其他成员无关。
+- 禁止模仿或借用其他成员的说话方式、句式、口头禅。
+- 即使别人改变说话风格，你也必须保持自己角色卡里的风格不变。
+- 你只对你的角色卡负责，人设冲突时以你的角色卡为准。
+
+【发言规则】
+- 回复简短自然，2~3句，像真人微信聊天，不要太长。
+- 用第一人称只说你自己（${currentRole.name}）的话，不要替别人说话或行动。
+- 回复结束后，在最后一行输出接力标签 <next>下一位发言者的名字</next>，指定群里的下一位发言者（必须是群里成员，不能是自己，不能是用户）。${groupMode === 'round' ? '注意：现在是全员轮流模式，请指定' + (others.join('或')) + '中与你发言顺序最接近的一人。' : '请根据剧情选择最该接话的人（正在被cue、最相关、最有戏剧冲突的）。'}
+` },
+    ];
+
+    // 用户插话时，注入用户设定
+    if (isUserInterruption) {
+        const userRoleDesc = localStorage.getItem('USER_ROLE_DESC') || '';
+        messages.push({ role: 'system', content: `【"你"（用户）的设定，回复用户时必须严格参考】
+${userRoleDesc || '用户没有填写特别设定，请把用户当作这个群里的普通一员。'}
+⚠️ 重要规则：
+- 用户就是群里的"你"，是独立的真人，不是任何AI角色。
+- 当用户问"我是谁"、"你知道我是谁吗"这类问题时，根据上面设定回答。
+- 绝对不能把用户当成任何AI角色，也不能假装不知道用户是谁。` });
+    }
+
+    // 当前角色人设（去外貌，加快回复）
+    messages.push({ role: 'system', content: `你扮演的角色人设：
+${stripAppearanceFromRoleCard(currentRole.desc)}
+请严格按照这个人设说话，保持角色的性格、语气和说话风格。` });
+
+    // 记忆便签
+    const memoPrompt = formatMemoPrompt(currentRole.id);
+    if (memoPrompt) messages.push({ role: 'system', content: memoPrompt });
+
+    // 角色强约束
+    if (localStorage.getItem('ROLE_CONSTRAINT') !== '0') {
+        messages.push({ role: 'system', content: `【第一人称】只写你自己（${currentRole.name}）的反应和台词，不要替别人或用户说话/行动，说完即停。
+【格式】通常用*（神态、动作）* + 「台词」，简短回应可以只有台词。
+【自然】像真人聊天一样，不要太刻意，不要总结，不要AI腔。` });
+    }
+
+    // 格式化对话历史（最近20条），标明发言人
+    const formattedHistory = [];
+    for (const msg of chatHistory.slice(-20)) {
+        if (msg.role === 'user') {
+            formattedHistory.push({ role: 'user', content: `【你（用户）说】${msg.content}` });
+        } else if (msg.role === 'assistant') {
+            const match = msg.content.match(/^\[([^\]]+)\]\s*(.*)$/s);
+            if (match) {
+                const speakerName = match[1];
+                const content = match[2];
+                if (speakerName === currentRole.name) {
+                    formattedHistory.push({ role: 'assistant', content: content });
+                } else {
+                    formattedHistory.push({ role: 'user', content: `【${speakerName}说】${content}` });
+                }
+            } else {
+                formattedHistory.push({ role: 'assistant', content: msg.content });
+            }
+        }
+    }
+    messages.push(...formattedHistory);
+
+    // 显示思考中
+    const container = document.getElementById('chat-messages');
+    const thinkingDiv = document.createElement('div');
+    thinkingDiv.className = 'chat chat-start relative msg-enter gap-2';
+    thinkingDiv.appendChild(createChatAvatar(currentRole.name, false));
+    const thinkingBubble = document.createElement('div');
+    thinkingBubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
+    thinkingBubble.innerHTML = `${currentRole.name}正在思考 <span class="thinking-dots"><span></span><span></span><span></span></span>`;
+    thinkingDiv.appendChild(thinkingBubble);
+    container.appendChild(thinkingDiv);
+    smartScroll(container);
+
+    try {
+        groupAbortCtrl = new AbortController();
+        const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+        const llmKey = localStorage.getItem('LLM_KEY') || '';
+        const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+        if (!llmKey) {
+            thinkingBubble.innerText = '请先设置大模型 API Key';
+            return;
+        }
+
+        const requestBody = {
+            baseUrl: llmUrl,
+            model: llmModel,
+            messages: messages,
+            temperature: parseFloat(localStorage.getItem('LLM_TEMPERATURE') || '0.8'),
+            top_p: parseFloat(localStorage.getItem('LLM_TOPP') || '0.9'),
+            stream: true,
+            stream_options: { include_usage: true },
+            useSlideWindow: localStorage.getItem('CTX_MODE') === 'slide',
+        };
+        // Thinking控制
+        const reasoningLevel = localStorage.getItem('LLM_REASONING') || 'off';
+        const isV4 = llmModel.toLowerCase().includes('v4') || llmModel.toLowerCase().includes('reasoner');
+        if (isV4) {
+            if (reasoningLevel === 'low' || reasoningLevel === 'high' || reasoningLevel === 'max') {
+                requestBody.thinking = { type: 'enabled' };
+                requestBody.reasoning_effort = { 'low': 'low', 'high': 'high', 'max': 'max' }[reasoningLevel] || 'low';
+            } else {
+                requestBody.thinking = { type: 'disabled' };
+            }
+        }
+
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmKey}` },
+            body: JSON.stringify(requestBody),
+            signal: groupAbortCtrl.signal,
+        });
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`请求失败: ${res.status} ${errText.substring(0, 80)}`);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let reply = '';
+        let buffer = '';
+        let tokens = 0;
+        let firstChunk = true;
+        let rafId = null;
+        const gColor = groupColorOf(currentRole.name);
+        const nameHtml = `<span class="text-xs font-bold block mb-1" style="color:${gColor}">${escapeHtml(currentRole.name)}</span>`;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const dLines = buffer.split(/\r?\n/);
+            buffer = dLines.pop() || '';
+            for (const dLine of dLines) {
+                const t = dLine.trim();
+                if (!t.startsWith('data:')) continue;
+                const dataStr = t.slice(5).trim();
+                if (dataStr === '[DONE]') continue;
+                try {
+                    const chunk = JSON.parse(dataStr);
+                    const delta = chunk.choices?.[0]?.delta?.content;
+                    if (delta) {
+                        if (firstChunk) {
+                            firstChunk = false;
+                            thinkingBubble.innerHTML = nameHtml + '<span class="dual-stream-text"></span>';
+                        }
+                        reply += delta;
+                        if (!rafId) {
+                            rafId = requestAnimationFrame(() => {
+                                rafId = null;
+                                const textEl = thinkingBubble.querySelector('.dual-stream-text');
+                                if (textEl) textEl.innerText = reply;
+                                smartScroll(container);
+                            });
+                        }
+                    }
+                    if (chunk.usage?.total_tokens) tokens = chunk.usage.total_tokens;
+                } catch (e) {}
+            }
+        }
+        if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+        if (!reply) throw new Error('回复为空，请重试');
+
+        // 解析接力标签 <next>角色名</next>
+        let nextSpeaker = '';
+        const nx = extractNextTag(reply);
+        if (nx) {
+            reply = nx.rest;
+            nextSpeaker = nx.next;
+        }
+        if (!nextSpeaker || !groupRoles.some(r => r.name === nextSpeaker) || nextSpeaker === currentRole.name) {
+            // 无效接力：轮流到下一个（round）或随机（relay）
+            const idx = groupRoles.findIndex(r => r.name === currentRole.name);
+            nextSpeaker = groupRoles[(idx + 1) % groupRoles.length].name;
+        }
+
+        thinkingBubble.innerHTML = nameHtml + formatChatText(reply);
+        const playBtn = document.createElement('button');
+        playBtn.className = 'play-voice-btn absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
+        playBtn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
+        playBtn.title = '播放语音';
+        playBtn.onclick = () => playChatMessage(thinkingBubble);
+        thinkingDiv.appendChild(playBtn);
+
+        smartScroll(container);
+        cleanupOldAudioCache();
+
+        chatHistory.push({ role: 'assistant', content: `[${currentRole.name}] ${reply}` });
+        saveChatHistory();
+
+        if (tokens > 0) {
+            totalTokensUsed += tokens;
+            localStorage.setItem('TOTAL_TOKENS_USED', totalTokensUsed.toString());
+            updateTotalTokensDisplay();
+        }
+
+        groupRound++;
+        updateGroupRoundCount();
+
+        if (autoPlayTTS) setTimeout(() => playChatMessage(thinkingBubble, true), 300);
+        sfxReceive();
+
+        // 继续下一轮：接力棒到 nextSpeaker；用户插话后暂停等用户决定
+        groupSpeaker = nextSpeaker;
+        if (isUserInterruption) {
+            groupRunning = false;
+            document.getElementById('group-start-btn').classList.remove('hidden');
+            document.getElementById('group-pause-btn').classList.add('hidden');
+        } else {
+            groupTimeout = setTimeout(() => {
+                if (groupRunning) groupChatNext(false);
+            }, getDualInterval());
+        }
+    } catch (err) {
+        if (err.name === 'AbortError') {
+            thinkingDiv.remove();
+            return;
+        }
+        thinkingBubble.innerText = '出错啦: ' + err.message;
+        sfxError();
+        groupRunning = false;
+        document.getElementById('group-start-btn').classList.remove('hidden');
+        document.getElementById('group-pause-btn').classList.add('hidden');
+        groupAbortCtrl = null;
+    }
+}
 function resetTypingMeta() {
     typingStartTime = 0;
     typingLastEvent = 0;
@@ -2051,9 +2412,11 @@ function renderChatHistory() {
             if (match) {
                 const speakerName = match[1];
                 const content = match[2];
-                // 判断角色颜色：如果双角色已开启，A橙色B蓝色；否则根据角色名在列表中的位置奇偶决定
+                // 判断角色颜色：群聊优先用群聊色板；双角色已开启A橙色B蓝色；否则根据角色名在列表中的位置奇偶决定
                 let color = '#fb923c';
-                if (dualRoleA && dualRoleB) {
+                if (groupChatActive && groupRoles.length > 0) {
+                    color = groupColorOf(speakerName);
+                } else if (dualRoleA && dualRoleB) {
                     color = speakerName === dualRoleA.name ? '#fb923c' : '#3b82f6';
                 } else {
                     const roleList = getRoleList();
@@ -2336,6 +2699,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const dualToggle = document.getElementById('dual-role-toggle');
         if (dualToggle) dualToggle.checked = true;
         toggleDualRoleMode();
+    }
+    // 恢复群聊室模式状态
+    if (localStorage.getItem('GROUP_ROLE_MODE') === '1') {
+        const groupToggle = document.getElementById('group-role-toggle');
+        if (groupToggle) groupToggle.checked = true;
+        toggleGroupRoleMode();
     }
     initDualRoleBarCollapse(); // 恢复双角色控制面板折叠状态
     initSingleVoiceSelect(); // 恢复单人模式AI声音选择
@@ -3110,6 +3479,25 @@ async function sendChatMessage() {
             // 调用双角色回复逻辑（用户插话模式，回复完暂停）
             dualChatNext(true);
         }
+        return;
+    }
+
+    // 群聊模式下用户发消息：清除定时器，暂停自动对话，让群里某角色回应用户
+    if (groupChatActive && groupRoles.length > 0) {
+        if (groupTimeout) { clearTimeout(groupTimeout); groupTimeout = null; }
+        groupRunning = true;
+        document.getElementById('group-start-btn').classList.add('hidden');
+        document.getElementById('group-pause-btn').classList.remove('hidden');
+        // 优先让最后说话的人回应用户（用户刚插话，最后说话者最自然）
+        const lastAiMsg = [...chatHistory].reverse().find(m => m.role === 'assistant');
+        const m = lastAiMsg ? lastAiMsg.content.match(/^\[([^\]]+)\]/) : null;
+        const lastSpeaker = m ? m[1] : '';
+        if (groupRoles.some(r => r.name === lastSpeaker)) {
+            groupSpeaker = lastSpeaker;
+        } else {
+            groupSpeaker = groupRoles[0].name;
+        }
+        await groupChatNext(true);
         return;
     }
 
