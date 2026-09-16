@@ -2038,7 +2038,7 @@ function initTypingSensor() {
                 typingDelSession = true;
                 typingDelSnapshot = typingPrevValue; // 记录删除前快照（保留以判断会话范围）
             }
-            typingDelBuffer += diff.deleted; // 实时累积被删文本
+            typingDelBuffer = diff.deleted + typingDelBuffer; // 前插累积，恢复原始删除顺序（退格是从右往左删的，追加会倒序）
         } else {
             // 本次不是纯删除（新增/替换等）：若之前有删除会话，结束并记录
             if (typingDelSession) closeTypingDelSession();
