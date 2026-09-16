@@ -3705,6 +3705,10 @@ function renderRoleCard() {
         avatar.innerText = firstChar;
         avatar.style.background = getAvatarGradient(role.name);
     }
+    // 同步聊天页标题与朋友圈入口头像
+    const titleEl = document.getElementById('chat-title-role');
+    if (titleEl) titleEl.textContent = role.name + ' 语音对话';
+    updateMomentsEntryAvatar();
 }
 
 // 根据名字生成渐变色头像
@@ -7041,5 +7045,187 @@ async function generateVideoFromChat(userInput = '') {
         }
     } finally {
         isGeneratingChatVideo = false;
+    }
+}
+
+// ============================================
+// 朋友圈（仿微信，单角色）
+// ============================================
+let momentsBusy = false;
+
+function momentsKey() {
+    const role = getCurrentRole();
+    return 'MOMENTS_' + (role ? role.id : 'default');
+}
+function momentsSigKey() {
+    const role = getCurrentRole();
+    return 'MOMENTS_SIG_' + (role ? role.id : 'default');
+}
+function loadMoments() {
+    try { return JSON.parse(localStorage.getItem(momentsKey()) || '[]'); }
+    catch (e) { return []; }
+}
+function saveMoments(list) {
+    localStorage.setItem(momentsKey(), JSON.stringify(list.slice(-10))); // 只留最近10条
+}
+function getRoleAvatarSrc() {
+    const role = getCurrentRole();
+    if (role && role.avatar) return role.avatar;
+    return localStorage.getItem('AVATAR_' + (role ? role.name : '')) || '';
+}
+function fmtMomentTime(ts) {
+    const diff = Date.now() - ts;
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return '刚刚';
+    if (min < 60) return min + '分钟前';
+    const h = Math.floor(min / 60);
+    if (h < 24) return h + '小时前';
+    const d = new Date(ts);
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+}
+function updateMomentsEntryAvatar() {
+    const el = document.getElementById('moments-entry-avatar');
+    if (!el) return;
+    const role = getCurrentRole();
+    const src = getRoleAvatarSrc();
+    if (src) {
+        el.innerHTML = '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover;">';
+        el.style.background = '';
+    } else {
+        el.textContent = role && role.name ? role.name.charAt(0) : '?';
+        el.style.background = getAvatarGradient(role ? role.name : '?');
+    }
+}
+async function openMoments() {
+    const role = getCurrentRole();
+    if (!role) return;
+    const src = getRoleAvatarSrc();
+    document.getElementById('moments-big-avatar').src = src || '';
+    document.getElementById('moments-nickname').textContent = role.name;
+    const sigEl = document.getElementById('moments-signature');
+    const sig = localStorage.getItem(momentsSigKey()) || '这个人很懒，什么都没留下';
+    sigEl.textContent = sig;
+    sigEl.onclick = () => {
+        const s = prompt('个性签名：', localStorage.getItem(momentsSigKey()) || '');
+        if (s !== null) {
+            localStorage.setItem(momentsSigKey(), s.trim());
+            sigEl.textContent = s.trim() || '这个人很懒，什么都没留下';
+        }
+    };
+    document.getElementById('moments-overlay').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    renderMoments();
+    if (loadMoments().length === 0 && !momentsBusy) postNewMoment();
+}
+function closeMoments() {
+    document.getElementById('moments-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+}
+function renderMoments() {
+    const role = getCurrentRole();
+    const feed = document.getElementById('moments-feed');
+    const list = loadMoments().slice().reverse();
+    const avatarSrc = getRoleAvatarSrc();
+    if (list.length === 0) {
+        feed.innerHTML = '<div style="text-align:center;color:#bbb;padding:60px 0;font-size:14px;">她还没有发动态</div>';
+        return;
+    }
+    feed.innerHTML = list.map(m =>
+        '<div class="moment-item">' +
+            (avatarSrc
+                ? '<img class="moment-avatar" src="' + avatarSrc + '">'
+                : '<div class="moment-avatar" style="display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;">' + (role.name ? role.name.charAt(0) : '?') + '</div>') +
+            '<div class="moment-body">' +
+                '<div class="moment-name">' + escapeHtml(role.name) + '</div>' +
+                '<div class="moment-text">' + escapeHtml(m.text) + '</div>' +
+                (m.image ? '<img class="moment-img" src="' + m.image + '" onclick="openImageLightbox(this.src)">' : '') +
+                '<div class="moment-meta">' +
+                    '<span class="moment-time">' + fmtMomentTime(m.ts) + '</span>' +
+                    '<button class="moment-like' + (m.liked ? ' liked' : '') + '" onclick="toggleLikeMoment(' + m.id + ')">' +
+                        '<i class="' + (m.liked ? 'fa-solid' : 'fa-regular') + ' fa-heart"></i> ' + (m.liked ? '已赞' : '赞') +
+                    '</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>'
+    ).join('');
+}
+function toggleLikeMoment(id) {
+    const list = loadMoments();
+    const m = list.find(x => x.id === id);
+    if (m) { m.liked = !m.liked; saveMoments(list); renderMoments(); }
+}
+async function blobToDataURLCompressed(blob, maxW) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+            const scale = Math.min(1, maxW / img.width);
+            const c = document.createElement('canvas');
+            c.width = Math.round(img.width * scale);
+            c.height = Math.round(img.height * scale);
+            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+            URL.revokeObjectURL(url);
+            resolve(c.toDataURL('image/jpeg', 0.72));
+        };
+        img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+        img.src = url;
+    });
+}
+async function postNewMoment() {
+    if (momentsBusy) return;
+    momentsBusy = true;
+    const role = getCurrentRole();
+    const statusEl = document.getElementById('moments-status');
+    try {
+        statusEl.textContent = '她正在构思这条动态...';
+        const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+        const llmKey = localStorage.getItem('LLM_KEY') || '';
+        const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+        if (!llmKey) throw new Error('没有配置 LLM Key');
+        const recent = (typeof chatHistory !== 'undefined' ? chatHistory : []).slice(-4);
+        const recentText = recent.map(m => (m.role === 'user' ? '用户' : role.name) + ': ' + String(m.content || '').slice(0, 150)).join('\n');
+        const messages = [
+            { role: 'system', content: '你是角色「' + role.name + '」。这是一个私人虚构陪伴空间。完全沉浸角色，不要AI腔，不要解释，不要客套。' },
+        ];
+        if (role.desc && role.desc !== DEFAULT_ROLE_DESC) {
+            messages.push({ role: 'system', content: '【角色卡】\n' + role.desc });
+        }
+        messages.push({ role: 'user', content:
+            '现在你要发一条朋友圈。请严格输出两行：\n' +
+            '第一行：动态文案，15~40字，像真人随手发的朋友圈——日常、矫情、阴阳怪气都可以，符合你和用户最近的关系氛围。\n' +
+            '第二行：画面描述（英文一句话），描述配图应该是什么样的手机自拍：你在哪、在做什么、什么表情。\n' +
+            '只输出这两行，不要序号、不要引号、不要解释。\n\n最近聊天：\n' + (recentText || '（刚认识不久）')
+        });
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
+            body: JSON.stringify({ baseUrl: llmUrl, model: llmModel, messages, temperature: 0.95, max_tokens: 200, stream: false })
+        });
+        if (!res.ok) throw new Error('LLM HTTP ' + res.status);
+        const data = await res.json();
+        let raw = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
+        const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
+        const text = (lines[0] || '今天也没什么事').replace(/^["'「『]+|["'」』]+$/g, '');
+        const scene = lines[1] || 'casual selfie in room, natural expression';
+
+        statusEl.textContent = '她在拍自拍...';
+        const style = (typeof getFixedStyleByMode === 'function') ? getFixedStyleByMode() : '';
+        const prompt = style + ', casual daily selfie, arm extended, phone front camera snapshot, ' + scene;
+        const model = (typeof getImageModel === 'function') ? getImageModel() : 'agnes-2.1';
+        const quality = localStorage.getItem('IMG_QUALITY') || '1K';
+        const avatarSrc = getRoleAvatarSrc();
+        const result = await generateImageWithSafety(prompt, model, (s) => { statusEl.textContent = s; }, null, avatarSrc || null, '3:4', quality);
+        const dataURL = await blobToDataURLCompressed(result.blob, 640);
+
+        const list = loadMoments();
+        list.push({ id: Date.now(), text, image: dataURL, ts: Date.now(), liked: false });
+        saveMoments(list);
+        renderMoments();
+        statusEl.textContent = '';
+    } catch (e) {
+        console.error('朋友圈生成失败:', e);
+        statusEl.textContent = '生成失败：' + (e.message || '稍后再试');
+    } finally {
+        momentsBusy = false;
     }
 }
