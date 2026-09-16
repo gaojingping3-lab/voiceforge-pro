@@ -1547,6 +1547,7 @@ let typingPrevValue = '';      // 上次完整value
 let typingDeletedTexts = [];   // 被删除的内容片段（每段截断20字，最多3段）
 let typingDelSnapshot = null;  // 连续删除会话的开始快照（用于合并完整删除段）
 let typingDelSession = false;  // 是否处于连续删除会话
+let typingDelBuffer = '';      // 删除会话期间实时累积的删除文本（不依赖最终diff，打字后也不丢）
 let typingComposing = false;   // 输入法组合期标志
 
 function getTypingSensorEnabled() {
@@ -1956,6 +1957,7 @@ function resetTypingMeta() {
     typingDeletedTexts = [];
     typingDelSnapshot = null;
     typingDelSession = false;
+    typingDelBuffer = '';
 }
 // 对比前后value，提取被删除的文本并判断是否纯删除（公共前缀+公共后缀法）
 function getDeleteDiff(prevValue, curValue) {
@@ -1970,10 +1972,6 @@ function getDeleteDiff(prevValue, curValue) {
     const kept = prevValue.slice(0, i) + prevValue.slice(prevValue.length - j);
     return { deleted, pure: curValue === kept };
 }
-// 兼容旧调用：仅返回删除文本
-function extractDeletedText(prevValue, curValue) {
-    return getDeleteDiff(prevValue, curValue).deleted;
-}
 // 记录一段完整删除文本（截断20字，最多3段）
 function pushTypingDeletedText(t) {
     const trimmed = (t || '').trim();
@@ -1981,14 +1979,14 @@ function pushTypingDeletedText(t) {
         typingDeletedTexts.push(trimmed.length > 20 ? trimmed.slice(0, 20) + '…' : trimmed);
     }
 }
-// 结束当前删除会话：从快照diff出完整删除段并记录
+// 结束当前删除会话：直接用实时累积的删除文本记录（不依赖最终diff，打字后长度变化也不丢）
 function closeTypingDelSession() {
-    if (typingDelSession && typingDelSnapshot !== null) {
-        const fullDel = extractDeletedText(typingDelSnapshot, typingPrevValue);
-        if (fullDel) pushTypingDeletedText(fullDel);
+    if (typingDelSession && typingDelBuffer) {
+        pushTypingDeletedText(typingDelBuffer);
     }
     typingDelSession = false;
     typingDelSnapshot = null;
+    typingDelBuffer = '';
 }
 // 返回本次输入的元数据描述（无显著行为返回null）
 function getTypingMeta() {
@@ -2032,16 +2030,17 @@ function initTypingSensor() {
         }
         typingLastEvent = now;
         const curValue = input.value;
-        // 检测删除：仅"纯删除"进入删除会话，结束时合并为完整删除段
+        // 检测删除：仅"纯删除"进入删除会话；删除文本在删除瞬间实时累积，避免最终diff被后续打字破坏
         const diff = getDeleteDiff(typingPrevValue, curValue);
         if (diff.pure && diff.deleted) {
             typingDeletedChars += diff.deleted.length;
             if (!typingDelSession) {
                 typingDelSession = true;
-                typingDelSnapshot = typingPrevValue; // 记录删除前快照
+                typingDelSnapshot = typingPrevValue; // 记录删除前快照（保留以判断会话范围）
             }
+            typingDelBuffer += diff.deleted; // 实时累积被删文本
         } else {
-            // 本次不是纯删除（新增/替换等）：若之前有删除会话，结束并合并
+            // 本次不是纯删除（新增/替换等）：若之前有删除会话，结束并记录
             if (typingDelSession) closeTypingDelSession();
         }
         typingPrevValue = curValue;
