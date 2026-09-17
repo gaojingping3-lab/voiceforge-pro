@@ -2612,6 +2612,18 @@ document.addEventListener('DOMContentLoaded', () => {
     initSmartScroll(); // 初始化智能滚动
     initPullToRefresh(); // 初始化下拉刷新
     initLongPressMenu(); // 初始化长按消息菜单
+    // 微信式拍一拍：双击聊天里她的头像触发（事件委托，头像类名 .chat-image）
+    const chatMessagesEl = document.getElementById('chat-messages');
+    if (chatMessagesEl) {
+        chatMessagesEl.addEventListener('dblclick', (e) => {
+            const avatar = e.target.closest('.chat-image');
+            if (!avatar) return;
+            const msgDiv = avatar.closest('.chat');
+            if (!msgDiv || !msgDiv.classList.contains('chat-start')) return; // 只对AI(左侧)头像生效
+            e.preventDefault();
+            patRoleInChat();
+        });
+    }
     initFullscreenMode(); // 初始化全屏模式
     updateAutoPlayBtn(); // 恢复自动朗读按钮状态
     // AI自动发朋友圈：在线定时器 + 离线补发（延迟几秒，避免和页面加载抢资源）
@@ -7537,35 +7549,61 @@ function showPatToast(main, reply) {
     clearTimeout(toast._t);
     toast._t = setTimeout(() => { toast.style.display = 'none'; }, 5000);
 }
+// 拍一拍：生成她的反应回复（公共逻辑，朋友圈toast版和聊天版共用）
+async function genPatReply(role, scene) {
+    const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+    const llmKey = localStorage.getItem('LLM_KEY') || '';
+    if (!llmKey) throw new Error('未配置LLM Key');
+    const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+    const messages = [
+        { role: 'system', content: '你是角色「' + role.name + '」。私人虚构陪伴空间，完全沉浸角色，不要AI腔。' },
+    ];
+    if (role.desc && role.desc !== DEFAULT_ROLE_DESC) {
+        messages.push({ role: 'system', content: '【角色卡】\n' + role.desc });
+    }
+    messages.push({ role: 'user', content: scene });
+    const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
+        body: JSON.stringify({ baseUrl: llmUrl, model: llmModel, messages, temperature: 1.0, max_tokens: 200, stream: false, thinking: { type: 'disabled' } })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    return ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
+}
 async function patRole(event) {
     if (event) event.stopPropagation();
     const role = getCurrentRole();
     if (!role) return;
     showPatToast('你拍了拍「' + role.name + '」', '…');
     try {
-        const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
-        const llmKey = localStorage.getItem('LLM_KEY') || '';
-        if (!llmKey) { showPatToast('你拍了拍「' + role.name + '」', '（未配置LLM Key）'); return; }
-        const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
-        const messages = [
-            { role: 'system', content: '你是角色「' + role.name + '」。私人虚构陪伴空间，完全沉浸角色，不要AI腔。' },
-        ];
-        if (role.desc && role.desc !== DEFAULT_ROLE_DESC) {
-            messages.push({ role: 'system', content: '【角色卡】\n' + role.desc });
-        }
-        messages.push({ role: 'user', content: '用户刚刚在朋友圈拍了拍你。请用一句符合人设的话回应这次"拍一拍"，口语化，10~30字，可以是害羞、傲娇、惊讶或调侃，不要引号，不要解释。' });
-        const res = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
-            body: JSON.stringify({ baseUrl: llmUrl, model: llmModel, messages, temperature: 1.0, max_tokens: 200, stream: false, thinking: { type: 'disabled' } })
-        });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        const reply = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
+        const reply = await genPatReply(role, '用户刚刚在朋友圈拍了拍你。请用一句符合人设的话回应这次"拍一拍"，口语化，10~30字，可以是害羞、傲娇、惊讶或调侃，不要引号，不要解释。');
         showPatToast('你拍了拍「' + role.name + '」', reply || '干嘛呀？');
     } catch (e) {
         console.warn('[拍一拍] 失败:', e.message);
         showPatToast('你拍了拍「' + role.name + '」', '（她没反应，可能是网络问题）');
+    }
+}
+// 聊天页微信式拍一拍：双击她的头像 → 灰字提示 + 她回一句（进聊天记录，她能记住）
+async function patRoleInChat() {
+    const role = getCurrentRole();
+    if (!role) return;
+    const container = document.getElementById('chat-messages');
+    // 微信灰字提示（不进chatHistory，像微信的系统提示）
+    const tip = document.createElement('div');
+    tip.className = 'pat-tip msg-enter';
+    tip.textContent = '你拍了拍「' + role.name + '」';
+    container.appendChild(tip);
+    smartScroll(container);
+    try {
+        const reply = await genPatReply(role, '用户刚刚在聊天里拍了拍你。请用一句符合人设的话回应这次"拍一拍"，口语化，10~30字，可以是害羞、傲娇、惊讶或调侃，不要引号，不要解释。');
+        if (reply) {
+            chatHistory.push({ role: 'assistant', content: reply });
+            appendChatMessage(reply, 'ai');
+        }
+    } catch (e) {
+        console.warn('[聊天拍一拍] 失败:', e.message);
+        tip.textContent = '你拍了拍「' + role.name + '」，但她没反应';
     }
 }
 async function blobToDataURLCompressed(blob, maxW) {
