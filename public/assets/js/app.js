@@ -3449,6 +3449,11 @@ async function sendChatMessage() {
         if (hasRoleCard) {
             messages.push({ role: 'system', content: roleCardDesc });
         }
+        // 朋友圈记忆：让AI记得自己最近发过哪几条朋友圈，聊到能接上
+        const momentsMemory = buildMomentsMemoryPrompt();
+        if (momentsMemory) {
+            messages.push({ role: 'system', content: momentsMemory });
+        }
         // 角色记忆便签（手动录入的用户信息）
         const memoPrompt = formatMemoPrompt(getCurrentRoleId());
         if (memoPrompt) {
@@ -7228,4 +7233,19 @@ async function postNewMoment() {
     } finally {
         momentsBusy = false;
     }
+}
+
+// 生成朋友圈记忆注入文本（单聊system prompt用）：最近3条朋友圈
+function buildMomentsMemoryPrompt() {
+    let list;
+    try { list = loadMoments(); } catch (e) { return ''; }
+    if (!list || list.length === 0) return '';
+    const recent = list.slice(-3).reverse();
+    const lines = recent.map(m => {
+        const ago = Date.now() - m.ts;
+        const day = ago < 86400000 ? '今天' : ago < 172800000 ? '昨天' : ago < 604800000 ? '这几天' : ((new Date(m.ts).getMonth() + 1) + '月' + new Date(m.ts).getDate() + '日');
+        return day + '，你发了一条朋友圈："' + String(m.text).slice(0, 80) + '"';
+    });
+    return '【你最近发的朋友圈，你本人要记得这些内容】\n' + lines.join('\n') +
+        '\n\n用户如果提起你的朋友圈、状态、配图，你要自然地接上梗，不要装不知道自己发过什么。';
 }
