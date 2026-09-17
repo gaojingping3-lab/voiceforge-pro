@@ -2499,6 +2499,21 @@ function updateBubblePos(){
 const _arDrawOrig = draw;
 draw = function(){ _arDrawOrig(); updateBubblePos(); };
 
+// 找当前角色：URL ?role=id 优先 → CURRENT_ROLE_ID → 角色列表第一个
+function getArRole(){
+  try {
+    const list = JSON.parse(localStorage.getItem('ROLE_LIST') || '[]');
+    if (list.length){
+      let rid = null;
+      const um = location.search.match(/[?&]role=([^&]+)/);
+      if (um) rid = parseInt(decodeURIComponent(um[1]));
+      if (!rid) rid = parseInt(localStorage.getItem('CURRENT_ROLE_ID'));
+      return list.find(r => r.id === rid) || list[0];
+    }
+  } catch(e){}
+  return null;
+}
+
 // ── ② 生成立绘：按角色头像/设定生成二次元全身立绘 → 抠绿幕 → 透明底贴入 ───
 async function genCharacter(){
   if (!arGenBtn) return;
@@ -2509,18 +2524,7 @@ async function genCharacter(){
     const key = localStorage.getItem('AGNES_API_KEY') || '';
     const quality = localStorage.getItem('IMG_QUALITY') || '1K';
 
-    // 找当前角色：URL ?role=id 优先 → CURRENT_ROLE_ID → 角色列表第一个
-    let role = null;
-    try {
-      const list = JSON.parse(localStorage.getItem('ROLE_LIST') || '[]');
-      if (list.length){
-        let rid = null;
-        const um = location.search.match(/[?&]role=([^&]+)/);
-        if (um) rid = parseInt(decodeURIComponent(um[1]));
-        if (!rid) rid = parseInt(localStorage.getItem('CURRENT_ROLE_ID'));
-        role = list.find(r => r.id === rid) || list[0];
-      }
-    } catch(e){}
+    const role = getArRole();
     const roleName = (role && role.name) || '她';
     const roleDesc = (role && role.desc) || localStorage.getItem('ROLE_CARD_DESC') || '';
     let look = '';
@@ -2708,8 +2712,9 @@ async function sendArMessage(text){
     const llmKey = localStorage.getItem('LLM_KEY') || '';
     const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
     let roleName = '她';
-    try { roleName = JSON.parse(localStorage.getItem('ROLE_CARD_NAME') || '"她"'); } catch(e){}
-    const roleDesc = localStorage.getItem('ROLE_CARD_DESC') || '';
+    const arRole = getArRole();
+    if (arRole && arRole.name) roleName = arRole.name;
+    const roleDesc = (arRole && arRole.desc) || localStorage.getItem('ROLE_CARD_DESC') || '';
     const sysMsg = '你是角色「' + roleName + '」。这是一个私人虚构陪伴空间。完全沉浸角色，不要AI腔，不要解释，不要客套。回复控制在80字以内，像真人说话，可以带一点表情动作描写。';
     const msgs = [{ role: 'system', content: sysMsg }];
     if (roleDesc) msgs.push({ role: 'system', content: '【角色卡】\n' + roleDesc });
