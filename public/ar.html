@@ -2667,20 +2667,13 @@ function initArAudio(){
   } catch(e){}
 }
 async function arTTS(text){
-  const engine = localStorage.getItem('FISH_KEY') ? 'fish' : 'edge';
-  const voiceId = localStorage.getItem('SINGLE_CHAT_VOICE') || localStorage.getItem('FISH_VOICE_ID') || 'shimmer';
-  const apiKey = localStorage.getItem('FISH_KEY') || '';
-  let url, headers, bodyObj;
-  if (engine === 'fish'){
-    url = '/api/fish/v1/tts';
-    headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
-    bodyObj = { text: text, reference_id: voiceId || null, model: 'fish-speech-1.4', format: 'mp3', normalize_loudness: true };
-  } else {
-    url = '/api/edge/tts';
-    headers = { 'Content-Type': 'application/json' };
-    bodyObj = { text: text, voiceId: voiceId, format: 'mp3', speed: 1.0, prompt: '' };
-  }
-  const res = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(bodyObj) });
+  // 和单角色聊天一致：默认 Edge（免费、默认音色 shimmer），不依赖密钥配置持久化
+  const voiceId = localStorage.getItem('SINGLE_CHAT_VOICE') || 'shimmer';
+  const res = await fetch('/api/edge/tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: text, voiceId: voiceId, format: 'mp3', speed: 1.0, prompt: '' })
+  });
   if (!res.ok) throw new Error('TTS HTTP ' + res.status);
   return await res.blob();
 }
@@ -2733,9 +2726,13 @@ async function sendArMessage(text){
                                .replace(/\*[^*]*\*/g, '').trim();
         if (speakText){
           const blob = await arTTS(speakText);
+          if (arAudioCtx && arAudioCtx.state === 'suspended') await arAudioCtx.resume();
           await arPlayAudio(blob);
         }
-      } catch(e){ console.warn('AR TTS失败:', e); }
+      } catch(e){
+        console.warn('AR TTS失败:', e);
+        showBubble('朗读失败：' + (e.message || e), 3000);
+      }
       arSpeaking = false;
     }
     resumeArListen();
