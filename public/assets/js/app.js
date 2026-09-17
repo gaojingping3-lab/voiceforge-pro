@@ -1548,6 +1548,7 @@ let typingDeletedTexts = [];   // 被删除的内容片段（每段截断20字�
 let typingDelSnapshot = null;  // 连续删除会话的开始快照（用于合并完整删除段）
 let typingDelSession = false;  // 是否处于连续删除会话
 let typingDelBuffer = '';      // 删除会话期间实时累积的删除文本（不依赖最终diff，打字后也不丢）
+let typingClearedSnapshot = ''; // 【新逻辑】记录"整段删空"时被删掉的完整内容
 let typingComposing = false;   // 输入法组合期标志
 
 function getTypingSensorEnabled() {
@@ -1958,6 +1959,7 @@ function resetTypingMeta() {
     typingDelSnapshot = null;
     typingDelSession = false;
     typingDelBuffer = '';
+    typingClearedSnapshot = '';
 }
 // 对比前后value，提取被删除的文本并判断是否纯删除（公共前缀+公共后缀法）
 function getDeleteDiff(prevValue, curValue) {
@@ -1990,19 +1992,14 @@ function closeTypingDelSession() {
 }
 // 返回本次输入的元数据描述（无显著行为返回null）
 function getTypingMeta() {
-    closeTypingDelSession(); // 补完还没结束的删除会话
-    // 精确触发：必须"删除≥2字" 且 "停顿≥2秒" 同时满足（删除+犹豫才触发，普通停顿不触发）
-    if (typingMaxPause < 2000 || typingDeletedChars < 2) return null;
-    const parts = [];
+    // 【新逻辑】只认"整段删空 → 停2秒以上 → 重打发出"这一种行为
+    // 打错字退格一两个字、局部删除，一律不报告
+    if (!typingClearedSnapshot) return null;
+    if (typingMaxPause < 2000) return null; // 删空后没停够2秒，不算
     const pauseSec = Math.round(typingMaxPause / 1000);
-    if (pauseSec > 0) parts.push('停顿了约' + pauseSec + '秒');
-    if (typingDeletedChars > 0) parts.push('删除了约' + typingDeletedChars + '个字符');
-    // 附带被删除的具体内容片段（如果记录到）
-    if (typingDeletedTexts.length > 0) {
-        const joined = typingDeletedTexts.map(t => '“' + t + '”').join('、');
-        parts.push('删除的内容片段包括：' + joined);
-    }
-    return parts.join('，');
+    const snippet = typingClearedSnapshot.trim();
+    const show = snippet.length > 30 ? snippet.slice(0, 30) + '…' : snippet;
+    return '把写好的一整段话全部删掉重打了（删掉的内容是："' + show + '"），删掉后停顿了约' + pauseSec + '秒才重新打字发出来';
 }
 function initTypingSensor() {
     const input = document.getElementById('chat-input');
@@ -2030,18 +2027,11 @@ function initTypingSensor() {
         }
         typingLastEvent = now;
         const curValue = input.value;
-        // 检测删除：仅"纯删除"进入删除会话；删除文本在删除瞬间实时累积，避免最终diff被后续打字破坏
-        const diff = getDeleteDiff(typingPrevValue, curValue);
-        if (diff.pure && diff.deleted) {
-            typingDeletedChars += diff.deleted.length;
-            if (!typingDelSession) {
-                typingDelSession = true;
-                typingDelSnapshot = typingPrevValue; // 记录删除前快照（保留以判断会话范围）
-            }
-            typingDelBuffer = diff.deleted + typingDelBuffer; // 前插累积，恢复原始删除顺序（退格是从右往左删的，追加会倒序）
-        } else {
-            // 本次不是纯删除（新增/替换等）：若之前有删除会话，结束并记录
-            if (typingDelSession) closeTypingDelSession();
+        // 【新逻辑】只捕捉"整段删空"：从有内容 → 空
+        // 打错字退格一两个字（局部删除）不记录
+        if (typingPrevValue.length > 0 && curValue === '') {
+            typingClearedSnapshot = typingPrevValue; // 记住被删掉的整段
+            typingMaxPause = 0; // 停顿计时重置：从"删空这一刻"开始算，到下次重打
         }
         typingPrevValue = curValue;
     });
@@ -3476,12 +3466,9 @@ async function sendChatMessage() {
             const lastIdx = messages.length - 1;
             const lastMsg = messages[lastIdx];
             if (lastMsg && lastMsg.role === 'user') {
-                const hasSnippet = typingMetaRaw.includes('片段');
-                const demand = hasSnippet
-                    ? `这是必须利用的关键信息：用户在输入这条消息时${typingMetaRaw}。你必须在角色扮演中直接点破TA删掉的这段具体内容，用角色口吻戳穿或嘲讽（例如："你把'开心啊'删掉，是怕我看到？"）。禁止只笼统说'删了几个字'或'你犹豫了'而不引用具体文字。`
-                    : `这是必须利用的关键信息：用户在输入这条消息时${typingMetaRaw}。你必须在角色扮演中自然察觉并点破这次删除与犹豫（例如以角色口吻说："字删了又重打，你在犹豫什么？"）。`;
+                const demand = `这是必须利用的关键信息：用户在发送这条消息之前${typingMetaRaw}。你必须在角色扮演中直接点破他刚才删掉的那段话，用角色口吻戳穿或嘲讽（例如："你刚才不是打了那句话吗，怎么又删了？"）。不要解释这是系统观测数据，保持角色人设。`;
                 const patched = { ...lastMsg };
-                patched.content = lastMsg.content + `\n\n【系统观测，非用户发言】${demand}不要向用户解释这是系统数据，保持角色人设。`;
+                patched.content = lastMsg.content + `\n\n【系统观测，非用户发言】${demand}`;
                 messages[lastIdx] = patched;
             }
         }
