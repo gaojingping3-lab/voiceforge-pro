@@ -7344,7 +7344,7 @@ async function postNewMoment() {
         messages.push({ role: 'user', content:
             '现在你要发一条朋友圈。请严格输出两行：\n' +
             '第一行：动态文案，15~40字，像真人随手发的朋友圈——日常、矫情、阴阳怪气都可以，符合你和用户最近的关系氛围。\n' +
-            '第二行：画面描述（英文一句话），描述配图应该是什么样的手机自拍：你在哪、在做什么、什么表情。\n' +
+            '第二行：画面描述（英文一句话），描述这条朋友圈配图是什么照片：你在哪、在做什么、什么表情、什么氛围。可以是生活场景、风景、他拍等，但画面中不要出现手机，不要自拍姿势和手势。\n' +
             '只输出这两行，不要序号、不要引号、不要解释。\n\n最近聊天：\n' + (recentText || '（刚认识不久）')
         });
         const res = await fetch('/api/chat', {
@@ -7359,14 +7359,14 @@ async function postNewMoment() {
         const text = (lines[0] || '今天也没什么事').replace(/^["'「『]+|["'」』]+$/g, '');
         const scene = lines[1] || 'casual selfie in room, natural expression';
 
-        statusEl.textContent = '她在拍自拍...';
+        statusEl.textContent = '她正在准备这张照片...';
         // ===== 完全复用聊天生图同一条链路 =====
         // 读最近聊天记录 + 角色身份锁 + 服装硬锁 + 视角/景别/人数约束 + 参考头像(同一开关) + 同一个出图函数
-        // 唯一区别：额外附加"发朋友圈自拍"的场景描述，不维护任何朋友圈专属生图逻辑
+        // 唯一区别：额外附加"发朋友圈配图"的场景描述，不维护任何朋友圈专属生图逻辑
         const result = await generateImageFromChat('', 2, {
             silent: true,
             forceSingle: true,
-            contextAppend: '【画面场景】' + (scene || 'casual selfie in room, natural expression') + '\n这是角色正在拍一张准备发朋友圈的手机自拍，请严格按照这个场景生成画面。'
+            contextAppend: '【画面场景】' + (scene || 'casual daily photo, natural expression') + '\n这是角色准备发朋友圈的一张生活照片，请严格按照这个场景生成画面。画面中绝对不要出现手机，不要自拍姿势、不要举着手机的手、不要手机屏幕反光。'
         });
         if (!result || !result.blob) throw new Error('朋友圈生图未返回结果');
         // 图片存IndexedDB（大空间），localStorage只存'idx:'小标记——不再占5MB，永不报存储满
