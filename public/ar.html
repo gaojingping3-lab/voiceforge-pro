@@ -2534,6 +2534,57 @@ function getArRole(){
 }
 
 // ── ② 生成立绘：按角色头像/设定生成二次元全身立绘 → 抠绿幕 → 透明底贴入 ───
+// 前端直连 Agnes（和聊天生图同一通道，绕过Cloudflare后端IP限流）
+async function generateArDirect(prompt, ratio, inputImage, quality, agnesApiKey){
+  const agnesModel = 'agnes-image-2.1-flash';
+  const endpoints = [
+    { url: 'https://apihub.agnes-ai.cn/v1/images/generations', name: '.cn' },
+    { url: 'https://apihub.agnes-ai.com/v1/images/generations', name: '.com' }
+  ];
+  let lastError = null;
+  for (const { url: endpoint, name: epName } of endpoints) {
+    try {
+      const requestBody = {
+        model: agnesModel, prompt: prompt, size: quality, ratio: ratio, n: 1,
+        response_format: 'b64_json', extra_body: { response_format: 'b64_json' }
+      };
+      if (inputImage) requestBody.extra_body.image = Array.isArray(inputImage) ? inputImage : [inputImage];
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+      let response;
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + agnesApiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody), signal: controller.signal
+        });
+      } finally { clearTimeout(timeoutId); }
+      if (!response.ok) {
+        let errDetail = '';
+        try { const ed = await response.json(); errDetail = ed.error?.message || ed.message || JSON.stringify(ed).substring(0, 200); } catch(e){}
+        lastError = new Error('[Agnes直连 ' + epName + '] HTTP ' + response.status + ': ' + errDetail);
+        if (response.status === 429) continue;   // .cn被限就继续试.com
+        continue;
+      }
+      const data = await response.json();
+      const item = data.data && data.data[0];
+      if (!item || !item.b64_json) { lastError = new Error('[Agnes直连 ' + epName + '] 返回数据为空'); continue; }
+      let b64 = item.b64_json, contentType = 'image/png';
+      if (b64.startsWith('data:')) {
+        const m = b64.match(/^data:([^;]+);base64,(.+)$/);
+        if (m) { contentType = m[1] || 'image/png'; b64 = m[2]; }
+      }
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return { blob: new Blob([bytes], { type: contentType }) };
+    } catch (err) {
+      const errDetail = (err && err.name === 'AbortError') ? '请求超时（120秒未响应）' : ((err && err.message) || err);
+      lastError = new Error('[Agnes直连 ' + epName + '] ' + errDetail);
+    }
+  }
+  throw lastError || new Error('Agnes直连失败');
+}
 // 姿势池：每次换姿势随机轮，保持角色长相/服装不变
 const AR_POSES = [
   'standing upright facing the camera, arms resting at sides, natural relaxed pose',
@@ -2585,17 +2636,25 @@ async function genCharacter(){
     }
 
     showBubble(avatar ? '正在按头像生成二次元立绘…' : '正在生成二次元立绘…', 0);
-    const body = { prompt: prompt, model: model, agnesApiKey: key, ratio: '2:3', quality: quality };
-    if (avatar) body.inputImage = avatar;   // 有头像 → 图生图，锁定长相
-    const res = await fetch('/api/image/generate', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-    });
-    if (!res.ok){
-      let msg = '生图失败';
-      try { const d = await res.json(); msg = d.error || msg; } catch(e){}
-      throw new Error(msg);
+    // 先走前端直连（和聊天生图同一通道，避开后端IP限流），失败再走后端兜底
+    let blob;
+    try {
+      const dr = await generateArDirect(prompt, '2:3', avatar || null, quality, key);
+      blob = dr.blob;
+    } catch (directErr) {
+      console.warn('AR直连失败，降级走后端:', directErr.message);
+      const body = { prompt: prompt, model: model, agnesApiKey: key, ratio: '2:3', quality: quality };
+      if (avatar) body.inputImage = avatar;   // 有头像 → 图生图，锁定长相
+      const res = await fetch('/api/image/generate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+      if (!res.ok){
+        let msg = '生图失败';
+        try { const d = await res.json(); msg = d.error || msg; } catch(e){}
+        throw new Error(msg + ' ｜直连报错：' + directErr.message);
+      }
+      blob = await res.blob();
     }
-    const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     // 用一张删一张：上一张立绘的 blob URL 直接释放，刷新后不保留任何东西
     if (arLastBlobUrl){ try { URL.revokeObjectURL(arLastBlobUrl); } catch(e){} }
