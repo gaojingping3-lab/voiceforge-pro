@@ -2113,7 +2113,7 @@ function getChatStorageKey() {
 // ============================================
 const CHAT_IMG_DB = 'voiceforge-chat-images';
 const CHAT_IMG_STORE = 'chatImages';
-const CHAT_IMG_LIMIT = 30;
+const CHAT_IMG_LIMIT = 20; // dataURL格式体积大，降低上限防Safari IndexedDB配额溢出
 const CHAT_IMG_RESTORE = 5;
 
 function openImageDB() {
@@ -2159,6 +2159,22 @@ async function saveChatImage(blob, savedPrompt, ts) {
             tx.onerror = () => resolve(t);
         });
     } catch (e) { console.warn('[ImgDB] 保存失败:', e.message); return t; }
+}
+
+// 清理旧版存的坏 blob 数据（Safari Blob存储坑遗留），释放IndexedDB空间
+async function cleanupLegacyBlobImages() {
+    try {
+        const db = await openImageDB();
+        const tx = db.transaction(CHAT_IMG_STORE, 'readwrite');
+        const store = tx.objectStore(CHAT_IMG_STORE);
+        const req = store.openCursor();
+        req.onsuccess = () => {
+            const c = req.result;
+            if (!c) return;
+            if (c.value && c.value.blob && !c.value.dataUrl) store.delete(c.primaryKey);
+            c.continue();
+        };
+    } catch (e) {}
 }
 
 // 按时间戳取当前角色的生图（含提示词），用于聊天历史中穿插渲染
@@ -2401,7 +2417,22 @@ function renderChatHistory() {
             imageDiv.appendChild(imageBubble);
             container.appendChild(imageDiv);
             loadChatImageByTs(msg.ts).then(item => {
-                if (!item || !imageBubble.isConnected) return;
+                if (item) return item;
+                // 兜底1：精确ts没找到 → 从当前角色全部图里按时间找最接近的
+                return loadRoleChatImages().then(all => {
+                    if (!all || !all.length) return null;
+                    let best = null, bestDiff = Infinity;
+                    for (const it of all) {
+                        const d = Math.abs((it.ts || 0) - msg.ts);
+                        if (d < bestDiff) { bestDiff = d; best = it; }
+                    }
+                    return best;
+                });
+            }).then(item => {
+                if (!item || !imageBubble.isConnected) {
+                    if (imageBubble && imageBubble.isConnected) imageBubble.innerHTML = '<div class="text-xs opacity-60 px-2 py-3">图片加载失败（本地数据缺失，可清空聊天后重新生成）</div>';
+                    return;
+                }
                 renderChatImageBubble(imageBubble, item);
             });
             continue;
@@ -2698,6 +2729,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initVoiceInput(); // 初始化语音输入
     initTypingSensor(); // 初始化打字行为感知（规训玩法）
     initSmartScroll(); // 初始化智能滚动
+    cleanupLegacyBlobImages(); // 清理旧版坏blob生图数据，释放空间
     initPullToRefresh(); // 初始化下拉刷新
     initLongPressMenu(); // 初始化长按消息菜单
     // 微信式拍一拍：双击聊天里她的头像触发（事件委托，头像类名 .chat-image）
