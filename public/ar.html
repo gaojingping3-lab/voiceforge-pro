@@ -2635,6 +2635,8 @@ async function setArMic(on){
   arMicBtn.classList.toggle('on', on);
   arMicBtn.textContent = on ? '🎤 聆听中…' : '🎤 对话';
   if (on){
+    // 用户手势里同时激活音频会话（TTS 播放需要）
+    try { initArAudio(); } catch(e){}
     try {
       const s = await navigator.mediaDevices.getUserMedia({ audio: true });
       s.getTracks().forEach(t => t.stop());   // 只为激活麦克风权限/音频会话，不长期占用
@@ -2646,6 +2648,52 @@ async function setArMic(on){
   }
 }
 arMicBtn.onclick = () => setArMic(!arMicOn);
+
+// ── TTS 播放：和聊天页同一通道（Fish 克隆音色 / Edge），不是浏览器自带朗读 ──
+let arAudioCtx = null;
+function initArAudio(){
+  if (arAudioCtx){ if (arAudioCtx.state === 'suspended') arAudioCtx.resume(); return; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  arAudioCtx = new AC();
+  if (arAudioCtx.state === 'suspended') arAudioCtx.resume();
+  // 静音振荡器：保持 iOS 音频会话活跃，TTS 才放得出声
+  try {
+    const osc = arAudioCtx.createOscillator();
+    const g = arAudioCtx.createGain();
+    g.gain.value = 0.00001;
+    osc.connect(g); g.connect(arAudioCtx.destination);
+    osc.start();
+  } catch(e){}
+}
+async function arTTS(text){
+  const engine = localStorage.getItem('FISH_KEY') ? 'fish' : 'edge';
+  const voiceId = localStorage.getItem('SINGLE_CHAT_VOICE') || localStorage.getItem('FISH_VOICE_ID') || 'shimmer';
+  const apiKey = localStorage.getItem('FISH_KEY') || '';
+  let url, headers, bodyObj;
+  if (engine === 'fish'){
+    url = '/api/fish/v1/tts';
+    headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
+    bodyObj = { text: text, reference_id: voiceId || null, model: 'fish-speech-1.4', format: 'mp3', normalize_loudness: true };
+  } else {
+    url = '/api/edge/tts';
+    headers = { 'Content-Type': 'application/json' };
+    bodyObj = { text: text, voiceId: voiceId, format: 'mp3', speed: 1.0, prompt: '' };
+  }
+  const res = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(bodyObj) });
+  if (!res.ok) throw new Error('TTS HTTP ' + res.status);
+  return await res.blob();
+}
+async function arPlayAudio(blob){
+  if (!arAudioCtx) throw new Error('音频未初始化');
+  const buf = await blob.arrayBuffer();
+  if (!buf || buf.byteLength < 10) throw new Error('音频数据为空');
+  const decoded = await new Promise((res, rej) => arAudioCtx.decodeAudioData(buf.slice(0), res, rej));
+  const src = arAudioCtx.createBufferSource();
+  src.buffer = decoded;
+  src.connect(arAudioCtx.destination);
+  return new Promise(resolve => { src.onended = resolve; src.start(0); });
+}
 function resumeArListen(){
   if (arMicOn && !arListening && !arSending){
     setTimeout(() => { if (arMicOn && !arSpeaking && !arSending) startArListen(); }, 300);
@@ -2673,18 +2721,22 @@ async function sendArMessage(text){
     const data = await res.json();
     const reply = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
     if (!reply) throw new Error('回复为空');
-    showBubble(reply, 6000);
-    const wantTTS = localStorage.getItem('AUTOPLAY_TTS') !== '0';
-    if (wantTTS && 'speechSynthesis' in window){
+    showBubble(reply, 0);
+    // 朗读开关和聊天页一致：AUTOPLAY_TTS === 'true' 才出声
+    const wantTTS = localStorage.getItem('AUTOPLAY_TTS') === 'true';
+    if (wantTTS){
       try {
-        const u = new SpeechSynthesisUtterance(reply);
-        u.lang = 'zh-CN'; u.rate = 1.05;
         arSpeaking = true;
-        u.onend = () => { arSpeaking = false; resumeArListen(); };
-        u.onerror = () => { arSpeaking = false; resumeArListen(); };
-        speechSynthesis.speak(u);
-        return;
-      } catch(e){ arSpeaking = false; }
+        // 去掉动作描写括号，只念台词
+        const speakText = reply.replace(/【[^】]*】/g, '').replace(/\[[^\]]*\]/g, '')
+                               .replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '')
+                               .replace(/\*[^*]*\*/g, '').trim();
+        if (speakText){
+          const blob = await arTTS(speakText);
+          await arPlayAudio(blob);
+        }
+      } catch(e){ console.warn('AR TTS失败:', e); }
+      arSpeaking = false;
     }
     resumeArListen();
   } catch (err){
