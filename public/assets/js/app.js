@@ -2143,7 +2143,7 @@ function openImageDB() {
     });
 }
 
-async function saveChatImage(blob, savedPrompt, ts) {
+async function saveChatImage(blob, savedPrompt, ts, ratio) {
     const t = ts || Date.now();
     // Safari 对 IndexedDB 直接存 Blob 有已知问题（读出的 Blob 可能为空/损坏），统一转 dataURL 文本存储
     let dataUrl = null;
@@ -2164,7 +2164,7 @@ async function saveChatImage(blob, savedPrompt, ts) {
         const db = await openImageDB();
         return new Promise((resolve) => {
             const tx = db.transaction(CHAT_IMG_STORE, 'readwrite');
-            tx.objectStore(CHAT_IMG_STORE).add({ dataUrl, ts: t, roleKey: getChatStorageKey(), prompt: savedPrompt || '' });
+            tx.objectStore(CHAT_IMG_STORE).add({ dataUrl, ts: t, roleKey: getChatStorageKey(), prompt: savedPrompt || '', ratio: ratio || '1:1' });
             tx.oncomplete = () => { trimChatImages(); resolve(t); };
             tx.onerror = () => resolve(t);
         });
@@ -2208,6 +2208,17 @@ async function loadChatImageByTs(ts) {
     } catch (e) { return null; }
 }
 
+// 聊天生图 blob URL 回收队列：连续生成几十张时，把最老的 blob URL 释放掉，防止 iPhone Safari 内存越堆越高
+const chatBlobUrls = [];
+function trackChatBlobUrl(url) {
+    if (!url || !url.startsWith('blob:')) return;
+    chatBlobUrls.push(url);
+    while (chatBlobUrls.length > 15) {
+        const old = chatBlobUrls.shift();
+        try { URL.revokeObjectURL(old); } catch (e) {}
+    }
+}
+
 // 渲染一张聊天生图气泡（支持 dataUrl 新格式 + 旧 blob 格式），含重新生成/下载
 function renderChatImageBubble(imageBubble, item) {
     let src = '';
@@ -2215,6 +2226,7 @@ function renderChatImageBubble(imageBubble, item) {
         src = item.dataUrl;
     } else if (item.blob) {
         src = URL.createObjectURL(item.blob);
+        trackChatBlobUrl(src);
     }
     imageBubble.innerHTML = `
         <img src="${src}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
@@ -2237,12 +2249,13 @@ function renderChatImageBubble(imageBubble, item) {
     const regBtn = imageBubble.querySelector('.regenerate-btn');
     if (!item.prompt) { regBtn.style.display = 'none'; return; }
     imageBubble.dataset.savedPrompt = item.prompt;
+    imageBubble.dataset.ratio = item.ratio || '1:1';
     regBtn.onclick = async function() {
         const btn = this;
         btn.disabled = true;
         btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中...';
         try {
-            const result = await generateImageWithSafety(item.prompt, getImageModel(), null, item.prompt, null, '1:1', getImageQuality());
+            const result = await generateImageWithSafety(item.prompt, getImageModel(), null, item.prompt, null, imageBubble.dataset.ratio || '1:1', getImageQuality());
             // 新图优先转 dataURL 显示（绕开 Safari blob URL 的偶发问题）
             const newDataUrl = await new Promise((resolve) => {
                 const fr = new FileReader();
@@ -2257,6 +2270,7 @@ function renderChatImageBubble(imageBubble, item) {
                 dlA.href = newDataUrl;
             } else {
                 const newImageUrl = URL.createObjectURL(result.blob);
+                trackChatBlobUrl(newImageUrl);
                 imgEl.src = newImageUrl;
                 imgEl.onclick = () => window.open(newImageUrl);
                 dlA.href = newImageUrl;
@@ -5595,35 +5609,62 @@ function handleImageUpload(event) {
     }
     const reader = new FileReader();
     reader.onload = function(e) {
-        uploadedImageBase64 = e.target.result;
-        // 读取图片宽高比
-        const img = new Image();
-        img.onload = function() {
-            const w = img.width;
-            const h = img.height;
-            // 判断比例，映射到Agnes支持的比例
-            if (w > h * 1.2) {
-                uploadedImageRatio = '16:9'; // 横图
-            } else if (h > w * 1.2) {
-                uploadedImageRatio = '9:16'; // 竖图
-            } else {
-                uploadedImageRatio = '1:1'; // 正方形
+        // 压缩后再用：iPhone照片几MB直接转Base64太大，传得慢还容易限流
+        compressImage(e.target.result, 1536, 0.85).then(function(compressed) {
+            uploadedImageBase64 = compressed;
+            // 读取图片宽高比
+            const img = new Image();
+            img.onload = function() {
+                const w = img.width;
+                const h = img.height;
+                // 判断比例，映射到Agnes支持的比例
+                if (w > h * 1.2) {
+                    uploadedImageRatio = '16:9'; // 横图
+                } else if (h > w * 1.2) {
+                    uploadedImageRatio = '9:16'; // 竖图
+                } else {
+                    uploadedImageRatio = '1:1'; // 正方形
+                }
+                console.log('[Img2Img] 图片比例:', w + 'x' + h, '->', uploadedImageRatio);
+            };
+            img.src = compressed;
+            // 显示预览
+            const preview = document.getElementById('uploaded-image-preview');
+            const imgEl = document.getElementById('uploaded-image');
+            const removeBtn = document.getElementById('remove-uploaded-img-btn');
+            if (preview && imgEl && removeBtn) {
+                imgEl.src = compressed;
+                preview.classList.remove('hidden');
+                removeBtn.classList.remove('hidden');
             }
-            console.log('[Img2Img] 图片比例:', w + 'x' + h, '->', uploadedImageRatio);
-        };
-        img.src = uploadedImageBase64;
-        // 显示预览
-        const preview = document.getElementById('uploaded-image-preview');
-        const imgEl = document.getElementById('uploaded-image');
-        const removeBtn = document.getElementById('remove-uploaded-img-btn');
-        if (preview && imgEl && removeBtn) {
-            imgEl.src = uploadedImageBase64;
-            preview.classList.remove('hidden');
-            removeBtn.classList.remove('hidden');
-        }
-        sfxSuccess();
+            sfxSuccess();
+        }).catch(function(err) {
+            console.error('压缩图片失败，用原图:', err);
+            uploadedImageBase64 = e.target.result;
+        });
     };
     reader.readAsDataURL(file);
+}
+
+// 压缩图片：最长边不超过maxSide，JPEG质量quality
+function compressImage(dataUrl, maxSide, quality) {
+    return new Promise(function(resolve, reject) {
+        const img = new Image();
+        img.onload = function() {
+            try {
+                let w = img.width, h = img.height;
+                const scale = Math.min(1, maxSide / Math.max(w, h));
+                if (scale >= 1 && w * h <= 1600 * 1600) { resolve(dataUrl); return; } // 已经够小
+                w = Math.round(w * scale); h = Math.round(h * scale);
+                const c = document.createElement('canvas');
+                c.width = w; c.height = h;
+                c.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(c.toDataURL('image/jpeg', quality));
+            } catch (err) { reject(err); }
+        };
+        img.onerror = reject;
+        img.src = dataUrl;
+    });
 }
 
 // 移除上传的图片
@@ -6839,11 +6880,13 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
         // 3. 把图片插入聊天记录
         loadingDiv.remove();
         const imageUrl = URL.createObjectURL(result.blob);
+        trackChatBlobUrl(imageUrl);
         // 保存优化后的提示词，重新生成时直接用，不再优化
         const savedPrompt = result.prompt;
+        const savedRatio = '1:1';   // 聊天生图当前固定1:1，存起来供重新生成保持一致
         // 存入IndexedDB（dataURL格式，Safari对Blob存储有坑），刷新后不丢失
         const imgTs = Date.now();
-        await saveChatImage(result.blob, savedPrompt, imgTs);
+        await saveChatImage(result.blob, savedPrompt, imgTs, savedRatio);
         // 图片也进聊天记录（带ts标记），重进/切换角色时按原位置穿插渲染，不再堆在末尾
         chatHistory.push({ role: 'assistant', content: '', type: 'image', ts: imgTs });
         saveChatHistory();
@@ -6863,6 +6906,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
         `;
         // 保存优化后的提示词，用于重新生成（直接用，不再优化）
         imageBubble.dataset.savedPrompt = savedPrompt;
+        imageBubble.dataset.ratio = savedRatio;
         // 重新生成按钮事件：用保存的提示词直连生成，走和原图一致的快通道
         imageBubble.querySelector('.regenerate-btn').onclick = async function() {
             const btn = this;
@@ -6875,8 +6919,9 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
                     if (!conf.confirmed) return;
                     finalSaved = (conf.text || '').trim() || savedPrompt;
                 }
-                const result = await generateImageWithSafety(finalSaved, getImageModel(), null, finalSaved, refImages, '1:1', getImageQuality());
+                const result = await generateImageWithSafety(finalSaved, getImageModel(), null, finalSaved, refImages, imageBubble.dataset.ratio || '1:1', getImageQuality());
                 const newImageUrl = URL.createObjectURL(result.blob);
+                trackChatBlobUrl(newImageUrl);
                 imageBubble.querySelector('img').src = newImageUrl;
                 imageBubble.querySelector('img').onclick = () => window.open(newImageUrl);
                 imageBubble.querySelector('a[download]').href = newImageUrl;
