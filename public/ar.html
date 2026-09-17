@@ -2496,7 +2496,7 @@ function updateBubblePos(){
 const _arDrawOrig = draw;
 draw = function(){ _arDrawOrig(); updateBubblePos(); };
 
-// ── ② 生成立绘：Agnes 生成纯色背景全身立绘 → 自动抠图 → 贴入 ───
+// ── ② 生成立绘：按角色头像/设定生成二次元全身立绘 → 抠绿幕 → 透明底贴入 ───
 async function genCharacter(){
   if (!arGenBtn) return;
   arGenBtn.disabled = true;
@@ -2505,16 +2505,46 @@ async function genCharacter(){
     const model = localStorage.getItem('IMAGE_MODEL') || 'agnes-2.1';
     const key = localStorage.getItem('AGNES_API_KEY') || '';
     const quality = localStorage.getItem('IMG_QUALITY') || '1K';
-    let roleName = '她';
-    try { roleName = JSON.parse(localStorage.getItem('ROLE_CARD_NAME') || '"她"'); } catch(e){}
-    const roleDesc = localStorage.getItem('ROLE_CARD_DESC') || '';
+
+    // 找当前角色：URL ?role=id 优先 → CURRENT_ROLE_ID → 角色列表第一个
+    let role = null;
+    try {
+      const list = JSON.parse(localStorage.getItem('ROLE_LIST') || '[]');
+      if (list.length){
+        let rid = null;
+        const um = location.search.match(/[?&]role=([^&]+)/);
+        if (um) rid = parseInt(decodeURIComponent(um[1]));
+        if (!rid) rid = parseInt(localStorage.getItem('CURRENT_ROLE_ID'));
+        role = list.find(r => r.id === rid) || list[0];
+      }
+    } catch(e){}
+    const roleName = (role && role.name) || '她';
+    const roleDesc = (role && role.desc) || localStorage.getItem('ROLE_CARD_DESC') || '';
     let look = '';
     const m = roleDesc.match(/【外貌】([\s\S]*?)(【|$)/);
     if (m && m[1]) look = m[1].replace(/\n+/g, '，').trim().slice(0, 300);
-    const prompt = (look ? look + '。' : 'A beautiful young woman.') +
-      ' Full body character standing upright, facing camera, whole body visible from head to toe, both feet flat on ground, standing straight, arms relaxed at sides, plain solid light gray background, completely uniform solid background, no texture, no gradient, no shadow, no floor line, no objects, clean character cutout, sharp clean edges, no text, no watermark';
-    showBubble('正在生成立绘…', 0);
+    // 头像参考（角色卡 avatar 或 AVATAR_<名字>）
+    let avatar = null;
+    if (role && role.avatar) avatar = role.avatar;
+    else if (role && role.name) { try { avatar = localStorage.getItem('AVATAR_' + role.name); } catch(e){} }
+
+    // 二次元立绘 + 纯绿幕背景（绿幕和人物反差最大，抠图最干净）
+    const stylePart = 'high quality Japanese anime style, cel shading, clean crisp lineart, beautiful anime illustration, full body character standing picture';
+    const posePart = 'full body visible from head to toe, standing upright facing the camera, both feet fully visible, natural relaxed standing pose, arms resting at sides, character centered with margin around the whole body';
+    const bgPart = 'plain solid chroma key green background color #00B140, completely uniform flat single-color background, no gradient, no texture, no shadow, no floor, no ground line, no furniture, no props, no text, no watermark, clean character cutout style';
+    let prompt;
+    if (avatar){
+      prompt = 'Redraw the person in the reference image as a ' + stylePart + '. ' +
+        'Keep the exact same character identity as the reference photo: same face, same facial features, same hairstyle, same hair color and hair length, recognizable as the same person, but rendered in anime style. ' +
+        (look ? 'Character settings: ' + look + '. ' : '') +
+        posePart + '. ' + bgPart;
+    } else {
+      prompt = (look ? look + '. ' : 'A beautiful young woman. ') + stylePart + '. ' + posePart + '. ' + bgPart;
+    }
+
+    showBubble(avatar ? '正在按头像生成二次元立绘…' : '正在生成二次元立绘…', 0);
     const body = { prompt: prompt, model: model, agnesApiKey: key, ratio: '2:3', quality: quality };
+    if (avatar) body.inputImage = avatar;   // 有头像 → 图生图，锁定长相
     const res = await fetch('/api/image/generate', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
     });
@@ -2527,19 +2557,19 @@ async function genCharacter(){
     const url = URL.createObjectURL(blob);
     const img = new Image();
     await new Promise((ok, no) => { img.onload = ok; img.onerror = () => no(new Error('图片解析失败')); img.src = url; });
-    // 抠掉纯色背景（有 cutout 才抠，没有就用原图）
+    // 抠掉绿幕纯色背景（有 cutout 才抠，没有就用原图）
     let src = img;
     if (window.ARCAM_CUT){
       try {
         const c = copyOf(img);
-        const rr = window.ARCAM_CUT.cutSolidBg(c, { tol: 40, feather: 1.2 });
+        const rr = window.ARCAM_CUT.cutSolidBg(c, { tol: 42, feather: 1.2 });
         if (rr !== null) src = c;
       } catch(e){ /* 抠图失败用原图 */ }
     }
     chName = 'AI·' + roleName; chSel = -1; syncChRow();
     setCharset(src);
     applyCharKind('full');   // 全身 → 贴地踩地
-    showBubble('立绘已生成，拖动画面调整位置', 3200);
+    showBubble('二次元立绘已生成，拖动画面调整位置', 3200);
   } catch (err){
     console.error('生成立绘失败:', err);
     showBubble('生成立绘失败：' + (err.message || err), 4000);
