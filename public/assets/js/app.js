@@ -7718,7 +7718,12 @@ function buildMomentsMemoryPrompt() {
     let list;
     try { list = loadMoments(); } catch (e) { return ''; }
     if (!list || list.length === 0) return '';
-    const recent = list.slice(-3).reverse();
+    // 优先记住"有评论互动"的动态（最多3条），再补最近动态（最多共5条）——
+    // 防止自动发朋友圈把用户评论过的那条顶出记忆窗口
+    const withC = list.filter(m => (m.comments || []).length > 0).slice(-3).reverse();
+    const hasIds = new Set(withC.map(m => m.id));
+    const others = list.filter(m => !hasIds.has(m.id)).slice(-5).reverse();
+    const recent = [...withC, ...others].slice(0, 5);
     const lines = recent.map(m => {
         const ago = Date.now() - m.ts;
         const day = ago < 86400000 ? '今天' : ago < 172800000 ? '昨天' : ago < 604800000 ? '这几天' : ((new Date(m.ts).getMonth() + 1) + '月' + new Date(m.ts).getDate() + '日');
