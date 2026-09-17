@@ -5686,6 +5686,27 @@ function extractAppearanceFromRoleCard(roleDesc) {
     return '';
 }
 
+// ===== 服装硬锁：从角色卡里抠出"服装/穿着/衣服"相关行 =====
+function extractClothingFromRoleCard(roleDesc) {
+    if (!roleDesc) return '';
+    const lines = roleDesc.split('\n');
+    const hits = [];
+    for (const line of lines) {
+        const t = line.trim();
+        if (!t) continue;
+        if (/服装|穿着|衣服|穿搭|上身|下身|上半身|下半身|裙子|上衣|下装|外套|内衣|光脚|赤裸|没穿|裸/.test(t)) {
+            hits.push(t.replace(/^[·\-\*•\d.、\s]+/, ''));
+        }
+    }
+    return hits.join(', ');
+}
+
+// 剧情明确在换衣服/脱衣服时，豁免服装硬锁
+function isChangingClothingScene(text) {
+    if (!text) return false;
+    return /脱|换衣|换了.{0,4}[衣裙装]|没穿|赤裸|裸体|裸体|睡衣|浴衣|湿身|刚洗完澡|只裹着|浴巾/.test(text);
+}
+
 // ===== B. 性别确定性提取：返回 'female' / 'male' / ''（不确定返回空，交回给AI判断）=====
 function getRoleGender(roleDesc) {
     if (!roleDesc) return '';
@@ -6560,6 +6581,17 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
                 genders = { single: cur ? getRoleGender(cur.desc) : '' };
             }
             rolePrompt = await generatePromptWithRoleAI(conversationText, isDualMode, { roleA, roleB }, isBackView, { identity: identityOpts, genders, cameraView, splitRear: isSplitRear });
+        }
+
+        // ===== 服装硬锁：从角色卡抠出服装描述，强制钉在画面描述最前；剧情明确换/脱衣服时豁免 =====
+        if (!isDualMode) {
+            const curForClothing = getCurrentRole();
+            const clothing = extractClothingFromRoleCard(curForClothing ? curForClothing.desc : '');
+            const changing = isChangingClothingScene((userInput || '') + ' ' + (conversationText || ''));
+            if (clothing && !changing) {
+                rolePrompt = `wearing exact outfit from character description (must not change): ${clothing}, ` + rolePrompt;
+                console.log('[服装硬锁] 已钉入:', clothing.slice(0, 80));
+            }
         }
 
         // ===== C 程序级二次清洗兜底：背面模式下，LLM即使没听话，也在最终prompt里洗掉正面/侧面冲突词 =====
