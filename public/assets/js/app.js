@@ -2135,11 +2135,26 @@ function openImageDB() {
 
 async function saveChatImage(blob, savedPrompt, ts) {
     const t = ts || Date.now();
+    // Safari 对 IndexedDB 直接存 Blob 有已知问题（读出的 Blob 可能为空/损坏），统一转 dataURL 文本存储
+    let dataUrl = null;
+    try {
+        if (blob instanceof Blob) {
+            dataUrl = await new Promise((resolve) => {
+                const fr = new FileReader();
+                fr.onload = () => resolve(fr.result);
+                fr.onerror = () => resolve(null);
+                fr.readAsDataURL(blob);
+            });
+        } else if (typeof blob === 'string') {
+            dataUrl = blob;
+        }
+    } catch (e) { dataUrl = null; }
+    if (!dataUrl) { console.warn('[ImgDB] blob转dataURL失败'); return t; }
     try {
         const db = await openImageDB();
         return new Promise((resolve) => {
             const tx = db.transaction(CHAT_IMG_STORE, 'readwrite');
-            tx.objectStore(CHAT_IMG_STORE).add({ blob, ts: t, roleKey: getChatStorageKey(), prompt: savedPrompt || '' });
+            tx.objectStore(CHAT_IMG_STORE).add({ dataUrl, ts: t, roleKey: getChatStorageKey(), prompt: savedPrompt || '' });
             tx.oncomplete = () => { trimChatImages(); resolve(t); };
             tx.onerror = () => resolve(t);
         });
@@ -2165,6 +2180,68 @@ async function loadChatImageByTs(ts) {
             req.onerror = () => resolve(null);
         });
     } catch (e) { return null; }
+}
+
+// 渲染一张聊天生图气泡（支持 dataUrl 新格式 + 旧 blob 格式），含重新生成/下载
+function renderChatImageBubble(imageBubble, item) {
+    let src = '';
+    if (item.dataUrl) {
+        src = item.dataUrl;
+    } else if (item.blob) {
+        src = URL.createObjectURL(item.blob);
+    }
+    imageBubble.innerHTML = `
+        <img src="${src}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
+        <div class="flex gap-2 mt-2 px-1 pb-1">
+            <button class="btn btn-primary btn-xs flex-1 regenerate-btn"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
+            <a href="${src}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
+        </div>`;
+    const imgEl = imageBubble.querySelector('img');
+    const dlA = imageBubble.querySelector('a[download]');
+    // 旧 blob 数据且加载失败：转 dataURL 兜底
+    imgEl.onerror = () => {
+        if (item.blob && !item.dataUrl) {
+            try { URL.revokeObjectURL(src); } catch (e) {}
+            const fr = new FileReader();
+            fr.onload = () => { imgEl.src = fr.result; imgEl.onerror = null; imgEl.onclick = () => window.open(fr.result); dlA.href = fr.result; };
+            fr.onerror = () => { imgEl.src = ''; };
+            fr.readAsDataURL(item.blob);
+        }
+    };
+    const regBtn = imageBubble.querySelector('.regenerate-btn');
+    if (!item.prompt) { regBtn.style.display = 'none'; return; }
+    imageBubble.dataset.savedPrompt = item.prompt;
+    regBtn.onclick = async function() {
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中...';
+        try {
+            const result = await generateImageWithSafety(item.prompt, getImageModel(), null, item.prompt, null, '1:1', getImageQuality());
+            // 新图优先转 dataURL 显示（绕开 Safari blob URL 的偶发问题）
+            const newDataUrl = await new Promise((resolve) => {
+                const fr = new FileReader();
+                fr.onload = () => resolve(fr.result);
+                fr.onerror = () => resolve(null);
+                fr.readAsDataURL(result.blob);
+            });
+            if (newDataUrl) {
+                imgEl.src = newDataUrl;
+                imgEl.onerror = null;
+                imgEl.onclick = () => window.open(newDataUrl);
+                dlA.href = newDataUrl;
+            } else {
+                const newImageUrl = URL.createObjectURL(result.blob);
+                imgEl.src = newImageUrl;
+                imgEl.onclick = () => window.open(newImageUrl);
+                dlA.href = newImageUrl;
+            }
+        } catch (err) {
+            alert('重新生成失败，图片未更新（仍是原图）: ' + (err.message || err));
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> 重新生成';
+        }
+    };
 }
 
 async function trimChatImages() {
@@ -2237,60 +2314,14 @@ async function restoreChatImages() {
     const markedTs = new Set((chatHistory || []).filter(m => m.type === 'image').map(m => m.ts));
     const images = allImages.filter(item => !markedTs.has(item.ts)).slice(-CHAT_IMG_RESTORE);
     for (const item of images) {
-        if (!item.blob) continue;
-        const imageUrl = URL.createObjectURL(item.blob);
+        if (!item.blob && !item.dataUrl) continue;
         const role = getCurrentRole();
         const imageDiv = document.createElement('div');
         imageDiv.className = 'chat chat-start relative gap-2';
         imageDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
         const imageBubble = document.createElement('div');
         imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-1 max-w-[80%]';
-        imageBubble.innerHTML = `
-            <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
-            <div class="flex gap-2 mt-2 px-1 pb-1">
-                <button class="btn btn-primary btn-xs flex-1 regenerate-btn"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
-                <a href="${imageUrl}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
-            </div>
-        `;
-        // Safari 偶发 blob URL 加载失败：自动转 dataURL 兜底显示
-        const imgEl = imageBubble.querySelector('img');
-        const dlA = imageBubble.querySelector('a[download]');
-        imgEl.onerror = () => {
-            console.warn('[孤儿图] blob URL 加载失败，转 dataURL 兜底, blob size=', item.blob && item.blob.size);
-            try { URL.revokeObjectURL(imageUrl); } catch (e) {}
-            const fr = new FileReader();
-            fr.onload = () => {
-                imgEl.src = fr.result;
-                imgEl.onerror = null;
-                imgEl.onclick = () => window.open(fr.result);
-                dlA.href = fr.result;
-            };
-            fr.onerror = () => { imgEl.src = ''; };
-            fr.readAsDataURL(item.blob);
-        };
-        if (item.prompt) {
-            imageBubble.dataset.savedPrompt = item.prompt;
-            imageBubble.querySelector('.regenerate-btn').onclick = async function() {
-                const btn = this;
-                btn.disabled = true;
-                btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中...';
-                try {
-                    // 复用直连生图链路：用原提示词、原比例(1:1)，不再走后端慢通道、不重新优化
-                    const result = await generateImageWithSafety(item.prompt, getImageModel(), null, item.prompt, null, '1:1', getImageQuality());
-                    const newImageUrl = URL.createObjectURL(result.blob);
-                    imageBubble.querySelector('img').src = newImageUrl;
-                    imageBubble.querySelector('img').onclick = () => window.open(newImageUrl);
-                    imageBubble.querySelector('a[download]').href = newImageUrl;
-                } catch (err) {
-                    alert('重新生成失败，图片未更新（仍是原图）: ' + (err.message || err));
-                } finally {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> 重新生成';
-                }
-            };
-        } else {
-            imageBubble.querySelector('.regenerate-btn').style.display = 'none';
-        }
+        renderChatImageBubble(imageBubble, item);
         imageDiv.appendChild(imageBubble);
         container.appendChild(imageDiv);
     }
@@ -2371,55 +2402,7 @@ function renderChatHistory() {
             container.appendChild(imageDiv);
             loadChatImageByTs(msg.ts).then(item => {
                 if (!item || !imageBubble.isConnected) return;
-                const imageUrl = URL.createObjectURL(item.blob);
-                imageBubble.innerHTML = `
-                    <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
-                    <div class="flex gap-2 mt-2 px-1 pb-1">
-                        <button class="btn btn-primary btn-xs flex-1 regenerate-btn"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
-                        <a href="${imageUrl}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
-                    </div>`;
-                // Safari 偶发 blob URL 加载失败：自动转 dataURL 兜底显示
-                const imgEl = imageBubble.querySelector('img');
-                const dlA = imageBubble.querySelector('a[download]');
-                imgEl.onerror = () => {
-                    console.warn('[图片] blob URL 加载失败，转 dataURL 兜底, blob size=', item.blob && item.blob.size);
-                    try { URL.revokeObjectURL(imageUrl); } catch (e) {}
-                    const fr = new FileReader();
-                    fr.onload = () => {
-                        imgEl.src = fr.result;
-                        imgEl.onerror = null;
-                        imgEl.onclick = () => window.open(fr.result);
-                        dlA.href = fr.result;
-                    };
-                    fr.onerror = () => { imgEl.src = ''; };
-                    fr.readAsDataURL(item.blob);
-                };
-                imageBubble.dataset.savedPrompt = item.prompt || '';
-                const regBtn = imageBubble.querySelector('.regenerate-btn');
-                regBtn.onclick = async function() {
-                    const btn = this;
-                    btn.disabled = true;
-                    btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中...';
-                    try {
-                        const result = await generateImageWithSafety(item.prompt, getImageModel(), null, item.prompt, null, '1:1', getImageQuality());
-                        const newImageUrl = URL.createObjectURL(result.blob);
-                        const newImg = imageBubble.querySelector('img');
-                        newImg.src = newImageUrl;
-                        newImg.onerror = () => {
-                            try { URL.revokeObjectURL(newImageUrl); } catch (e) {}
-                            const fr2 = new FileReader();
-                            fr2.onload = () => { newImg.src = fr2.result; newImg.onerror = null; imageBubble.querySelector('a[download]').href = fr2.result; };
-                            fr2.readAsDataURL(result.blob);
-                        };
-                        newImg.onclick = () => window.open(newImg.src);
-                        imageBubble.querySelector('a[download]').href = newImageUrl;
-                    } catch (err) {
-                        alert('重新生成失败，图片未更新（仍是原图）: ' + (err.message || err));
-                    } finally {
-                        btn.disabled = false;
-                        btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> 重新生成';
-                    }
-                };
+                renderChatImageBubble(imageBubble, item);
             });
             continue;
         }
@@ -6816,9 +6799,9 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
         const imageUrl = URL.createObjectURL(result.blob);
         // 保存优化后的提示词，重新生成时直接用，不再优化
         const savedPrompt = result.prompt;
-        // 存入IndexedDB，刷新后不丢失（只恢复最近5张防卡顿）
+        // 存入IndexedDB（dataURL格式，Safari对Blob存储有坑），刷新后不丢失
         const imgTs = Date.now();
-        saveChatImage(result.blob, savedPrompt, imgTs);
+        await saveChatImage(result.blob, savedPrompt, imgTs);
         // 图片也进聊天记录（带ts标记），重进/切换角色时按原位置穿插渲染，不再堆在末尾
         chatHistory.push({ role: 'assistant', content: '', type: 'image', ts: imgTs });
         saveChatHistory();
