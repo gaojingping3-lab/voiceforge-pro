@@ -2515,8 +2515,22 @@ function getArRole(){
 }
 
 // ── ② 生成立绘：按角色头像/设定生成二次元全身立绘 → 抠绿幕 → 透明底贴入 ───
+// 姿势池：每次换姿势随机轮，保持角色长相/服装不变
+const AR_POSES = [
+  'standing upright facing the camera, arms resting at sides, natural relaxed pose',
+  'sitting on a simple chair, hands resting on lap, facing the camera',
+  'leaning against a wall, arms crossed, relaxed cool pose',
+  'one hand in pocket, other arm relaxed at side, standing facing the camera',
+  'hands behind back, head slightly tilted, looking at the camera',
+  'waving with one hand, friendly soft expression, facing the camera',
+  'arms crossed over chest, confident standing pose',
+  'sitting on the floor, knees slightly bent, hands resting on knees'
+];
+let arPoseIdx = Math.floor(Math.random() * AR_POSES.length);
+function nextArPose(){ arPoseIdx = (arPoseIdx + 1) % AR_POSES.length; return AR_POSES[arPoseIdx]; }
+let arAutoPoseTimer = null;
 async function genCharacter(){
-  if (!arGenBtn) return;
+  if (!arGenBtn || arGenBtn.disabled) return;   // 防重入：正在生成就跳过
   arGenBtn.disabled = true;
   arGenBtn.textContent = '生成中…';
   try {
@@ -2536,8 +2550,8 @@ async function genCharacter(){
     else if (role && role.name) { try { avatar = localStorage.getItem('AVATAR_' + role.name); } catch(e){} }
 
     // 二次元立绘 + 纯绿幕背景（绿幕和人物反差最大，抠图最干净）
-    const stylePart = 'high quality Japanese anime style, cel shading, clean crisp lineart, beautiful anime illustration, full body character standing picture';
-    const posePart = 'full body visible from head to toe, standing upright facing the camera, both feet fully visible, natural relaxed standing pose, arms resting at sides, character centered with margin around the whole body';
+    const stylePart = 'high quality Japanese anime style, cel shading, clean crisp lineart, beautiful anime illustration, full body character picture';
+    const posePart = 'full body visible from head to toe, ' + nextArPose() + ', character centered with margin around the whole body';
     const bgPart = 'plain solid chroma key green background color #00B140, completely uniform flat single-color background, no gradient, no texture, no shadow, no floor, no ground line, no furniture, no props, no text, no watermark, clean character cutout style';
     let prompt;
     if (avatar){
@@ -2577,6 +2591,9 @@ async function genCharacter(){
     setCharset(src);
     applyCharKind('full');   // 全身 → 贴地踩地
     showBubble('二次元立绘已生成，拖动画面调整位置', 3200);
+    // 自动换姿势：每90秒生成一个新动作（角色长相/服装不变）
+    if (arAutoPoseTimer) clearInterval(arAutoPoseTimer);
+    arAutoPoseTimer = setInterval(genCharacter, 90000);
   } catch (err){
     console.error('生成立绘失败:', err);
     showBubble('生成立绘失败：' + (err.message || err), 4000);
@@ -2789,6 +2806,7 @@ async function sendArMessage(text){
 // 返回主站
 function arCleanup(){
   arMicOn = false;
+  if (arAutoPoseTimer){ clearInterval(arAutoPoseTimer); arAutoPoseTimer = null; }
   try { arRecognition && arRecognition.abort(); } catch(e){}
   try {
     if (v.srcObject){ v.srcObject.getTracks().forEach(t => t.stop()); v.srcObject = null; }
