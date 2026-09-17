@@ -1,6 +1,6 @@
 {
-  "name": "VoiceForge Pro",
-  "short_name": "VoiceForge",
+  "name": "乐乐大人专用",
+  "short_name": "乐乐大人专用",
   "description": "多模态语音合成与克隆，AI语音对话",
   "start_url": "/",
   "display": "standalone",
