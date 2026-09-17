@@ -7252,8 +7252,8 @@ async function postNewMoment() {
         const style = (typeof getFixedStyleByMode === 'function') ? getFixedStyleByMode() : '';
         const prompt = style + ', casual daily selfie, arm extended, phone front camera snapshot, ' + scene;
         const model = (typeof getImageModel === 'function') ? getImageModel() : 'agnes-2.1';
-        // 朋友圈自拍固定1K：3:4竖图在高档位会被Agnes归入3/4K队列(RPM仅1次/分钟)，1K足够且不撞限流
-        const quality = '1K';
+        // 与聊天生图完全一致的参数：1:1 + 跟随清晰度设置，排除3:4比例触发Agnes高档计费/参数拒绝
+        const quality = (typeof getImageQuality === 'function') ? getImageQuality() : '1K';
         let avatarSrc = getRoleAvatarSrc();
         // 与聊天生图完全对齐：尊重"参考头像"开关（关闭则纯文生图，和聊天走同一队列）
         if (avatarSrc && localStorage.getItem('IMG_REF_AVATAR') === '0') {
@@ -7264,7 +7264,7 @@ async function postNewMoment() {
         if (avatarSrc) {
             try { avatarSrc = await cropAvatarToFace(avatarSrc); } catch (e) { /* 裁剪失败用原图 */ }
         }
-        const result = await generateImageWithSafety(prompt, model, (s) => { statusEl.textContent = s; }, null, avatarSrc || null, '3:4', quality);
+        const result = await generateImageWithSafety(prompt, model, (s) => { statusEl.textContent = s; }, null, avatarSrc || null, '1:1', quality);
         const dataURL = await blobToDataURLCompressed(result.blob, 640);
 
         const list = loadMoments();
