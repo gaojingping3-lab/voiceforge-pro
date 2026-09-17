@@ -2722,6 +2722,21 @@ async function sendArMessage(text){
     const sysMsg = '你是角色「' + roleName + '」。这是一个私人虚构陪伴空间。完全沉浸角色，不要AI腔，不要解释，不要客套。回复控制在80字以内，像真人说话，可以带一点表情动作描写。';
     const msgs = [{ role: 'system', content: sysMsg }];
     if (roleDesc) msgs.push({ role: 'system', content: '【角色卡】\n' + roleDesc });
+    // 读主站该角色的最近聊天记录作为上下文（和主站聊天接着聊）
+    let chatKey = 'CHAT_HISTORY_default';
+    try {
+      const um = location.search.match(/[?&]role=([^&]+)/);
+      let rid = um ? parseInt(decodeURIComponent(um[1])) : parseInt(localStorage.getItem('CURRENT_ROLE_ID'));
+      if (rid) chatKey = 'CHAT_HISTORY_' + rid;
+    } catch(e){}
+    try {
+      const hist = JSON.parse(localStorage.getItem(chatKey) || '[]');
+      hist.slice(-6).forEach(h => {   // 最近6条（3轮）
+        if (h && (h.role === 'user' || h.role === 'assistant') && h.content){
+          msgs.push({ role: h.role, content: String(h.content) });
+        }
+      });
+    } catch(e){}
     msgs.push({ role: 'user', content: text });
     const res = await fetch('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
@@ -2731,6 +2746,13 @@ async function sendArMessage(text){
     const data = await res.json();
     const reply = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
     if (!reply) throw new Error('回复为空');
+    // 对话写回主站聊天记录，主站聊天页能看到AR里聊的内容
+    try {
+      const list = JSON.parse(localStorage.getItem(chatKey) || '[]');
+      list.push({ role: 'user', content: text });
+      list.push({ role: 'assistant', content: reply });
+      localStorage.setItem(chatKey, JSON.stringify(list.slice(-50)));
+    } catch(e){}
     // 气泡只显示台词：去掉动作/心理描写的括号内容
     const cleanText = reply
       .replace(/【[^】]*】/g, '')
