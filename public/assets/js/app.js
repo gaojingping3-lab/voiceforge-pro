@@ -7763,49 +7763,11 @@ async function postNewMoment(autoOpts) {
         if (!llmKey) throw new Error('没有配置 LLM Key');
         const recent = (typeof chatHistory !== 'undefined' ? chatHistory : []).slice(-4);
         const recentText = recent.map(m => (m.role === 'user' ? '用户' : role.name) + ': ' + String(m.content || '').slice(0, 150)).join('\n');
-        // 随机主题，让文案有变化，不再千篇一律
-        const momentTopics = [
-            '你刚吃了或喝了什么，随口吐槽一句',
-            '窗外/路上看到的一个小画面',
-            '一首歌或一段旋律勾起的情绪',
-            '今天的天气给你的感觉',
-            '一件有点好笑或有点烦的小事',
-            '深夜/午后的一种念头和情绪',
-            '发现了什么好东西想分享',
-            '和用户之间的一个微小互动瞬间',
-            '衣柜/鞋柜/桌面上的一个小细节',
-            '一个一闪而过的生活小感慨（别鸡汤）'
-        ];
-        const randomTopic = momentTopics[Math.floor(Math.random() * momentTopics.length)];
-        const messages = [
-            { role: 'system', content: '你是角色「' + role.name + '」。这是一个私人虚构陪伴空间。完全沉浸角色，不要AI腔，不要解释，不要客套。' },
-        ];
-        if (role.desc && role.desc !== DEFAULT_ROLE_DESC) {
-            messages.push({ role: 'system', content: '【角色卡】\n' + role.desc });
-        }
-        messages.push({ role: 'user', content:
-            '现在你要发一条朋友圈。请严格输出两行：\n' +
-            '第一行：动态文案，15~40字，要有具体细节，像真人随手发的朋友圈——日常、矫情、阴阳怪气都可以，符合你和用户最近的关系氛围。\n' +
-            '第二行：画面描述（英文一句话），描述这条朋友圈配图是什么照片：你在哪、在做什么、什么表情、什么氛围。可以是生活场景、风景、他拍等，但画面中不要出现手机，不要自拍姿势和手势。\n' +
-            '【硬性要求】\n' +
-            '1. 绝对禁止这些敷衍模板句（出现一个都算失败）：「今天也没什么事」「今天好无聊」「又是平淡的一天」「日常」「打卡」「没什么好说的」。\n' +
-            '2. 必须从具体细节出发，写具体的人和物：吃的、喝的、看到的画面、听到的歌、衣服、天气、和用户的小互动。\n' +
-            '3. 围绕这个随机主题展开：【主题】' + randomTopic + '\n' +
-            '4. 不要以「今天」开头写流水账，不要无病呻吟，不要心灵鸡汤。\n' +
-            '只输出这两行，不要序号、不要引号、不要解释。\n\n最近聊天：\n' + (recentText || '（刚认识不久）')
-        });
-        const res = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
-            body: JSON.stringify({ baseUrl: llmUrl, model: llmModel, messages, temperature: 1.05, max_tokens: 200, stream: false })
-        });
-        if (!res.ok) throw new Error('LLM HTTP ' + res.status);
-        const data = await res.json();
-        let raw = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
-        const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
-        let text = (lines[0] || '').replace(/^["'「『]+|["'」』]+$/g, '');
-        const scene = lines[1] || 'casual daily photo, natural expression';
-        // 程序级兜底：模型偷懒输出敷衍模板时，直接换一条有细节的备用文案
+        // 历史文案（去重用）：文案必须完全根据最近聊天记录来写，且不能和发过的重复
+        const existingMoments = (() => { try { return loadMoments().map(m => String(m.text || '').trim()); } catch (e) { return []; } })();
+        const existingBlock = existingMoments.length
+            ? '你已经发过这些文案，绝对不允许和它们重复（内容、开头、核心意思雷同都不行）：\n' + existingMoments.slice(-12).map(t => '- ' + (t.slice(0, 45) || '（纯图）')).join('\n') + '\n'
+            : '';
         const BANNED_TEXT = ['今天也没什么事', '今天好无聊', '又是平淡的一天', '日常', '打卡', '没什么好说的', '平平无奇的一天'];
         const fallbackTexts = [
             '巷口那只橘猫今天居然主动蹭我腿了，太阳底下它睡得像块小毯子。',
@@ -7819,8 +7781,56 @@ async function postNewMoment(autoOpts) {
             '这家店的糖水甜得刚刚好，下次想带某人来。',
             '今天心情一般，但看到你发来的消息，好了一点。'
         ];
-        if (!text || BANNED_TEXT.some(b => text.includes(b))) {
-            text = fallbackTexts[Math.floor(Math.random() * fallbackTexts.length)];
+        const messagesBase = [
+            { role: 'system', content: '你是角色「' + role.name + '」。这是一个私人虚构陪伴空间。完全沉浸角色，不要AI腔，不要解释，不要客套。' },
+        ];
+        if (role.desc && role.desc !== DEFAULT_ROLE_DESC) {
+            messagesBase.push({ role: 'system', content: '【角色卡】\n' + role.desc });
+        }
+        const buildUserMsg = (extraHint) => (
+            '现在你要发一条朋友圈。请严格输出两行：\n' +
+            '第一行：动态文案，15~40字，要有具体细节，像真人随手发的朋友圈——日常、矫情、阴阳怪气都可以，符合你和用户最近的关系氛围。\n' +
+            '第二行：画面描述（英文一句话），描述这条朋友圈配图是什么照片：你在哪、在做什么、什么表情、什么氛围。可以是生活场景、风景、他拍等，但画面中不要出现手机，不要自拍姿势和手势。\n' +
+            '【怎么写】完全根据下面「最近聊天」里实际聊到的内容来写——抓取里面一个具体的点（她说的话、聊到的事、场景、情绪、称呼、互动），围绕它发一条朋友圈。不要写和聊天记录无关的泛泛内容。\n' +
+            '【硬性要求】\n' +
+            existingBlock +
+            '1. 绝对禁止敷衍模板句：「今天也没什么事」「今天好无聊」「又是平淡的一天」「日常」「打卡」「没什么好说的」。\n' +
+            '2. 不要以「今天」开头写流水账，不要无病呻吟，不要心灵鸡汤。\n' +
+            (extraHint || '') +
+            '只输出这两行，不要序号、不要引号、不要解释。\n\n最近聊天：\n' + (recentText || '（刚认识不久）')
+        );
+        // 调用 LLM 生成文案（可重试）
+        const genOnce = async (extraHint) => {
+            const messages = messagesBase.concat({ role: 'user', content: buildUserMsg(extraHint) });
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
+                body: JSON.stringify({ baseUrl: llmUrl, model: llmModel, messages, temperature: 1.05, max_tokens: 200, stream: false })
+            });
+            if (!res.ok) throw new Error('LLM HTTP ' + res.status);
+            const data = await res.json();
+            const raw = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
+            const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
+            return {
+                text: (lines[0] || '').replace(/^["'「『]+|["'」』]+$/g, ''),
+                scene: lines[1] || 'casual daily photo, natural expression'
+            };
+        };
+        // 去重判断：完全一样，或一方包含另一方且长度>8（视为雷同）
+        const isDup = (t) => !!t && existingMoments.some(e => !!e && (e === t || (e.length > 8 && (e.includes(t) || t.includes(e)))));
+        let gen = await genOnce('');
+        let retry = 0;
+        while ((!gen.text || isDup(gen.text) || BANNED_TEXT.some(b => gen.text.includes(b))) && retry < 2) {
+            retry++;
+            gen = await genOnce('\n（注意：你上一条文案和以前发过的重复了或太敷衍，请重新写一条完全不同的、更具体的。）\n');
+        }
+        let text = gen.text;
+        const scene = gen.scene;
+        // 程序级兜底：仍失败/重复/敷衍时，换一条没用过的备用文案
+        if (!text || isDup(text) || BANNED_TEXT.some(b => text.includes(b))) {
+            const unused = fallbackTexts.filter(f => !isDup(f));
+            const pool = unused.length ? unused : fallbackTexts;
+            text = pool[Math.floor(Math.random() * pool.length)];
         }
 
         // 随机纯文字动态：约30%概率不配图，只发文字（微信朋友圈本就有纯文字模式，更真实）
