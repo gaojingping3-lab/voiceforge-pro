@@ -1807,10 +1807,18 @@ function currentPlacement(){ return S.mode === 'free' ? freePlacement() : ground
 function drawCharTo(g){
   const c = currentPlacement();
   if (!c || !chCanvas) return;
+  // 脚底接触阴影：半透明椭圆，跟着人物位置和大小走，让她不"飘"
+  g.save();
+  g.translate(c.u, c.v + c.h / 2);          // 脚底中心
+  g.fillStyle = 'rgba(0,0,0,0.35)';
+  g.beginPath();
+  g.ellipse(0, 0, c.w * 0.32, Math.max(4, c.h * 0.035), 0, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
   g.save();
   g.translate(c.u, c.v);
   g.rotate(c.rot);
-  g.drawImage(chCanvas, -c.w/2, -c.h/2, c.w, c.h);
+  g.drawImage(chCanvas, -c.w/2, -c.h/2 - 2, c.w, c.h);   // 脚底再压上2px，避免悬在阴影上方
   g.restore();
 }
 
