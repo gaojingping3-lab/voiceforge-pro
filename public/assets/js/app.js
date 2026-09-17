@@ -4730,12 +4730,14 @@ function updateModeHint() {
 
 // 清空聊天记录（同时清除永久记忆）
 function clearChat() {
-    if (!confirm('确定清空当前角色的聊天记录吗？AI将忘记全部对话内容。')) return;
+    if (!confirm('确定清空当前角色的聊天记录吗？AI将忘记全部对话内容，她的朋友圈动态也会一起清空。')) return;
     const container = document.getElementById('chat-messages');
     container.innerHTML = ''; // 清空，不显示默认欢迎消息
     chatHistory = []; // 清空对话记忆
     localStorage.removeItem(getChatStorageKey()); // 清除当前角色的本地永久记忆
     clearRoleChatImages(); // 联动清空当前角色保存在IndexedDB里的生图
+    // 联动清空当前角色的朋友圈动态
+    try { localStorage.removeItem(momentsKey()); } catch (e) { /* ignore */ }
     // 重置总tokens
     totalTokensUsed = 0;
     localStorage.removeItem('TOTAL_TOKENS_USED');
