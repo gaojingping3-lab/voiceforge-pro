@@ -7722,8 +7722,16 @@ function buildMomentsMemoryPrompt() {
     const lines = recent.map(m => {
         const ago = Date.now() - m.ts;
         const day = ago < 86400000 ? '今天' : ago < 172800000 ? '昨天' : ago < 604800000 ? '这几天' : ((new Date(m.ts).getMonth() + 1) + '月' + new Date(m.ts).getDate() + '日');
-        return day + '，你发了一条朋友圈："' + String(m.text).slice(0, 80) + '"';
+        let line = day + '，你发了一条朋友圈："' + String(m.text).slice(0, 80) + '"';
+        // 评论互动也一起记住：用户评论了什么、你回了什么
+        const cmts = (m.comments || []).filter(c => c.from === 'user' || c.from === 'role');
+        if (cmts.length) {
+            line += '。' + cmts.map(c =>
+                (c.from === 'user' ? '用户评论说：' : '你回复：') + '"' + String(c.text).slice(0, 60) + '"'
+            ).join('；');
+        }
+        return line;
     });
-    return '【你最近发的朋友圈，你本人要记得这些内容】\n' + lines.join('\n') +
-        '\n\n用户如果提起你的朋友圈、状态、配图，你要自然地接上梗，不要装不知道自己发过什么。';
+    return '【你最近发的朋友圈（含评论互动），你本人要记得这些内容】\n' + lines.join('\n') +
+        '\n\n用户如果提起你的朋友圈、状态、配图、或者他评论过什么，你要自然地接上梗，不要装不知道自己发过什么、也不要装不知道他评论过。';
 }
