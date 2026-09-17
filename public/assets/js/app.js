@@ -2252,6 +2252,22 @@ async function restoreChatImages() {
                 <a href="${imageUrl}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
             </div>
         `;
+        // Safari 偶发 blob URL 加载失败：自动转 dataURL 兜底显示
+        const imgEl = imageBubble.querySelector('img');
+        const dlA = imageBubble.querySelector('a[download]');
+        imgEl.onerror = () => {
+            console.warn('[孤儿图] blob URL 加载失败，转 dataURL 兜底, blob size=', item.blob && item.blob.size);
+            try { URL.revokeObjectURL(imageUrl); } catch (e) {}
+            const fr = new FileReader();
+            fr.onload = () => {
+                imgEl.src = fr.result;
+                imgEl.onerror = null;
+                imgEl.onclick = () => window.open(fr.result);
+                dlA.href = fr.result;
+            };
+            fr.onerror = () => { imgEl.src = ''; };
+            fr.readAsDataURL(item.blob);
+        };
         if (item.prompt) {
             imageBubble.dataset.savedPrompt = item.prompt;
             imageBubble.querySelector('.regenerate-btn').onclick = async function() {
@@ -2362,6 +2378,22 @@ function renderChatHistory() {
                         <button class="btn btn-primary btn-xs flex-1 regenerate-btn"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
                         <a href="${imageUrl}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
                     </div>`;
+                // Safari 偶发 blob URL 加载失败：自动转 dataURL 兜底显示
+                const imgEl = imageBubble.querySelector('img');
+                const dlA = imageBubble.querySelector('a[download]');
+                imgEl.onerror = () => {
+                    console.warn('[图片] blob URL 加载失败，转 dataURL 兜底, blob size=', item.blob && item.blob.size);
+                    try { URL.revokeObjectURL(imageUrl); } catch (e) {}
+                    const fr = new FileReader();
+                    fr.onload = () => {
+                        imgEl.src = fr.result;
+                        imgEl.onerror = null;
+                        imgEl.onclick = () => window.open(fr.result);
+                        dlA.href = fr.result;
+                    };
+                    fr.onerror = () => { imgEl.src = ''; };
+                    fr.readAsDataURL(item.blob);
+                };
                 imageBubble.dataset.savedPrompt = item.prompt || '';
                 const regBtn = imageBubble.querySelector('.regenerate-btn');
                 regBtn.onclick = async function() {
@@ -2371,8 +2403,15 @@ function renderChatHistory() {
                     try {
                         const result = await generateImageWithSafety(item.prompt, getImageModel(), null, item.prompt, null, '1:1', getImageQuality());
                         const newImageUrl = URL.createObjectURL(result.blob);
-                        imageBubble.querySelector('img').src = newImageUrl;
-                        imageBubble.querySelector('img').onclick = () => window.open(newImageUrl);
+                        const newImg = imageBubble.querySelector('img');
+                        newImg.src = newImageUrl;
+                        newImg.onerror = () => {
+                            try { URL.revokeObjectURL(newImageUrl); } catch (e) {}
+                            const fr2 = new FileReader();
+                            fr2.onload = () => { newImg.src = fr2.result; newImg.onerror = null; imageBubble.querySelector('a[download]').href = fr2.result; };
+                            fr2.readAsDataURL(result.blob);
+                        };
+                        newImg.onclick = () => window.open(newImg.src);
                         imageBubble.querySelector('a[download]').href = newImageUrl;
                     } catch (err) {
                         alert('重新生成失败，图片未更新（仍是原图）: ' + (err.message || err));
