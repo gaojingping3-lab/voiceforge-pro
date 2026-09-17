@@ -7151,7 +7151,7 @@ async function openMoments() {
     document.getElementById('moments-overlay').style.display = 'flex';
     document.body.style.overflow = 'hidden';
     renderMoments();
-    if (loadMoments().length === 0 && !momentsBusy) postNewMoment();
+    // 不再打开即自动生成：避免自动+手动连点撞高档位RPM(3/4K仅1次/分钟)，统一由底部按钮手动触发
 }
 function closeMoments() {
     document.getElementById('moments-overlay').style.display = 'none';
@@ -7248,8 +7248,13 @@ async function postNewMoment() {
         const style = (typeof getFixedStyleByMode === 'function') ? getFixedStyleByMode() : '';
         const prompt = style + ', casual daily selfie, arm extended, phone front camera snapshot, ' + scene;
         const model = (typeof getImageModel === 'function') ? getImageModel() : 'agnes-2.1';
-        const quality = localStorage.getItem('IMG_QUALITY') || '1K';
-        const avatarSrc = getRoleAvatarSrc();
+        // 朋友圈自拍固定1K：3:4竖图在高档位会被Agnes归入3/4K队列(RPM仅1次/分钟)，1K足够且不撞限流
+        const quality = '1K';
+        let avatarSrc = getRoleAvatarSrc();
+        // 参考头像与聊天生图一致：先裁剪成脸部小图，避免整张原图让图生图任务变重
+        if (avatarSrc) {
+            try { avatarSrc = await cropAvatarToFace(avatarSrc); } catch (e) { /* 裁剪失败用原图 */ }
+        }
         const result = await generateImageWithSafety(prompt, model, (s) => { statusEl.textContent = s; }, null, avatarSrc || null, '3:4', quality);
         const dataURL = await blobToDataURLCompressed(result.blob, 640);
 
