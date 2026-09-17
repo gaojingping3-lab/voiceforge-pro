@@ -5281,13 +5281,15 @@ async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimiz
 
         try {
             // Agnes 模型：优先前端直连（绕过Cloudflare IP限流），失败自动降级走后端
+            let directErrMsg = '';
             if (currentModel === 'agnes-2.1') {
                 try {
                     if (onStatusUpdate) onStatusUpdate('正在直连 Agnes 生成图片...');
                     const directResult = await generateAgnesDirect(optimizedPrompt, ratio, inputImage, quality);
                     return { blob: directResult.blob, prompt: optimizedPrompt, model: currentModel };
                 } catch (directErr) {
-                    console.warn('Agnes直连失败，降级走后端:', directErr.message);
+                    directErrMsg = directErr.message || String(directErr);
+                    console.warn('Agnes直连失败，降级走后端:', directErrMsg);
                     if (onStatusUpdate) onStatusUpdate('Agnes直连失败，尝试后端通道...');
                     // 继续往下走后端通道
                 }
@@ -5309,6 +5311,8 @@ async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimiz
                     const errData = await response.json();
                     errorMsg = errData.error || errorMsg;
                 } catch (e) {}
+                // 直连和后端都失败时，把两条错误都带上，方便定位到底是哪一层/哪个endpoint
+                if (directErrMsg) throw new Error(errorMsg + ' ｜直连报错：' + directErrMsg);
                 throw new Error(errorMsg);
             }
 
@@ -7251,6 +7255,11 @@ async function postNewMoment() {
         // 朋友圈自拍固定1K：3:4竖图在高档位会被Agnes归入3/4K队列(RPM仅1次/分钟)，1K足够且不撞限流
         const quality = '1K';
         let avatarSrc = getRoleAvatarSrc();
+        // 与聊天生图完全对齐：尊重"参考头像"开关（关闭则纯文生图，和聊天走同一队列）
+        if (avatarSrc && localStorage.getItem('IMG_REF_AVATAR') === '0') {
+            console.log('[朋友圈] 参考头像开关已关闭，纯文生图');
+            avatarSrc = '';
+        }
         // 参考头像与聊天生图一致：先裁剪成脸部小图，避免整张原图让图生图任务变重
         if (avatarSrc) {
             try { avatarSrc = await cropAvatarToFace(avatarSrc); } catch (e) { /* 裁剪失败用原图 */ }
