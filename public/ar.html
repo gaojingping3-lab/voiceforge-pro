@@ -211,6 +211,24 @@
                  border:1px solid #3f9fd0; border-radius:9px; font-size:15px; }
   #gate .err { color:#ff8a8a; }
 
+  /* ── gate/kind 弹窗的主题适配 ── */
+  /* pearl（浅色）：白卡片+深字 */
+  body.ar-theme-pearl #gate { background:#f4f5f7; color:#1f2937; }
+  body.ar-theme-pearl #gate button { background:#4f46e5; border-color:#6366f1; }
+  body.ar-theme-pearl #kind { background:#ffffff; border-color:#e5e7eb; box-shadow:0 6px 24px rgba(0,0,0,0.12); }
+  body.ar-theme-pearl #kind .kdTitle { color:#4f46e5; }
+  body.ar-theme-pearl #kind .kdRow button { background:#f4f5f7; color:#374151; border-color:#e5e7eb; }
+  body.ar-theme-pearl #kind .kdRow button:active { background:#4f46e5; color:#fff; border-color:#6366f1; }
+  body.ar-theme-pearl #kind #kdClose { color:#6b7280; }
+  body.ar-theme-pearl #kind .kdTip { color:#6b7280; }
+  /* amber（暖黄）：暖底 */
+  body.ar-theme-amber #gate { background:#fdf5eb; color:#5b4636; }
+  body.ar-theme-amber #gate button { background:#b45309; border-color:#d97706; }
+  body.ar-theme-amber #kind { background:#fffaf2; border-color:#e7d3b3; }
+  body.ar-theme-amber #kind .kdTitle { color:#b45309; }
+  body.ar-theme-amber #kind .kdRow button { background:#fdf0dc; color:#5b4636; border-color:#e7d3b3; }
+  body.ar-theme-amber #kind .kdRow button:active { background:#b45309; color:#fff; border-color:#d97706; }
+
   /* 中 / EN 开关。放右上角，和左边那块 HUD 对称 */
   #lang { position:fixed; right:10px; top:calc(10px + env(safe-area-inset-top)); z-index:60;
           background:#00000070; border:1px solid #ffffff22; border-radius:8px;
