@@ -7379,11 +7379,13 @@ function renderMoments() {
         return;
     }
     feed.innerHTML = list.map(m => {
-        const comments = (m.comments || []).map(c =>
-            '<div class="moment-comment">' +
+        const comments = (m.comments || []).map(c => {
+            if (c.from === 'replying') return '<div class="moment-comment moment-comment-replying">她正在回复…</div>';
+            if (c.from === 'sys') return '<div class="moment-comment moment-comment-replying">' + escapeHtml(c.text) + '</div>';
+            return '<div class="moment-comment">' +
                 '<span class="' + (c.from === 'user' ? 'cc-mine' : 'cc-name') + '">' + escapeHtml(c.name) + '</span>：' + escapeHtml(c.text) +
-            '</div>'
-        ).join('');
+            '</div>';
+        }).join('');
         return '<div class="moment-item">' +
             (avatarSrc
                 ? '<img class="moment-avatar" src="' + avatarSrc + '">'
@@ -7427,28 +7429,47 @@ function toggleLikeMoment(id) {
 }
 
 // ============================================
-// 朋友圈评论互动：你评论她回复（LLM）
+// 朋友圈评论互动：底部输入条输入，你评论她回复（LLM）
+// 不用prompt()——iOS Safari不支持系统弹窗，改成微信同款底部输入条
 // ============================================
-async function commentMoment(id) {
+let commentingMomentId = null;
+function commentMoment(id) {
+    commentingMomentId = id;
+    const bar = document.getElementById('moment-comment-bar');
+    const input = document.getElementById('moment-comment-input');
+    if (bar && input) {
+        bar.style.display = 'flex';
+        input.value = '';
+        input.focus();
+    }
+}
+async function submitMomentComment() {
+    const id = commentingMomentId;
+    const input = document.getElementById('moment-comment-input');
+    if (id === null || !input) return;
+    const text = input.value.trim();
+    if (!text) return;
     const role = getCurrentRole();
     if (!role) return;
+    const bar = document.getElementById('moment-comment-bar');
+    if (bar) bar.style.display = 'none';
+    commentingMomentId = null;
     const list = loadMoments();
     const m = list.find(x => x.id === id);
     if (!m) return;
-    const text = prompt('评论这条动态：');
-    if (text === null || !text.trim()) return;
     if (!m.comments) m.comments = [];
-    m.comments.push({ from: 'user', name: '我', text: text.trim(), ts: Date.now() });
+    m.comments.push({ from: 'user', name: '我', text, ts: Date.now() });
+    m.comments.push({ from: 'replying', name: '', text: '', ts: Date.now() }); // 占位：她正在回复
     saveMoments(list);
     renderMoments();
     // 异步生成她的回复
     try {
         const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
         const llmKey = localStorage.getItem('LLM_KEY') || '';
-        if (!llmKey) return;
+        if (!llmKey) throw new Error('未配置LLM Key');
         const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
         const replyPrompt = '你的朋友圈动态：「' + String(m.text).slice(0, 80) + '」\n' +
-            '用户评论：「' + text.trim() + '」\n' +
+            '用户评论：「' + text + '」\n' +
             '请以角色身份用一句符合人设的话回复这条评论，口语化，10~30字，不要引号，不要解释。';
         const messages = [
             { role: 'system', content: '你是角色「' + role.name + '」。私人虚构陪伴空间，完全沉浸角色，不要AI腔。' },
@@ -7460,22 +7481,35 @@ async function commentMoment(id) {
         const res = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
-            body: JSON.stringify({ baseUrl: llmUrl, model: llmModel, messages, temperature: 1.0, max_tokens: 80, stream: false })
+            body: JSON.stringify({ baseUrl: llmUrl, model: llmModel, messages, temperature: 1.0, max_tokens: 100, stream: false })
         });
-        if (!res.ok) return;
+        if (!res.ok) throw new Error('LLM HTTP ' + res.status);
         const data = await res.json();
         const reply = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
-        if (!reply) return;
         const list2 = loadMoments();
         const m2 = list2.find(x => x.id === id);
-        if (m2) {
-            if (!m2.comments) m2.comments = [];
-            m2.comments.push({ from: 'role', name: role.name, text: reply, ts: Date.now() });
+        if (m2 && m2.comments) {
+            const idx = m2.comments.findIndex(c => c.from === 'replying');
+            if (idx >= 0) m2.comments.splice(idx, 1);
+            if (reply) {
+                m2.comments.push({ from: 'role', name: role.name, text: reply, ts: Date.now() });
+            } else {
+                m2.comments.push({ from: 'sys', name: '', text: '（她没回这条评论）', ts: Date.now() });
+            }
             saveMoments(list2);
             renderMoments();
         }
     } catch (e) {
         console.warn('[朋友圈评论] 回复失败:', e.message);
+        const list2 = loadMoments();
+        const m2 = list2.find(x => x.id === id);
+        if (m2 && m2.comments) {
+            const idx = m2.comments.findIndex(c => c.from === 'replying');
+            if (idx >= 0) m2.comments.splice(idx, 1);
+            m2.comments.push({ from: 'sys', name: '', text: '（她没回这条评论）', ts: Date.now() });
+            saveMoments(list2);
+            renderMoments();
+        }
     }
 }
 
