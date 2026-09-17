@@ -2595,12 +2595,14 @@ function initArRecognition(){
   arRecognition = new SR();
   arRecognition.lang = 'zh-CN';
   arRecognition.interimResults = true;
-  arRecognition.continuous = false;
+  arRecognition.continuous = true;   // 持续监听：避免每句说完反复stop/start导致失效
   arRecognition.onstart = () => {
     arListening = true;
     showBubble('正在听…说完我会回你', 1500);
   };
   arRecognition.onresult = (ev) => {
+    // AI说话/思考期间忽略麦克风，防止把TTS回声当成你说话
+    if (arSpeaking || arSending) return;
     let finalText = '';
     for (let i = ev.resultIndex; i < ev.results.length; i++){
       if (ev.results[i].isFinal) finalText += ev.results[i][0].transcript;
@@ -2610,7 +2612,7 @@ function initArRecognition(){
   arRecognition.onend = () => {
     arListening = false;
     if (arMicOn && !arSpeaking && !arSending){
-      setTimeout(() => { if (arMicOn && !arSpeaking && !arSending) startArListen(); }, 250);
+      setTimeout(() => { if (arMicOn && !arSpeaking && !arSending) startArListen(); }, 350);
     } else if (!arMicOn){
       arMicBtn.classList.remove('on'); arMicBtn.textContent = '🎤 对话';
     }
@@ -2619,15 +2621,21 @@ function initArRecognition(){
     arListening = false;
     if (ev.error === 'not-allowed'){ showBubble('麦克风权限被拒绝，去Safari设置里允许', 2800); setArMic(false); }
     else if (ev.error === 'no-speech'){
-      setTimeout(() => { if (arMicOn && !arSpeaking && !arSending) startArListen(); }, 250);
+      setTimeout(() => { if (arMicOn && !arSpeaking && !arSending) startArListen(); }, 350);
     }
     else { showBubble('语音识别：' + (ev.error || '未知错误'), 2500); }
   };
   return true;
 }
+let arListenRetry = 0;
 function startArListen(){
   if (!arMicOn || !arRecognition || arListening || arSpeaking || arSending) return;
-  try { arRecognition.start(); arListening = true; } catch(e){ setTimeout(startArListen, 250); }
+  try { arRecognition.start(); arListening = true; arListenRetry = 0; }
+  catch(e){
+    arListenRetry++;
+    if (arListenRetry < 5) setTimeout(startArListen, 350 * arListenRetry);
+    else { arListenRetry = 0; showBubble('麦克风启动失败，请重开对话', 2500); }
+  }
 }
 // iOS：开着摄像头时，必须先在用户手势里激活麦克风会话，识别才启动得起来
 async function setArMic(on){
@@ -2689,7 +2697,7 @@ async function arPlayAudio(blob){
 }
 function resumeArListen(){
   if (arMicOn && !arListening && !arSending){
-    setTimeout(() => { if (arMicOn && !arSpeaking && !arSending) startArListen(); }, 300);
+    setTimeout(() => { if (arMicOn && !arSpeaking && !arSending) startArListen(); }, 500);
   }
 }
 async function sendArMessage(text){
