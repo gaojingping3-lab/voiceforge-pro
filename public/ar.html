@@ -2627,7 +2627,11 @@ function initArRecognition(){
     else if (ev.error === 'no-speech'){
       setTimeout(() => { if (arMicOn && !arSpeaking && !arSending) startArListen(); }, 350);
     }
-    else { showBubble('语音识别：' + (ev.error || '未知错误'), 2500); }
+    else {
+      showBubble('语音识别：' + (ev.error || '未知错误') + '，正在重连…', 2000);
+      // network/audio-capture 等错误后自动重连，避免识别永久停掉
+      setTimeout(() => { if (arMicOn && !arSpeaking && !arSending) startArListen(); }, 800);
+    }
   };
   return true;
 }
@@ -2734,7 +2738,7 @@ async function sendArMessage(text){
       .replace(/\([^)]*\)/g, '')
       .replace(/\[[^\]]*\]/g, '')
       .replace(/\*[^*]*\*/g, '')
-      .replace(/[ \t]+/g, ' ').trim();
+      .replace(/[ \t]+/g, ' ').trim() || reply;   // 全是动作描写时兜底显示原文
     showBubble(cleanText, 0);
     // 朗读开关和聊天页一致：AUTOPLAY_TTS === 'true' 才出声
     const wantTTS = localStorage.getItem('AUTOPLAY_TTS') === 'true';
@@ -2752,17 +2756,24 @@ async function sendArMessage(text){
       }
       arSpeaking = false;
     }
-    resumeArListen();
   } catch (err){
     console.error('AR对话失败:', err);
     showBubble('对话失败：' + (err.message || err), 3500);
-    resumeArListen();
   } finally {
     arSending = false;
+    resumeArListen();   // 必须在解锁后调，否则恢复监听会被 !arSending 守卫挡掉
   }
 }
 // 返回主站
-arBackBtn.onclick = () => { location.href = 'index.html'; };
+function arCleanup(){
+  arMicOn = false;
+  try { arRecognition && arRecognition.abort(); } catch(e){}
+  try {
+    if (v.srcObject){ v.srcObject.getTracks().forEach(t => t.stop()); v.srcObject = null; }
+  } catch(e){}
+}
+arBackBtn.onclick = () => { arCleanup(); location.href = 'index.html'; };
+window.addEventListener('pagehide', arCleanup);
 // 主题适配：跟随主站 PREMIUM_THEME（theme-pearl / theme-obsidian / theme-amber）
 (function () {
   var t = 'theme-pearl';
