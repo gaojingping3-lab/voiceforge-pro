@@ -470,7 +470,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <a class="tab text-sm font-medium h-12 flex-1 rounded-lg whitespace-nowrap px-1" id="tab-image" onclick="switchTab('image')"><i class="fa-solid fa-image mr-1 text-xs"></i>AI生图</a>
             <a class="tab text-sm font-medium h-12 flex-1 rounded-lg whitespace-nowrap px-1" id="tab-clone" onclick="switchTab('clone')"><i class="fa-solid fa-dna mr-1 text-xs"></i>声音ID</a>
             <a class="tab text-sm font-medium h-12 flex-1 rounded-lg whitespace-nowrap px-1" id="tab-history" onclick="switchTab('history')"><i class="fa-solid fa-clock-rotate-left mr-1 text-xs"></i>历史</a>
-            <a class="tab text-sm font-medium h-12 flex-1 rounded-lg whitespace-nowrap px-1" onclick="location.href='ar'" style="color:#f43f5e"><i class="fa-solid fa-camera mr-1 text-xs"></i>AR出屏</a>
         </div>
 
         <!-- TTS Section -->
@@ -878,9 +877,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             <i class="fa-solid fa-chevron-left text-lg"></i>
                         </button>
                         <span id="fullscreen-title" class="font-bold text-base truncate max-w-[60%]">聊天</span>
-                        <button class="btn btn-ghost btn-sm btn-circle text-error" onclick="clearChat()">
-                            <i class="fa-solid fa-eraser text-lg"></i>
-                        </button>
+                        <div class="flex items-center gap-1">
+                            <button class="btn btn-ghost btn-sm btn-circle" onclick="openArFromChat()" title="AR出屏">
+                                <i class="fa-solid fa-camera text-lg" style="color:#f43f5e"></i>
+                            </button>
+                            <button class="btn btn-ghost btn-sm btn-circle text-error" onclick="clearChat()">
+                                <i class="fa-solid fa-eraser text-lg"></i>
+                            </button>
+                        </div>
                     </div>
                     <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 mb-3"></div>
                     <button id="fullscreen-clear-btn" onclick="clearChat()" class="absolute top-2 right-12 z-20 btn btn-circle btn-sm bg-base-200/90 backdrop-blur shadow-lg opacity-0 pointer-events-none transition-all duration-200 hover:scale-110" title="清空聊天">

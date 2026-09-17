@@ -1572,6 +1572,7 @@ function renderChRow(){
     b.type = 'button';
     b.title = it.name;
     b.dataset.idx = i;
+    if (it.rid != null) b.dataset.rid = String(it.rid);
     const im = document.createElement('img');
     im.alt = it.name;
     im.src = it.data ? it.file : './' + it.file;   // dataURL 直接用，相对路径才补 ./
@@ -1584,6 +1585,16 @@ function renderChRow(){
   });
 }
 renderChRow();
+// 从聊天页带 ?role=<id> 进来时，自动选中并加载当前角色
+(function autoSelectRoleFromUrl(){
+  try {
+    const m = location.search.match(/[?&]role=([^&]+)/);
+    if (!m) return;
+    const rid = decodeURIComponent(m[1]);
+    const btn = document.querySelector('#chRow button[data-rid="' + rid + '"]');
+    if (btn) btn.click();
+  } catch (e) {}
+})();
 
 $('fCh').addEventListener('change', e => {
   const f = e.target.files && e.target.files[0];

@@ -177,6 +177,16 @@ function updateFullscreenTitle() {
     }
 }
 
+// 从聊天全屏进入 AR 出屏，带上当前角色 id（AR 页面自动选中）
+function openArFromChat() {
+    let url = 'ar';
+    try {
+        const id = getCurrentRoleId();
+        if (id) url += '?role=' + encodeURIComponent(id);
+    } catch (e) {}
+    location.href = url;
+}
+
 function toggleChatFullscreen() {
     const isFull = document.body.classList.toggle('chat-fullscreen');
     document.documentElement.classList.toggle('chat-fullscreen-html', isFull);
