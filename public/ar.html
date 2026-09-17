@@ -211,6 +211,9 @@
   #lang { position:fixed; right:10px; top:calc(10px + env(safe-area-inset-top)); z-index:60;
           background:#00000070; border:1px solid #ffffff22; border-radius:8px;
           padding:5px 11px; font-size:12px; color:#9fb0bd; letter-spacing:.5px; }
+
+  /* ── AR 精简：保留主要功能（立绘/摆位/取景/拍照/对话），隐藏高级项 ── */
+  #foldCam, #camBox, #tGrid, #tBody, #exPack, #lvFe { display:none !important; }
 </style>
 </head>
 <body>
@@ -720,7 +723,7 @@ const S = { h:1.6, Hp:1.65, d:4.0, x:0, feq:23, pitch:0, roll:0,
             // 默认满幅：出图 = 整块画布，别照可见区裁。
             // 「自由」那种裁法横屏时把画面裁成一条，全身塞不进去；
             // 可见区那块被常驻条压住的部分，靠 UI 半透明让你看得见（见 CSS）。
-            grid:true, body:true, ready:false, frame:'满幅',
+            grid:false, body:false, ready:false, frame:'满幅',
             // 立绘摆放：'ground' = 贴地（默认，全身立绘用），'free' = 自由（半身用）
             mode:'ground', sizePct:60,
             // 景别：这张立绘从人身上哪一段切的。老存档没有这一项 ——
