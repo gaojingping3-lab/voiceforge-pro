@@ -7276,17 +7276,30 @@ async function postNewMoment() {
             contextAppend: '【画面场景】' + (scene || 'casual selfie in room, natural expression') + '\n这是角色正在拍一张准备发朋友圈的手机自拍，请严格按照这个场景生成画面。'
         });
         if (!result || !result.blob) throw new Error('朋友圈生图未返回结果');
-        // 存图清晰度：1080（和聊天生图观感接近）；若localStorage空间不足自动降级800重存
-        let dataURL = await blobToDataURLCompressed(result.blob, 1080);
+        // 存图：默认900px（手机看足够清晰且省空间）。Safari的localStorage只有约5MB，
+        // 存满时报"The quota has been exceeded"（浏览器存储满，不是Agnes额度）。
+        // 三级降级：压720→清理最旧3条→明确报错，保证永远能发。
+        let dataURL = await blobToDataURLCompressed(result.blob, 900);
         const list = loadMoments();
-        list.push({ id: Date.now(), text, image: dataURL, ts: Date.now(), liked: false });
-        try {
-            saveMoments(list);
-        } catch (e) {
-            console.warn('[朋友圈] 存储空间不足，降级压缩到800px:', e.message);
-            dataURL = await blobToDataURLCompressed(result.blob, 800);
-            list[list.length - 1].image = dataURL;
-            saveMoments(list);
+        const newMoment = { id: Date.now(), text, image: dataURL, ts: Date.now(), liked: false };
+        list.push(newMoment);
+        let stored = false;
+        try { saveMoments(list); stored = true; } catch (e1) { /* 空间不足，继续降级 */ }
+        if (!stored) {
+            console.warn('[朋友圈] 存储空间不足，压缩到720px重存:', (e1 && e1.message) || '');
+            statusEl.textContent = '存储空间不足，正在压缩图片...';
+            dataURL = await blobToDataURLCompressed(result.blob, 720);
+            newMoment.image = dataURL;
+            try { saveMoments(list); stored = true; } catch (e2) { /* 继续降级 */ }
+        }
+        if (!stored) {
+            console.warn('[朋友圈] 空间仍不足，自动清理最旧动态后重存');
+            statusEl.textContent = '空间不足，正在清理最旧动态...';
+            const trimmed = list.slice(-7); // 只留最近7条
+            try { saveMoments(trimmed); stored = true; } catch (e3) { stored = false; }
+        }
+        if (!stored) {
+            throw new Error('朋友圈存储空间已满，请到设置里清空一次朋友圈后再试');
         }
         renderMoments();
         statusEl.textContent = '';
