@@ -7470,7 +7470,8 @@ async function submitMomentComment() {
         const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
         const replyPrompt = '你的朋友圈动态：「' + String(m.text).slice(0, 80) + '」\n' +
             '用户评论：「' + text + '」\n' +
-            '请以角色身份用一句符合人设的话回复这条评论，口语化，10~30字，不要引号，不要解释。';
+            '【重要】评论你的人就是「用户本人」——那个和你关系最亲密、你完全信任的人，你知道是他。他不是外人，不是在公开场合的陌生人。\n' +
+            '即使你平时对外人高冷，对他也不是外人。请以角色身份回应他，口语化，10~30字，可以傲娇、吐槽、调侃或温柔，但必须回应他，不能不理他。不要引号，不要解释。';
         const messages = [
             { role: 'system', content: '你是角色「' + role.name + '」。私人虚构陪伴空间，完全沉浸角色，不要AI腔。' },
         ];
