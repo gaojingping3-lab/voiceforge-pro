@@ -7357,7 +7357,17 @@ async function postNewMoment() {
         let raw = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
         const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
         const text = (lines[0] || '今天也没什么事').replace(/^["'「『]+|["'」』]+$/g, '');
-        const scene = lines[1] || 'casual selfie in room, natural expression';
+        const scene = lines[1] || 'casual daily photo, natural expression';
+
+        // 随机纯文字动态：约30%概率不配图，只发文字（微信朋友圈本就有纯文字模式，更真实）
+        if (Math.random() < 0.3) {
+            const list0 = loadMoments();
+            list0.push({ id: Date.now(), text, image: '', ts: Date.now(), liked: false });
+            try { saveMoments(list0); } catch (e) { /* ignore */ }
+            renderMoments();
+            statusEl.textContent = '';
+            return;
+        }
 
         statusEl.textContent = '她正在准备这张照片...';
         // ===== 完全复用聊天生图同一条链路 =====
