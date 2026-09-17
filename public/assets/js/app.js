@@ -6439,23 +6439,27 @@ ${chatText}`;
     }
 }
 
-async function generateImageFromChat(userInput = '', messageCount = 2) {
-    // 防重复：正在生成时静默返回，不弹alert打扰用户
-    if (isGeneratingChatImage) {
+async function generateImageFromChat(userInput = '', messageCount = 2, silentOpts = null) {
+    // silentOpts: { silent:true, contextAppend:'...', forceSingle:true } —— 朋友圈等复用入口，不走聊天UI，直接返回{blob,prompt}
+    const silent = !!(silentOpts && silentOpts.silent);
+    // 防重复：正在生成时静默返回，不弹alert打扰用户（silent模式不占用聊天锁，由调用方自行防重）
+    if (isGeneratingChatImage && !silent) {
         return;
     }
     // 上下文条数：单人2条（1轮对话），双角色4条；魔法棒和普通生图统一
-    const isDualMode = localStorage.getItem('DUAL_ROLE_MODE') === '1';
+    let isDualMode = localStorage.getItem('DUAL_ROLE_MODE') === '1';
+    if (silentOpts && silentOpts.forceSingle) isDualMode = false; // 朋友圈固定单人
     const effectiveCount = messageCount > 2 ? messageCount : (isDualMode ? 4 : 2);
     // 取最近N条消息
     const recentMessages = chatHistory.slice(-effectiveCount);
     if (recentMessages.length < 2) {
+        if (silent) return null; // silent模式不弹窗，返回null由调用方提示
         alert('至少需要一轮对话才能生成图片');
         return;
     }
-    isGeneratingChatImage = true;
+    if (!silent) isGeneratingChatImage = true;
 
-    // 在聊天区显示加载气泡
+    // 在聊天区显示加载气泡（silent模式不插入DOM，仅保留变量供状态更新）
     const container = document.getElementById('chat-messages');
     const loadingDiv = document.createElement('div');
     loadingDiv.className = 'chat chat-start relative gap-2';
@@ -6465,8 +6469,10 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
     loadingBubble.className = 'chat-bubble bg-base-200 text-base-content';
     loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在根据对话生成图片...</span></div>';
     loadingDiv.appendChild(loadingBubble);
-    container.appendChild(loadingDiv);
-    smartScroll(container);
+    if (!silent) {
+        container.appendChild(loadingDiv);
+        smartScroll(container);
+    }
 
     try {
         // 获取角色卡信息，用于保持人物外貌一致
@@ -6504,6 +6510,10 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         // 把用户的拍摄要求也加进去，让角色AI自己理解（全身/特写/侧脸/微笑等）
         if (userInput) {
             conversationText += `\n\n【用户拍摄要求】${userInput}\n请根据以上拍摄要求生成画面，包含景别、角度、表情、动作等细节。`;
+        }
+        // silent模式附加上下文（朋友圈：把场景描述拼进去，与userInput同效但不需要视角/景别解析）
+        if (silentOpts && silentOpts.contextAppend) {
+            conversationText += '\n\n' + silentOpts.contextAppend;
         }
 
         // 角色头像参考：单人取当前角色头像，双角色取A/B头像（base64 data URI），有头像才传
@@ -6647,8 +6657,8 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
             rolePrompt = rolePrompt + ', ' + refConstraint;
         }
 
-        // 生图前确认提示词（可检查修改；取消则中止本次生成）
-        if (localStorage.getItem('IMG_CONFIRM_PROMPT') !== '0') {
+        // 生图前确认提示词（可检查修改；取消则中止本次生成）——silent模式跳过确认
+        if (!silent && localStorage.getItem('IMG_CONFIRM_PROMPT') !== '0') {
             const conf = await awaitPromptConfirm(rolePrompt);
             if (!conf.confirmed) {
                 if (loadingDiv && loadingDiv.parentNode) loadingDiv.remove();
@@ -6660,8 +6670,14 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
 
         // 第二步：用角色AI生成的提示词直接生图（跳过独立的提示词优化）
         const result = await generateImageWithSafety(conversationText, getImageModel(), (msg) => {
-            loadingBubble.innerHTML = `<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${msg}</span></div>`;
+            if (!silent) loadingBubble.innerHTML = `<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${msg}</span></div>`;
         }, rolePrompt, refImages, '1:1', getImageQuality());
+
+        // silent模式：不做任何聊天UI，直接把结果返回给调用方（朋友圈复用同一链路）
+        if (silent) {
+            if (loadingDiv && loadingDiv.parentNode) loadingDiv.remove();
+            return { blob: result.blob, prompt: result.prompt };
+        }
 
         // 3. 把图片插入聊天记录
         loadingDiv.remove();
@@ -6721,6 +6737,8 @@ async function generateImageFromChat(userInput = '', messageCount = 2) {
         if (loadingDiv && loadingDiv.parentNode) {
             loadingDiv.remove();
         }
+        // silent模式：原样抛出，由调用方（朋友圈）展示错误
+        if (silent) throw error;
         isGeneratingChatImage = false;
         const errMsg = error.message || '';
         if (errMsg.includes('NSFW') || errMsg.includes('8007')) {
@@ -7249,50 +7267,16 @@ async function postNewMoment() {
         const scene = lines[1] || 'casual selfie in room, natural expression';
 
         statusEl.textContent = '她在拍自拍...';
-        const style = (typeof getFixedStyleByMode === 'function') ? getFixedStyleByMode() : '';
-        // 服装硬锁：和聊天生图一致，从角色卡抠出服装钉在最前；画面描述里提到换/脱衣服则豁免
-        let outfitPrefix = '';
-        try {
-            const clothing = extractClothingFromRoleCard(role.desc);
-            const changing = (typeof isChangingClothingScene === 'function') ? isChangingClothingScene(scene) : false;
-            if (clothing && !changing) {
-                outfitPrefix = `wearing exact outfit from character description (must not change): ${clothing}, `;
-                console.log('[朋友圈服装硬锁] 已钉入:', clothing.slice(0, 80));
-            }
-        } catch (e) { /* 服装提取失败不影响生图 */ }
-        // 角色身份块：和聊天生图完全一致（复用同一个缓存身份锁，锁定发色瞳色脸型服装）
-        let identityBlock = '';
-        try {
-            if (typeof ensureIdentityBlock === 'function') {
-                identityBlock = (await ensureIdentityBlock(role)) || '';
-                console.log('[朋友圈] 身份块已加载:', identityBlock.slice(0, 60));
-            }
-        } catch (e) { /* 身份块失败不影响生图 */ }
-        const prompt = outfitPrefix + (identityBlock ? identityBlock + ', ' : '') + style + ', casual daily selfie, arm extended, phone front camera snapshot, ' + scene;
-        const model = (typeof getImageModel === 'function') ? getImageModel() : 'agnes-2.1';
-        // 与聊天生图完全一致的参数：1:1 + 跟随清晰度设置，排除3:4比例触发Agnes高档计费/参数拒绝
-        const quality = (typeof getImageQuality === 'function') ? getImageQuality() : '1K';
-        let avatarSrc = getRoleAvatarSrc();
-        // 与聊天生图完全对齐：尊重"参考头像"开关（关闭则纯文生图，和聊天走同一队列）
-        if (avatarSrc && localStorage.getItem('IMG_REF_AVATAR') === '0') {
-            console.log('[朋友圈] 参考头像开关已关闭，纯文生图');
-            avatarSrc = '';
-        }
-        // 参考头像与聊天生图一致：先裁剪成脸部小图，避免整张原图让图生图任务变重
-        if (avatarSrc) {
-            try { avatarSrc = await cropAvatarToFace(avatarSrc); } catch (e) { /* 裁剪失败用原图 */ }
-        }
-        // 先生图：带参考头像（图生图）。若失败（图生图队列独立配额/限流），自动降级纯文生图重试一次
-        // 注意：第4参数直接传prompt作为"已优化提示词"，跳过DeepSeek优化器重写——否则服装硬锁前缀会被优化器洗掉
-        let result;
-        try {
-            result = await generateImageWithSafety(prompt, model, (s) => { statusEl.textContent = s; }, prompt, avatarSrc || null, '1:1', quality);
-        } catch (imgErr) {
-            console.warn('[朋友圈] 带参考图失败，降级纯文生图:', imgErr.message);
-            statusEl.textContent = '带参考图失败，正在用纯文生图重试...';
-            result = await generateImageWithSafety(prompt, model, (s) => { statusEl.textContent = s; }, prompt, null, '1:1', quality);
-        }
-        // 存图清晰度：从640提升到1080（和聊天生图观感更接近）；若localStorage空间不足自动降级800重存
+        // ===== 完全复用聊天生图同一条链路 =====
+        // 读最近聊天记录 + 角色身份锁 + 服装硬锁 + 视角/景别/人数约束 + 参考头像(同一开关) + 同一个出图函数
+        // 唯一区别：额外附加"发朋友圈自拍"的场景描述，不维护任何朋友圈专属生图逻辑
+        const result = await generateImageFromChat('', 2, {
+            silent: true,
+            forceSingle: true,
+            contextAppend: '【画面场景】' + (scene || 'casual selfie in room, natural expression') + '\n这是角色正在拍一张准备发朋友圈的手机自拍，请严格按照这个场景生成画面。'
+        });
+        if (!result || !result.blob) throw new Error('朋友圈生图未返回结果');
+        // 存图清晰度：1080（和聊天生图观感接近）；若localStorage空间不足自动降级800重存
         let dataURL = await blobToDataURLCompressed(result.blob, 1080);
         const list = loadMoments();
         list.push({ id: Date.now(), text, image: dataURL, ts: Date.now(), liked: false });
