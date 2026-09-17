@@ -7275,13 +7275,14 @@ async function postNewMoment() {
             try { avatarSrc = await cropAvatarToFace(avatarSrc); } catch (e) { /* 裁剪失败用原图 */ }
         }
         // 先生图：带参考头像（图生图）。若失败（图生图队列独立配额/限流），自动降级纯文生图重试一次
+        // 注意：第4参数直接传prompt作为"已优化提示词"，跳过DeepSeek优化器重写——否则服装硬锁前缀会被优化器洗掉
         let result;
         try {
-            result = await generateImageWithSafety(prompt, model, (s) => { statusEl.textContent = s; }, null, avatarSrc || null, '1:1', quality);
+            result = await generateImageWithSafety(prompt, model, (s) => { statusEl.textContent = s; }, prompt, avatarSrc || null, '1:1', quality);
         } catch (imgErr) {
             console.warn('[朋友圈] 带参考图失败，降级纯文生图:', imgErr.message);
             statusEl.textContent = '带参考图失败，正在用纯文生图重试...';
-            result = await generateImageWithSafety(prompt, model, (s) => { statusEl.textContent = s; }, null, null, '1:1', quality);
+            result = await generateImageWithSafety(prompt, model, (s) => { statusEl.textContent = s; }, prompt, null, '1:1', quality);
         }
         const dataURL = await blobToDataURLCompressed(result.blob, 640);
 
