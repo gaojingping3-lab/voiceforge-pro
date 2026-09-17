@@ -7250,7 +7250,17 @@ async function postNewMoment() {
 
         statusEl.textContent = '她在拍自拍...';
         const style = (typeof getFixedStyleByMode === 'function') ? getFixedStyleByMode() : '';
-        const prompt = style + ', casual daily selfie, arm extended, phone front camera snapshot, ' + scene;
+        // 服装硬锁：和聊天生图一致，从角色卡抠出服装钉在最前；画面描述里提到换/脱衣服则豁免
+        let outfitPrefix = '';
+        try {
+            const clothing = extractClothingFromRoleCard(role.desc);
+            const changing = (typeof isChangingClothingScene === 'function') ? isChangingClothingScene(scene) : false;
+            if (clothing && !changing) {
+                outfitPrefix = `wearing exact outfit from character description (must not change): ${clothing}, `;
+                console.log('[朋友圈服装硬锁] 已钉入:', clothing.slice(0, 80));
+            }
+        } catch (e) { /* 服装提取失败不影响生图 */ }
+        const prompt = outfitPrefix + style + ', casual daily selfie, arm extended, phone front camera snapshot, ' + scene;
         const model = (typeof getImageModel === 'function') ? getImageModel() : 'agnes-2.1';
         // 与聊天生图完全一致的参数：1:1 + 跟随清晰度设置，排除3:4比例触发Agnes高档计费/参数拒绝
         const quality = (typeof getImageQuality === 'function') ? getImageQuality() : '1K';
