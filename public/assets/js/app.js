@@ -7378,8 +7378,13 @@ function renderMoments() {
         feed.innerHTML = '<div style="text-align:center;color:#bbb;padding:60px 0;font-size:14px;">她还没有发动态</div>';
         return;
     }
-    feed.innerHTML = list.map(m =>
-        '<div class="moment-item">' +
+    feed.innerHTML = list.map(m => {
+        const comments = (m.comments || []).map(c =>
+            '<div class="moment-comment">' +
+                '<span class="' + (c.from === 'user' ? 'cc-mine' : 'cc-name') + '">' + escapeHtml(c.name) + '</span>：' + escapeHtml(c.text) +
+            '</div>'
+        ).join('');
+        return '<div class="moment-item">' +
             (avatarSrc
                 ? '<img class="moment-avatar" src="' + avatarSrc + '">'
                 : '<div class="moment-avatar" style="display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;">' + (role.name ? role.name.charAt(0) : '?') + '</div>') +
@@ -7389,13 +7394,17 @@ function renderMoments() {
                 (m.image ? '<img class="moment-img" data-mid="' + m.id + '" src="' + (m.image.indexOf('data:') === 0 ? m.image : '') + '" onclick="openImageLightbox(this.src)">' : '') +
                 '<div class="moment-meta">' +
                     '<span class="moment-time">' + fmtMomentTime(m.ts) + '</span>' +
-                    '<button class="moment-like' + (m.liked ? ' liked' : '') + '" onclick="toggleLikeMoment(' + m.id + ')">' +
-                        '<i class="' + (m.liked ? 'fa-solid' : 'fa-regular') + ' fa-heart"></i> ' + (m.liked ? '已赞' : '赞') +
-                    '</button>' +
+                    '<span>' +
+                        '<button class="moment-like' + (m.liked ? ' liked' : '') + '" onclick="toggleLikeMoment(' + m.id + ')">' +
+                            '<i class="' + (m.liked ? 'fa-solid' : 'fa-regular') + ' fa-heart"></i> ' + (m.liked ? '已赞' : '赞') +
+                        '</button>' +
+                        '<button class="moment-comment-btn" onclick="commentMoment(' + m.id + ')"><i class="fa-regular fa-comment"></i> 评论</button>' +
+                    '</span>' +
                 '</div>' +
+                (comments ? '<div class="moment-comments">' + comments + '</div>' : '') +
             '</div>' +
-        '</div>'
-    ).join('');
+        '</div>';
+    }).join('');
     // 异步加载IndexedDB里存的图片（'idx:'格式），加载完成后替换src
     list.forEach(m => {
         if (m.image && m.image.indexOf('idx:') === 0) {
@@ -7415,6 +7424,102 @@ function toggleLikeMoment(id) {
     const list = loadMoments();
     const m = list.find(x => x.id === id);
     if (m) { m.liked = !m.liked; saveMoments(list); renderMoments(); }
+}
+
+// ============================================
+// 朋友圈评论互动：你评论她回复（LLM）
+// ============================================
+async function commentMoment(id) {
+    const role = getCurrentRole();
+    if (!role) return;
+    const list = loadMoments();
+    const m = list.find(x => x.id === id);
+    if (!m) return;
+    const text = prompt('评论这条动态：');
+    if (text === null || !text.trim()) return;
+    if (!m.comments) m.comments = [];
+    m.comments.push({ from: 'user', name: '我', text: text.trim(), ts: Date.now() });
+    saveMoments(list);
+    renderMoments();
+    // 异步生成她的回复
+    try {
+        const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+        const llmKey = localStorage.getItem('LLM_KEY') || '';
+        if (!llmKey) return;
+        const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+        const replyPrompt = '你的朋友圈动态：「' + String(m.text).slice(0, 80) + '」\n' +
+            '用户评论：「' + text.trim() + '」\n' +
+            '请以角色身份用一句符合人设的话回复这条评论，口语化，10~30字，不要引号，不要解释。';
+        const messages = [
+            { role: 'system', content: '你是角色「' + role.name + '」。私人虚构陪伴空间，完全沉浸角色，不要AI腔。' },
+        ];
+        if (role.desc && role.desc !== DEFAULT_ROLE_DESC) {
+            messages.push({ role: 'system', content: '【角色卡】\n' + role.desc });
+        }
+        messages.push({ role: 'user', content: replyPrompt });
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
+            body: JSON.stringify({ baseUrl: llmUrl, model: llmModel, messages, temperature: 1.0, max_tokens: 80, stream: false })
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const reply = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
+        if (!reply) return;
+        const list2 = loadMoments();
+        const m2 = list2.find(x => x.id === id);
+        if (m2) {
+            if (!m2.comments) m2.comments = [];
+            m2.comments.push({ from: 'role', name: role.name, text: reply, ts: Date.now() });
+            saveMoments(list2);
+            renderMoments();
+        }
+    } catch (e) {
+        console.warn('[朋友圈评论] 回复失败:', e.message);
+    }
+}
+
+// ============================================
+// 拍一拍：点她头像，她回一句（微信拍一拍玩法）
+// ============================================
+function showPatToast(main, reply) {
+    const toast = document.getElementById('pat-toast');
+    if (!toast) return;
+    toast.innerHTML = '<div class="pat-main">' + main + '</div>' + (reply ? '<div class="pat-reply">' + reply + '</div>' : '');
+    toast.style.display = 'block';
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => { toast.style.display = 'none'; }, 5000);
+}
+async function patRole(event) {
+    if (event) event.stopPropagation();
+    const role = getCurrentRole();
+    if (!role) return;
+    showPatToast('你拍了拍「' + role.name + '」', '…');
+    try {
+        const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+        const llmKey = localStorage.getItem('LLM_KEY') || '';
+        if (!llmKey) { showPatToast('你拍了拍「' + role.name + '」', '（未配置LLM Key）'); return; }
+        const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+        const messages = [
+            { role: 'system', content: '你是角色「' + role.name + '」。私人虚构陪伴空间，完全沉浸角色，不要AI腔。' },
+        ];
+        if (role.desc && role.desc !== DEFAULT_ROLE_DESC) {
+            messages.push({ role: 'system', content: '【角色卡】\n' + role.desc });
+        }
+        messages.push({ role: 'user', content: '用户刚刚在朋友圈拍了拍你。请用一句符合人设的话回应这次"拍一拍"，口语化，10~30字，可以是害羞、傲娇、惊讶或调侃，不要引号，不要解释。' });
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
+            body: JSON.stringify({ baseUrl: llmUrl, model: llmModel, messages, temperature: 1.0, max_tokens: 80, stream: false })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const reply = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
+        showPatToast('你拍了拍「' + role.name + '」', reply || '干嘛呀？');
+    } catch (e) {
+        console.warn('[拍一拍] 失败:', e.message);
+        showPatToast('你拍了拍「' + role.name + '」', '（她没反应，可能是网络问题）');
+    }
 }
 async function blobToDataURLCompressed(blob, maxW) {
     return new Promise((resolve, reject) => {
