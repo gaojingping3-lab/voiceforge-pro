@@ -2548,6 +2548,7 @@ const AR_POSES = [
 let arPoseIdx = Math.floor(Math.random() * AR_POSES.length);
 function nextArPose(){ arPoseIdx = (arPoseIdx + 1) % AR_POSES.length; return AR_POSES[arPoseIdx]; }
 let arAutoPoseTimer = null;
+let arLastBlobUrl = null;   // 上一张立绘的 blob URL，换新图时释放
 async function genCharacter(){
   if (!arGenBtn || arGenBtn.disabled) return;   // 防重入：正在生成就跳过
   arGenBtn.disabled = true;
@@ -2555,7 +2556,8 @@ async function genCharacter(){
   try {
     const model = localStorage.getItem('IMAGE_MODEL') || 'agnes-2.1';
     const key = localStorage.getItem('AGNES_API_KEY') || '';
-    const quality = localStorage.getItem('IMG_QUALITY') || '1K';
+    // 立绘强制1K：临时贴图不需要高清，1K限额最宽，避免被限流
+    const quality = '1K';
 
     const role = getArRole();
     const roleName = (role && role.name) || '她';
@@ -2595,6 +2597,9 @@ async function genCharacter(){
     }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
+    // 用一张删一张：上一张立绘的 blob URL 直接释放，刷新后不保留任何东西
+    if (arLastBlobUrl){ try { URL.revokeObjectURL(arLastBlobUrl); } catch(e){} }
+    arLastBlobUrl = url;
     const img = new Image();
     await new Promise((ok, no) => { img.onload = ok; img.onerror = () => no(new Error('图片解析失败')); img.src = url; });
     // 抠掉绿幕纯色背景（有 cutout 才抠，没有就用原图）
@@ -2826,6 +2831,7 @@ async function sendArMessage(text){
 function arCleanup(){
   arMicOn = false;
   if (arAutoPoseTimer){ clearInterval(arAutoPoseTimer); arAutoPoseTimer = null; }
+  if (arLastBlobUrl){ try { URL.revokeObjectURL(arLastBlobUrl); } catch(e){} arLastBlobUrl = null; }
   try { arRecognition && arRecognition.abort(); } catch(e){}
   try {
     if (v.srcObject){ v.srcObject.getTracks().forEach(t => t.stop()); v.srcObject = null; }
