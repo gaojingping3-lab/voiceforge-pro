@@ -1549,6 +1549,7 @@ let typingDelSnapshot = null;  // 连续删除会话的开始快照（用于合�
 let typingDelSession = false;  // 是否处于连续删除会话
 let typingDelBuffer = '';      // 删除会话期间实时累积的删除文本（不依赖最终diff，打字后也不丢）
 let typingClearedSnapshot = ''; // 【新逻辑】记录"整段删空"时被删掉的完整内容
+let typingDeleteBuffer = '';     // 删除过程中实时累积的删除片段（逐字退格也能拼回整段）
 let typingComposing = false;   // 输入法组合期标志
 
 function getTypingSensorEnabled() {
@@ -1960,6 +1961,7 @@ function resetTypingMeta() {
     typingDelSession = false;
     typingDelBuffer = '';
     typingClearedSnapshot = '';
+    typingDeleteBuffer = '';
 }
 // 对比前后value，提取被删除的文本并判断是否纯删除（公共前缀+公共后缀法）
 function getDeleteDiff(prevValue, curValue) {
@@ -2027,11 +2029,19 @@ function initTypingSensor() {
         }
         typingLastEvent = now;
         const curValue = input.value;
-        // 【新逻辑】只捕捉"整段删空"：从有内容 → 空
-        // 打错字退格一两个字（局部删除）不记录
-        if (typingPrevValue.length > 0 && curValue === '') {
-            typingClearedSnapshot = typingPrevValue; // 记住被删掉的整段
-            typingMaxPause = 0; // 停顿计时重置：从"删空这一刻"开始算，到下次重打
+        // 【新逻辑】：从开始删就实时累积，逐字退格也能拼回完整整段
+        if (curValue === '' && typingPrevValue.length > 0) {
+            // 删空了：最后剩的字(在最左) + 之前累积的删除片段 = 被删掉的整段话
+            typingClearedSnapshot = typingPrevValue + typingDeleteBuffer;
+            typingMaxPause = 0; // 停顿计时从"删空这一刻"重新算
+            typingDeleteBuffer = '';
+        } else if (curValue.length < typingPrevValue.length) {
+            // 局部删除（还没删空）：把这次删掉的内容前插累积
+            const diff = getDeleteDiff(typingPrevValue, curValue);
+            if (diff.deleted) typingDeleteBuffer = diff.deleted + typingDeleteBuffer;
+        } else if (curValue !== typingPrevValue) {
+            // 打字/修改：不是在删空，清空累积（打错字局部编辑不算）
+            typingDeleteBuffer = '';
         }
         typingPrevValue = curValue;
     });
