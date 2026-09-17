@@ -4854,6 +4854,149 @@ function saveRoleCard() {
     sfxSuccess();
 }
 
+// 角色卡导出（单张，JSON格式，含头像+记忆便签）
+function exportRoleCard() {
+    const name = (document.getElementById('role-name-input').value || '').trim() || DEFAULT_ROLE_NAME;
+    const desc = (document.getElementById('role-desc-input').value || '').trim() || DEFAULT_ROLE_DESC;
+    const opening = (document.getElementById('role-opening-input').value || '').trim();
+    const roleId = getCurrentRoleId();
+    let avatar = null;
+    if (editingRoleAvatar !== null && editingRoleAvatar !== undefined && editingRoleAvatar !== '') {
+        avatar = editingRoleAvatar;
+    } else {
+        const role = getRoleList().find(r => r.id === roleId);
+        if (role && role.avatar) avatar = role.avatar;
+        if (!avatar) { try { avatar = localStorage.getItem('AVATAR_' + name) || null; } catch(e){} }
+    }
+    const memos = getRoleMemos(roleId);
+    const data = { format: 'voiceforge-role-card', version: 1, role: { name, desc, opening: opening || '', avatar: avatar || null, memos: memos || [] } };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '角色卡_' + name + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    sfxSuccess();
+}
+
+// 角色卡导入（支持本站JSON + 酒馆PNG卡）
+function importRoleCard() {
+    const input = document.getElementById('role-import-file');
+    if (input) input.click();
+}
+
+function handleRoleImportFile(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const dataUrl = e.target.result;
+            let parsed = null;
+            let pngAvatar = null;
+            if (file.name.toLowerCase().endsWith('.png')) {
+                const b64 = dataUrl.split(',')[1];
+                const bin = atob(b64);
+                const bytes = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                parsed = parseTavernPng(bytes);        // 解析PNG内嵌chara数据
+                pngAvatar = dataUrl;                   // PNG图片本身当头像
+            } else {
+                const b = atob(dataUrl.split(',')[1]);
+                const u = new Uint8Array(b.length);
+                for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+                const text = new TextDecoder().decode(u);
+                parsed = JSON.parse(text);
+            }
+            const roleData = normalizeImportedRole(parsed, pngAvatar);
+            if (!roleData || !roleData.name) { alert('导入失败：文件中没有找到有效的角色数据'); return; }
+            const list = getRoleList();
+            const dup = list.find(r => r.name === roleData.name);
+            let mode = 'new';
+            if (dup) {
+                mode = confirm('已存在同名角色「' + roleData.name + '」\n确定 = 覆盖该角色\n取消 = 新建副本（名字加"（副本）"）') ? 'overwrite' : 'copy';
+            }
+            if (mode === 'overwrite') {
+                dup.name = roleData.name;
+                dup.desc = roleData.desc;
+                dup.opening = roleData.opening || '';
+                if (roleData.avatar) dup.avatar = roleData.avatar;
+                saveRoleList(list);
+                saveRoleMemos(dup.id, roleData.memos || []);
+                alert('已覆盖角色「' + roleData.name + '」');
+            } else {
+                const newRole = { id: Date.now(), name: roleData.name, desc: roleData.desc, opening: roleData.opening || '' };
+                if (roleData.avatar) newRole.avatar = roleData.avatar;
+                if (mode === 'copy') newRole.name = roleData.name + '（副本）';
+                list.push(newRole);
+                saveRoleList(list);
+                saveRoleMemos(newRole.id, roleData.memos || []);
+                alert('已导入角色「' + newRole.name + '」');
+            }
+            renderRoleList();
+            sfxSuccess();
+        } catch (err) {
+            alert('导入失败：' + (err.message || err));
+            console.error('[RoleImport]', err);
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+// 解析酒馆PNG卡：读取PNG的tEXt块里 keyword="chara" 的base64 JSON数据
+function parseTavernPng(bytes) {
+    const sig = [137, 80, 78, 71, 13, 10, 26, 10];
+    for (let i = 0; i < 8; i++) { if (bytes[i] !== sig[i]) throw new Error('不是有效的PNG文件'); }
+    let offset = 8;
+    while (offset + 12 <= bytes.length) {
+        const len = ((bytes[offset] << 24) | (bytes[offset+1] << 16) | (bytes[offset+2] << 8) | bytes[offset+3]) >>> 0;
+        const type = String.fromCharCode(bytes[offset+4], bytes[offset+5], bytes[offset+6], bytes[offset+7]);
+        const dataStart = offset + 8;
+        const dataEnd = dataStart + len;
+        if (dataEnd > bytes.length) break;
+        if (type === 'tEXt') {
+            let sep = -1;
+            for (let i = dataStart; i < dataEnd; i++) { if (bytes[i] === 0) { sep = i; break; } }
+            if (sep > dataStart) {
+                let kw = '';
+                for (let i = dataStart; i < sep; i++) kw += String.fromCharCode(bytes[i]);
+                if (kw === 'chara') {
+                    const text = new TextDecoder().decode(bytes.slice(sep + 1, dataEnd));
+                    return JSON.parse(atob(text));
+                }
+            }
+        }
+        offset = dataEnd + 4; // 跳过CRC
+    }
+    throw new Error('PNG中没有找到酒馆角色数据（chara字段）');
+}
+
+// 统一导入数据格式：本站JSON / 酒馆v2 / 酒馆v1
+function normalizeImportedRole(parsed, pngAvatar) {
+    if (!parsed) return null;
+    // 本站格式
+    if (parsed.format === 'voiceforge-role-card' && parsed.role) {
+        const r = parsed.role;
+        return { name: (r.name || '').trim(), desc: r.desc || '', opening: r.opening || '', avatar: r.avatar || pngAvatar || null, memos: Array.isArray(r.memos) ? r.memos : [] };
+    }
+    // 酒馆 v2（spec + data）
+    if (parsed.spec && parsed.data) {
+        const d = parsed.data;
+        const descParts = [d.description, d.personality, d.scenario].filter(x => x && String(x).trim());
+        return { name: (d.name || '').trim() || '导入角色', desc: descParts.join('\n\n'), opening: d.first_mes || '', avatar: pngAvatar || null, memos: [] };
+    }
+    // 酒馆 v1 / 简易 JSON
+    if (parsed.name) {
+        const descParts = [parsed.description, parsed.personality, parsed.scenario].filter(x => x && String(x).trim());
+        return { name: (parsed.name || '').trim() || '导入角色', desc: descParts.join('\n\n'), opening: parsed.first_mes || parsed.opening || '', avatar: pngAvatar || null, memos: [] };
+    }
+    return null;
+}
+
 function resetRoleCard() {
     if (!confirm('确定重置当前角色卡为默认设定吗？')) return;
     const list = getRoleList();

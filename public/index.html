@@ -825,8 +825,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             <button class="btn btn-primary btn-sm flex-1" onclick="addNewRole()">
                                 <i class="fa-solid fa-plus"></i> 新建角色
                             </button>
+                            <button class="btn btn-ghost btn-sm flex-1" onclick="importRoleCard()">
+                                <i class="fa-solid fa-upload"></i> 导入角色卡
+                            </button>
                             <button class="btn btn-ghost btn-sm" onclick="document.getElementById('role-list-modal').close()">关闭</button>
                         </div>
+                        <input type="file" id="role-import-file" accept=".json,.png,image/png,application/json" class="hidden" onchange="handleRoleImportFile(this)" />
                     </div>
                     <form method="dialog" class="modal-backdrop">
                         <button>close</button>
@@ -875,6 +879,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <div class="modal-action mt-4">
+                            <button class="btn btn-ghost btn-sm" onclick="exportRoleCard()">
+                                <i class="fa-solid fa-download"></i> 导出这张卡
+                            </button>
                             <button class="btn btn-ghost btn-sm" onclick="document.getElementById('role-card-modal').close()">取消</button>
                             <button class="btn btn-primary btn-sm" onclick="saveRoleCard()">保存</button>
                         </div>
