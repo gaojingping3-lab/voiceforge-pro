@@ -4736,8 +4736,9 @@ function clearChat() {
     chatHistory = []; // 清空对话记忆
     localStorage.removeItem(getChatStorageKey()); // 清除当前角色的本地永久记忆
     clearRoleChatImages(); // 联动清空当前角色保存在IndexedDB里的生图
-    // 联动清空当前角色的朋友圈动态
+    // 联动清空当前角色的朋友圈动态（localStorage元数据 + IndexedDB图片）
     try { localStorage.removeItem(momentsKey()); } catch (e) { /* ignore */ }
+    try { momentsDbClear(momentsKey()); } catch (e) { /* ignore */ }
     // 重置总tokens
     totalTokensUsed = 0;
     localStorage.removeItem('TOTAL_TOKENS_USED');
@@ -7108,9 +7109,86 @@ async function generateVideoFromChat(userInput = '') {
 
 // ============================================
 // 朋友圈（仿微信，单角色）
+// 图片存IndexedDB（大空间），localStorage只存文案/点赞等小数据（不再占5MB，永不报存储满）
 // ============================================
+const MOMENTS_DB = 'voiceforge-moments';
+const MOMENTS_STORE = 'momentsImages';
 let momentsBusy = false;
 
+function openMomentsDB() {
+    return new Promise((resolve, reject) => {
+        if (!window.indexedDB) { reject(new Error('浏览器不支持IndexedDB')); return; }
+        const req = indexedDB.open(MOMENTS_DB, 1);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(MOMENTS_STORE)) {
+                const store = db.createObjectStore(MOMENTS_STORE, { keyPath: 'id' });
+                store.createIndex('roleKey', 'roleKey');
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('打开朋友圈图片库失败'));
+    });
+}
+async function momentsDbSave(id, dataURL, roleKey) {
+    try {
+        const db = await openMomentsDB();
+        return new Promise((resolve) => {
+            const tx = db.transaction(MOMENTS_STORE, 'readwrite');
+            tx.objectStore(MOMENTS_STORE).put({ id, dataURL, roleKey, ts: Date.now() });
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+        });
+    } catch (e) { console.warn('[MomentsDB] 保存失败:', e.message); return false; }
+}
+async function momentsDbGet(id) {
+    try {
+        const db = await openMomentsDB();
+        return new Promise((resolve) => {
+            const tx = db.transaction(MOMENTS_STORE, 'readonly');
+            const req = tx.objectStore(MOMENTS_STORE).get(id);
+            req.onsuccess = () => resolve(req.result ? req.result.dataURL : null);
+            req.onerror = () => resolve(null);
+        });
+    } catch (e) { return null; }
+}
+async function momentsDbClear(roleKey) {
+    try {
+        const db = await openMomentsDB();
+        return new Promise((resolve) => {
+            const tx = db.transaction(MOMENTS_STORE, 'readwrite');
+            const store = tx.objectStore(MOMENTS_STORE);
+            if (roleKey && store.indexNames.contains('roleKey')) {
+                const idx = store.index('roleKey');
+                const req = idx.openCursor(IDBKeyRange.only(roleKey));
+                req.onsuccess = () => {
+                    const cur = req.result;
+                    if (cur) { store.delete(cur.primaryKey); cur.continue(); }
+                };
+            } else {
+                store.clear();
+            }
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+        });
+    } catch (e) { /* ignore */ }
+}
+// 首次迁移：把旧的dataURL大图从localStorage搬到IndexedDB，localStorage只留'idx:'小标记
+async function migrateMomentsToDB() {
+    let list;
+    try { list = loadMoments(); } catch (e) { return; }
+    if (!list || !list.length) return;
+    let changed = false;
+    for (const m of list) {
+        if (m.image && m.image.startsWith('data:')) {
+            const ok = await momentsDbSave(m.id, m.image, momentsKey());
+            if (ok) { m.image = 'idx:' + m.id; changed = true; }
+        }
+    }
+    if (changed) {
+        try { saveMoments(list); } catch (e) { /* 迁移失败不影响使用 */ }
+    }
+}
 function momentsKey() {
     const role = getCurrentRole();
     return 'MOMENTS_' + (role ? role.id : 'default');
@@ -7172,7 +7250,8 @@ async function openMoments() {
     };
     document.getElementById('moments-overlay').style.display = 'flex';
     document.body.style.overflow = 'hidden';
-    renderMoments();
+    // 打开时先迁移旧图（dataURL→IndexedDB），再渲染
+    migrateMomentsToDB().then(() => renderMoments());
     // 不再打开即自动生成：避免自动+手动连点撞高档位RPM(3/4K仅1次/分钟)，统一由底部按钮手动触发
 }
 function closeMoments() {
@@ -7196,7 +7275,7 @@ function renderMoments() {
             '<div class="moment-body">' +
                 '<div class="moment-name">' + escapeHtml(role.name) + '</div>' +
                 '<div class="moment-text">' + escapeHtml(m.text) + '</div>' +
-                (m.image ? '<img class="moment-img" src="' + m.image + '" onclick="openImageLightbox(this.src)">' : '') +
+                (m.image ? '<img class="moment-img" data-mid="' + m.id + '" src="' + (m.image.indexOf('data:') === 0 ? m.image : '') + '" onclick="openImageLightbox(this.src)">' : '') +
                 '<div class="moment-meta">' +
                     '<span class="moment-time">' + fmtMomentTime(m.ts) + '</span>' +
                     '<button class="moment-like' + (m.liked ? ' liked' : '') + '" onclick="toggleLikeMoment(' + m.id + ')">' +
@@ -7206,6 +7285,20 @@ function renderMoments() {
             '</div>' +
         '</div>'
     ).join('');
+    // 异步加载IndexedDB里存的图片（'idx:'格式），加载完成后替换src
+    list.forEach(m => {
+        if (m.image && m.image.indexOf('idx:') === 0) {
+            const mid = parseInt(m.image.slice(4), 10);
+            if (!isNaN(mid)) {
+                momentsDbGet(mid).then(src => {
+                    if (src) {
+                        const img = feed.querySelector('img.moment-img[data-mid="' + m.id + '"]');
+                        if (img) img.src = src;
+                    }
+                });
+            }
+        }
+    });
 }
 function toggleLikeMoment(id) {
     const list = loadMoments();
@@ -7276,31 +7369,23 @@ async function postNewMoment() {
             contextAppend: '【画面场景】' + (scene || 'casual selfie in room, natural expression') + '\n这是角色正在拍一张准备发朋友圈的手机自拍，请严格按照这个场景生成画面。'
         });
         if (!result || !result.blob) throw new Error('朋友圈生图未返回结果');
-        // 存图：默认900px（手机看足够清晰且省空间）。Safari的localStorage只有约5MB，
-        // 存满时报"The quota has been exceeded"（浏览器存储满，不是Agnes额度）。
-        // 三级降级：压720→清理最旧3条→明确报错，保证永远能发。
-        let dataURL = await blobToDataURLCompressed(result.blob, 900);
-        const list = loadMoments();
-        const newMoment = { id: Date.now(), text, image: dataURL, ts: Date.now(), liked: false };
-        list.push(newMoment);
-        let stored = false;
-        try { saveMoments(list); stored = true; } catch (e1) { /* 空间不足，继续降级 */ }
-        if (!stored) {
-            console.warn('[朋友圈] 存储空间不足，压缩到720px重存:', (e1 && e1.message) || '');
-            statusEl.textContent = '存储空间不足，正在压缩图片...';
+        // 图片存IndexedDB（大空间），localStorage只存'idx:'小标记——不再占5MB，永不报存储满
+        const mid = Date.now();
+        let dataURL = await blobToDataURLCompressed(result.blob, 1080);
+        const dbOk = await momentsDbSave(mid, dataURL, momentsKey());
+        if (!dbOk) {
+            // IndexedDB异常兜底：压缩后仍存localStorage（旧方案），并提示
             dataURL = await blobToDataURLCompressed(result.blob, 720);
-            newMoment.image = dataURL;
-            try { saveMoments(list); stored = true; } catch (e2) { /* 继续降级 */ }
+            const list0 = loadMoments();
+            list0.push({ id: mid, text, image: dataURL, ts: Date.now(), liked: false });
+            try { saveMoments(list0); } catch (e) { throw new Error('朋友圈存储失败，请清空一次朋友圈后再试'); }
+            renderMoments();
+            statusEl.textContent = '';
+            return;
         }
-        if (!stored) {
-            console.warn('[朋友圈] 空间仍不足，自动清理最旧动态后重存');
-            statusEl.textContent = '空间不足，正在清理最旧动态...';
-            const trimmed = list.slice(-7); // 只留最近7条
-            try { saveMoments(trimmed); stored = true; } catch (e3) { stored = false; }
-        }
-        if (!stored) {
-            throw new Error('朋友圈存储空间已满，请到设置里清空一次朋友圈后再试');
-        }
+        const list = loadMoments();
+        list.push({ id: mid, text, image: 'idx:' + mid, ts: Date.now(), liked: false });
+        try { saveMoments(list); } catch (e) { /* localStorage只存小数据，几乎不会满 */ }
         renderMoments();
         statusEl.textContent = '';
     } catch (e) {
