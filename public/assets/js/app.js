@@ -1039,6 +1039,9 @@ function syncModalInputs() {
     // 加载聊天生图参考头像开关
     const imgRefToggle = document.getElementById('img-ref-avatar-toggle');
     if (imgRefToggle) imgRefToggle.checked = localStorage.getItem('IMG_REF_AVATAR') !== '0';
+    // 加载AI自动发朋友圈开关
+    const autoMomToggle = document.getElementById('auto-moments-toggle');
+    if (autoMomToggle) autoMomToggle.checked = localStorage.getItem('AUTO_MOMENTS') !== '0';
     // 加载双角色模式开关
     const dualToggle = document.getElementById('dual-role-toggle');
     if (dualToggle) {
@@ -2611,6 +2614,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initLongPressMenu(); // 初始化长按消息菜单
     initFullscreenMode(); // 初始化全屏模式
     updateAutoPlayBtn(); // 恢复自动朗读按钮状态
+    // AI自动发朋友圈：在线定时器 + 离线补发（延迟几秒，避免和页面加载抢资源）
+    startAutoMomentsTimer();
+    setTimeout(() => { catchUpMoments(); }, 8000);
 
     // 恢复双角色模式状态
     if (localStorage.getItem('DUAL_ROLE_MODE') === '1') {
@@ -5636,6 +5642,12 @@ function saveImgRefAvatar() {
     localStorage.setItem('IMG_REF_AVATAR', el && el.checked ? '1' : '0');
 }
 
+// 设置：AI 自动发朋友圈
+function saveAutoMoments() {
+    const el = document.getElementById('auto-moments-toggle');
+    localStorage.setItem('AUTO_MOMENTS', el && el.checked ? '1' : '0');
+}
+
 // 保存生图画风（AI生图页面下拉框onchange直接调用，无需点保存按钮）
 function saveImageStyle() {
     const sel = document.getElementById('modal-image-style');
@@ -7322,13 +7334,16 @@ async function blobToDataURLCompressed(blob, maxW) {
         img.src = url;
     });
 }
-async function postNewMoment() {
+async function postNewMoment(autoOpts) {
     if (momentsBusy) return;
     momentsBusy = true;
+    // autoOpts: { auto:true, ts:模拟时间戳 } —— 自动发朋友圈（静默，不显示状态条）
+    const isAuto = !!(autoOpts && autoOpts.auto);
+    const simTs = (autoOpts && autoOpts.ts) || null;
     const role = getCurrentRole();
     const statusEl = document.getElementById('moments-status');
     try {
-        statusEl.textContent = '她正在构思这条动态...';
+        if (!isAuto) statusEl.textContent = '她正在构思这条动态...';
         const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
         const llmKey = localStorage.getItem('LLM_KEY') || '';
         const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
@@ -7362,14 +7377,13 @@ async function postNewMoment() {
         // 随机纯文字动态：约30%概率不配图，只发文字（微信朋友圈本就有纯文字模式，更真实）
         if (Math.random() < 0.3) {
             const list0 = loadMoments();
-            list0.push({ id: Date.now(), text, image: '', ts: Date.now(), liked: false });
+            list0.push({ id: simTs || Date.now(), text, image: '', ts: simTs || Date.now(), liked: false });
             try { saveMoments(list0); } catch (e) { /* ignore */ }
-            renderMoments();
-            statusEl.textContent = '';
+            if (!isAuto) { renderMoments(); statusEl.textContent = ''; }
             return;
         }
 
-        statusEl.textContent = '她正在准备这张照片...';
+        if (!isAuto) statusEl.textContent = '她正在准备这张照片...';
         // ===== 完全复用聊天生图同一条链路 =====
         // 读最近聊天记录 + 角色身份锁 + 服装硬锁 + 视角/景别/人数约束 + 参考头像(同一开关) + 同一个出图函数
         // 唯一区别：额外附加"发朋友圈配图"的场景描述，不维护任何朋友圈专属生图逻辑
@@ -7380,29 +7394,84 @@ async function postNewMoment() {
         });
         if (!result || !result.blob) throw new Error('朋友圈生图未返回结果');
         // 图片存IndexedDB（大空间），localStorage只存'idx:'小标记——不再占5MB，永不报存储满
-        const mid = Date.now();
+        const mid = simTs || Date.now();
         let dataURL = await blobToDataURLCompressed(result.blob, 1080);
         const dbOk = await momentsDbSave(mid, dataURL, momentsKey());
         if (!dbOk) {
             // IndexedDB异常兜底：压缩后仍存localStorage（旧方案），并提示
             dataURL = await blobToDataURLCompressed(result.blob, 720);
             const list0 = loadMoments();
-            list0.push({ id: mid, text, image: dataURL, ts: Date.now(), liked: false });
+            list0.push({ id: mid, text, image: dataURL, ts: mid, liked: false });
             try { saveMoments(list0); } catch (e) { throw new Error('朋友圈存储失败，请清空一次朋友圈后再试'); }
-            renderMoments();
-            statusEl.textContent = '';
+            if (!isAuto) { renderMoments(); statusEl.textContent = ''; }
             return;
         }
         const list = loadMoments();
-        list.push({ id: mid, text, image: 'idx:' + mid, ts: Date.now(), liked: false });
+        list.push({ id: mid, text, image: 'idx:' + mid, ts: mid, liked: false });
         try { saveMoments(list); } catch (e) { /* localStorage只存小数据，几乎不会满 */ }
-        renderMoments();
-        statusEl.textContent = '';
+        if (!isAuto) { renderMoments(); statusEl.textContent = ''; }
     } catch (e) {
         console.error('朋友圈生成失败:', e);
-        statusEl.textContent = '生成失败：' + (e.message || '稍后再试');
+        if (!isAuto) statusEl.textContent = '生成失败：' + (e.message || '稍后再试');
     } finally {
         momentsBusy = false;
+    }
+}
+
+// ============================================
+// AI 自动发朋友圈：聊天时每2-3分钟一条；离线每1-2小时补发（网页关闭无法真发，打开时补发模拟）
+// ============================================
+function getAutoMomentsTs() {
+    const role = getCurrentRole();
+    return parseInt(localStorage.getItem('MOMENTS_AUTO_TS_' + (role ? role.id : 'default')) || '0', 10) || 0;
+}
+function setAutoMomentsTs(ts) {
+    const role = getCurrentRole();
+    localStorage.setItem('MOMENTS_AUTO_TS_' + (role ? role.id : 'default'), String(ts));
+}
+function autoMomentsEnabled() {
+    return localStorage.getItem('AUTO_MOMENTS') !== '0';
+}
+async function autoPostMoment(simTs) {
+    if (!autoMomentsEnabled()) return;
+    const role = getCurrentRole();
+    if (!role) return;
+    try {
+        await postNewMoment({ auto: true, ts: simTs || Date.now() });
+        console.log('[自动朋友圈] 已发送', simTs ? '（补发，时间戳=' + new Date(simTs).toLocaleString() + '）' : '');
+    } catch (e) {
+        console.warn('[自动朋友圈] 发送失败:', e.message);
+    }
+}
+// 在线定时：页面可见时每2.5分钟检查一次，够了就发
+function startAutoMomentsTimer() {
+    setInterval(() => {
+        if (document.visibilityState !== 'visible') return;
+        if (!autoMomentsEnabled()) return;
+        const last = getAutoMomentsTs();
+        const now = Date.now();
+        if (now - last >= 2.5 * 60 * 1000) {
+            setAutoMomentsTs(now);
+            autoPostMoment();
+        }
+    }, 60 * 1000);
+}
+// 离线补发：打开页面时若已离线超过1小时，按每1-2小时一条补发（最多2条），时间戳模拟为离线期间
+async function catchUpMoments() {
+    if (!autoMomentsEnabled()) return;
+    const role = getCurrentRole();
+    if (!role) return;
+    const last = getAutoMomentsTs();
+    const now = Date.now();
+    const gap = now - last;
+    if (last === 0 || gap < 60 * 60 * 1000) return; // 从没发过或离线不足1小时不补
+    const hours = Math.floor(gap / (60 * 60 * 1000));
+    const n = Math.min(hours, 2);
+    for (let i = 0; i < n; i++) {
+        const simTs = last + (i + 1) * (60 + Math.floor(Math.random() * 60)) * 60 * 1000;
+        if (simTs > now) break;
+        setAutoMomentsTs(simTs);
+        await autoPostMoment(simTs);
     }
 }
 
