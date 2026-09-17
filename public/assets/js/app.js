@@ -4745,6 +4745,8 @@ function clearChat() {
     // 联动清空当前角色的朋友圈动态（localStorage元数据 + IndexedDB图片）
     try { localStorage.removeItem(momentsKey()); } catch (e) { /* ignore */ }
     try { momentsDbClear(momentsKey()); } catch (e) { /* ignore */ }
+    // 重置个性签名：清空后下次打开朋友圈重新随机生成一个
+    try { localStorage.removeItem(momentsSigKey()); } catch (e) { /* ignore */ }
     // 重置总tokens
     totalTokensUsed = 0;
     localStorage.removeItem('TOTAL_TOKENS_USED');
@@ -7209,6 +7211,25 @@ function momentsSigKey() {
     const role = getCurrentRole();
     return 'MOMENTS_SIG_' + (role ? role.id : 'default');
 }
+// 个性签名随机库：打开朋友圈时若还没有签名就随机生成一个挂上去；清空聊天记录才重置
+const MOMENT_SIGNATURES = [
+    '今天也要开心呀', '人间烟火气，最抚凡人心', '正在加载人生进度条…',
+    '日子常新，未来不远', '且听风吟，静待花开', '做个俗人，贪财好色一身正气',
+    '生活明朗，万物可爱', '慢慢来，比较快', '心之所向，素履以往',
+    '好好生活，慢慢相遇', '别慌，月亮也正在大海某处迷茫', '保持热爱，奔赴山海',
+    '万物皆有裂痕，那是光照进来的地方', '你若盛开，蝴蝶自来', '温柔半两，从容一生',
+    '爱自己是终身浪漫的开始', '平淡日子里泛着光', '知足且坚定，温柔且上进',
+    '与其互为人间，不如自成宇宙', '山有顶峰，湖有彼岸', '幸好思念无声',
+    '余生还长，何必慌张', '无事绊心弦，所念皆如愿', '清醒知趣，保持热爱',
+    '各自努力，顶峰相见', '月亮不会奔你而来，星星也不会，但我会', '我与我周旋久，宁作我'
+];
+function getRandomSignature() {
+    const existed = localStorage.getItem(momentsSigKey());
+    if (existed) return existed; // 已有签名就不换，保持真实（只有清空聊天记录才重置）
+    const newSig = MOMENT_SIGNATURES[Math.floor(Math.random() * MOMENT_SIGNATURES.length)];
+    try { localStorage.setItem(momentsSigKey(), newSig); } catch (e) { /* ignore */ }
+    return newSig;
+}
 function loadMoments() {
     try { return JSON.parse(localStorage.getItem(momentsKey()) || '[]'); }
     catch (e) { return []; }
@@ -7251,7 +7272,7 @@ async function openMoments() {
     document.getElementById('moments-big-avatar').src = src || '';
     document.getElementById('moments-nickname').textContent = role.name;
     const sigEl = document.getElementById('moments-signature');
-    const sig = localStorage.getItem(momentsSigKey()) || '这个人很懒，什么都没留下';
+    const sig = getRandomSignature(); // 随机生成挂上；已有则不换，清空聊天才重置
     sigEl.textContent = sig;
     sigEl.onclick = () => {
         const s = prompt('个性签名：', localStorage.getItem(momentsSigKey()) || '');
