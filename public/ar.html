@@ -2714,18 +2714,22 @@ async function sendArMessage(text){
     const data = await res.json();
     const reply = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
     if (!reply) throw new Error('回复为空');
-    showBubble(reply, 0);
+    // 气泡只显示台词：去掉动作/心理描写的括号内容
+    const cleanText = reply
+      .replace(/【[^】]*】/g, '')
+      .replace(/（[^）]*）/g, '')
+      .replace(/\([^)]*\)/g, '')
+      .replace(/\[[^\]]*\]/g, '')
+      .replace(/\*[^*]*\*/g, '')
+      .replace(/[ \t]+/g, ' ').trim();
+    showBubble(cleanText, 0);
     // 朗读开关和聊天页一致：AUTOPLAY_TTS === 'true' 才出声
     const wantTTS = localStorage.getItem('AUTOPLAY_TTS') === 'true';
     if (wantTTS){
       try {
         arSpeaking = true;
-        // 去掉动作描写括号，只念台词
-        const speakText = reply.replace(/【[^】]*】/g, '').replace(/\[[^\]]*\]/g, '')
-                               .replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '')
-                               .replace(/\*[^*]*\*/g, '').trim();
-        if (speakText){
-          const blob = await arTTS(speakText);
+        if (cleanText){
+          const blob = await arTTS(cleanText);
           if (arAudioCtx && arAudioCtx.state === 'suspended') await arAudioCtx.resume();
           await arPlayAudio(blob);
         }
