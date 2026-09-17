@@ -5,6 +5,9 @@
     "/assets/*",
     "/manifest.json",
     "/index.html",
+    "/ar.html",
+    "/cutout.js",
+    "/chars/*",
     "/favicon.ico"
   ]
 }
