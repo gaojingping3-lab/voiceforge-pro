@@ -7462,7 +7462,7 @@ async function submitMomentComment() {
     m.comments.push({ from: 'replying', name: '', text: '', ts: Date.now() }); // 占位：她正在回复
     saveMoments(list);
     renderMoments();
-    // 异步生成她的回复
+    // 异步生成她的回复（网络层失败自动重试一次）
     try {
         const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
         const llmKey = localStorage.getItem('LLM_KEY') || '';
@@ -7478,12 +7478,24 @@ async function submitMomentComment() {
             messages.push({ role: 'system', content: '【角色卡】\n' + role.desc });
         }
         messages.push({ role: 'user', content: replyPrompt });
-        const res = await fetch('/api/chat', {
+        const buildReq = () => ({
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
             body: JSON.stringify({ baseUrl: llmUrl, model: llmModel, messages, temperature: 1.0, max_tokens: 100, stream: false })
         });
-        if (!res.ok) throw new Error('LLM HTTP ' + res.status);
+        let res;
+        try {
+            res = await fetch('/api/chat', buildReq());
+        } catch (firstErr) {
+            // 网络层异常重试一次
+            await new Promise(r => setTimeout(r, 1200));
+            res = await fetch('/api/chat', buildReq());
+        }
+        if (!res.ok) {
+            let errText = '';
+            try { errText = (await res.text()).slice(0, 200); } catch (e) { /* ignore */ }
+            throw new Error('HTTP ' + res.status + (errText ? ' ' + errText : ''));
+        }
         const data = await res.json();
         const reply = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
         const list2 = loadMoments();
@@ -7506,7 +7518,7 @@ async function submitMomentComment() {
         if (m2 && m2.comments) {
             const idx = m2.comments.findIndex(c => c.from === 'replying');
             if (idx >= 0) m2.comments.splice(idx, 1);
-            m2.comments.push({ from: 'sys', name: '', text: '（她没回这条评论）', ts: Date.now() });
+            m2.comments.push({ from: 'sys', name: '', text: '（她没回这条评论：' + String(e.message).slice(0, 120) + '）', ts: Date.now() });
             saveMoments(list2);
             renderMoments();
         }
