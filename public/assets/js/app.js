@@ -2133,16 +2133,38 @@ function openImageDB() {
     });
 }
 
-async function saveChatImage(blob, savedPrompt) {
+async function saveChatImage(blob, savedPrompt, ts) {
+    const t = ts || Date.now();
     try {
         const db = await openImageDB();
         return new Promise((resolve) => {
             const tx = db.transaction(CHAT_IMG_STORE, 'readwrite');
-            tx.objectStore(CHAT_IMG_STORE).add({ blob, ts: Date.now(), roleKey: getChatStorageKey(), prompt: savedPrompt || '' });
-            tx.oncomplete = () => { trimChatImages(); resolve(); };
-            tx.onerror = () => resolve();
+            tx.objectStore(CHAT_IMG_STORE).add({ blob, ts: t, roleKey: getChatStorageKey(), prompt: savedPrompt || '' });
+            tx.oncomplete = () => { trimChatImages(); resolve(t); };
+            tx.onerror = () => resolve(t);
         });
-    } catch (e) { console.warn('[ImgDB] 保存失败:', e.message); }
+    } catch (e) { console.warn('[ImgDB] 保存失败:', e.message); return t; }
+}
+
+// 按时间戳取当前角色的生图（含提示词），用于聊天历史中穿插渲染
+async function loadChatImageByTs(ts) {
+    try {
+        const db = await openImageDB();
+        return new Promise((resolve) => {
+            const tx = db.transaction(CHAT_IMG_STORE, 'readonly');
+            const store = tx.objectStore(CHAT_IMG_STORE);
+            const idx = store.index('ts');
+            const req = idx.openCursor();
+            req.onsuccess = () => {
+                const cursor = req.result;
+                if (!cursor) { resolve(null); return; }
+                const v = cursor.value;
+                if (v.ts === ts && v.roleKey === getChatStorageKey()) { resolve(v); return; }
+                cursor.continue();
+            };
+            req.onerror = () => resolve(null);
+        });
+    } catch (e) { return null; }
 }
 
 async function trimChatImages() {
@@ -2211,7 +2233,9 @@ async function restoreChatImages() {
     const container = document.getElementById('chat-messages');
     if (!container) return;
     const allImages = await loadRoleChatImages();
-    const images = allImages.slice(-CHAT_IMG_RESTORE);
+    // 跳过已经进聊天记录的图（新图已按位置穿插渲染），只兜底恢复旧版没有标记的孤儿图
+    const markedTs = new Set((chatHistory || []).filter(m => m.type === 'image').map(m => m.ts));
+    const images = allImages.filter(item => !markedTs.has(item.ts)).slice(-CHAT_IMG_RESTORE);
     for (const item of images) {
         if (!item.blob) continue;
         const imageUrl = URL.createObjectURL(item.blob);
@@ -2318,6 +2342,48 @@ function renderChatHistory() {
         return; // 空聊天，不显示默认欢迎消息
     }
     for (const msg of chatHistory) {
+        if (msg.type === 'image') {
+            // 图片消息：按原位置穿插渲染（占位 → 异步取blob填充）
+            const curRole = getCurrentRole();
+            const imageDiv = document.createElement('div');
+            imageDiv.className = 'chat chat-start relative gap-2';
+            imageDiv.appendChild(createChatAvatar(curRole ? curRole.name : 'AI', false));
+            const imageBubble = document.createElement('div');
+            imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-1 max-w-[80%]';
+            imageBubble.innerHTML = '<div class="text-xs opacity-60 px-2 py-3">图片加载中…</div>';
+            imageDiv.appendChild(imageBubble);
+            container.appendChild(imageDiv);
+            loadChatImageByTs(msg.ts).then(item => {
+                if (!item || !imageBubble.isConnected) return;
+                const imageUrl = URL.createObjectURL(item.blob);
+                imageBubble.innerHTML = `
+                    <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
+                    <div class="flex gap-2 mt-2 px-1 pb-1">
+                        <button class="btn btn-primary btn-xs flex-1 regenerate-btn"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
+                        <a href="${imageUrl}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
+                    </div>`;
+                imageBubble.dataset.savedPrompt = item.prompt || '';
+                const regBtn = imageBubble.querySelector('.regenerate-btn');
+                regBtn.onclick = async function() {
+                    const btn = this;
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中...';
+                    try {
+                        const result = await generateImageWithSafety(item.prompt, getImageModel(), null, item.prompt, null, '1:1', getImageQuality());
+                        const newImageUrl = URL.createObjectURL(result.blob);
+                        imageBubble.querySelector('img').src = newImageUrl;
+                        imageBubble.querySelector('img').onclick = () => window.open(newImageUrl);
+                        imageBubble.querySelector('a[download]').href = newImageUrl;
+                    } catch (err) {
+                        alert('重新生成失败，图片未更新（仍是原图）: ' + (err.message || err));
+                    } finally {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> 重新生成';
+                    }
+                };
+            });
+            continue;
+        }
         if (msg.role === 'user') {
             const div = document.createElement('div');
             div.className = 'chat chat-end gap-2';
@@ -6712,7 +6778,11 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
         // 保存优化后的提示词，重新生成时直接用，不再优化
         const savedPrompt = result.prompt;
         // 存入IndexedDB，刷新后不丢失（只恢复最近5张防卡顿）
-        saveChatImage(result.blob, savedPrompt);
+        const imgTs = Date.now();
+        saveChatImage(result.blob, savedPrompt, imgTs);
+        // 图片也进聊天记录（带ts标记），重进/切换角色时按原位置穿插渲染，不再堆在末尾
+        chatHistory.push({ role: 'assistant', content: '', type: 'image', ts: imgTs });
+        saveChatHistory();
 
         const imageDiv = document.createElement('div');
         imageDiv.className = 'chat chat-start relative gap-2';
