@@ -1497,10 +1497,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     <!-- ===== 朋友圈全屏页 ===== -->
     <div id="moments-overlay" style="position:fixed;inset:0;z-index:100;background:#000;display:none;flex-direction:column;">
-      <!-- 顶部封面区 -->
-      <div id="moments-cover" style="position:relative;height:200px;background:linear-gradient(160deg,#2c3e50,#4ca1af);overflow:hidden;flex:none;">
+      <!-- 顶部封面区：点击可手动换背景图 -->
+      <div id="moments-cover" onclick="uploadMomentsCover(event)" style="position:relative;height:200px;background:linear-gradient(160deg,#2c3e50,#4ca1af);overflow:hidden;flex:none;cursor:pointer;">
         <img id="moments-cover-img" src="" style="width:100%;height:100%;object-fit:cover;display:none;" alt="">
-        <button onclick="closeMoments()" style="position:absolute;top:14px;left:14px;width:38px;height:38px;border-radius:9999px;background:rgba(0,0,0,.45);color:#fff;border:none;font-size:16px;cursor:pointer;z-index:2;"><i class="fa-solid fa-arrow-left"></i></button>
+        <div style="position:absolute;top:14px;right:14px;z-index:2;font-size:11px;color:#fff;background:rgba(0,0,0,.35);padding:3px 8px;border-radius:9999px;">点此换背景</div>
+        <input type="file" id="moments-cover-file" accept="image/*" style="display:none;" onchange="handleMomentsCoverFile(this)">
+        <button id="moments-back-btn" onclick="closeMoments()" style="position:absolute;top:14px;left:14px;width:38px;height:38px;border-radius:9999px;background:rgba(0,0,0,.45);color:#fff;border:none;font-size:16px;cursor:pointer;z-index:2;"><i class="fa-solid fa-arrow-left"></i></button>
         <!-- 头像+昵称+签名 -->
         <div style="position:absolute;bottom:12px;right:16px;display:flex;align-items:flex-end;gap:10px;">
           <div style="text-align:right;">
@@ -1533,6 +1535,6 @@ document.addEventListener('DOMContentLoaded', () => {
       .moment-like.liked{color:#f8981d;}
     </style>
 
-    <script src="assets/js/app.js?v=20260917u"></script>
+    <script src="assets/js/app.js?v=20260917v"></script>
 </body>
 </html>

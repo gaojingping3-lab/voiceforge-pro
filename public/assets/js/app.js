@@ -7274,6 +7274,17 @@ async function openMoments() {
     const sigEl = document.getElementById('moments-signature');
     const sig = getRandomSignature(); // 随机生成挂上；已有则不换，清空聊天才重置
     sigEl.textContent = sig;
+    // 背景图：有缓存直接显示；没有缓存后台生成（不阻塞打开，生成好自动换上）
+    const coverImg = document.getElementById('moments-cover-img');
+    if (coverImg) {
+        const cachedCover = await momentsDbGet('cover_' + role.id);
+        if (cachedCover) {
+            coverImg.src = cachedCover;
+            coverImg.style.display = 'block';
+        } else {
+            ensureMomentsCover();
+        }
+    }
     sigEl.onclick = () => {
         const s = prompt('个性签名：', localStorage.getItem(momentsSigKey()) || '');
         if (s !== null) {
@@ -7290,6 +7301,73 @@ async function openMoments() {
 function closeMoments() {
     document.getElementById('moments-overlay').style.display = 'none';
     document.body.style.overflow = '';
+}
+
+// ============================================
+// 朋友圈封面背景图：AI自动生成角色专属 + 点击手动换图
+// 存在IndexedDB（id='cover_'+角色id），清空聊天时随朋友圈一起清掉，下次打开重新生成
+// ============================================
+// 后台生成角色专属封面（风景/氛围，不出现人物），生成好自动换上
+async function ensureMomentsCover() {
+    const role = getCurrentRole();
+    if (!role) return;
+    try {
+        const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+        const llmKey = localStorage.getItem('LLM_KEY') || '';
+        if (!llmKey) return;
+        const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+        // 1) 根据角色卡生成一句英文封面场景描述
+        const messages = [
+            { role: 'system', content: '你是朋友圈封面设计师。只输出一句英文场景描述，不要任何解释。' },
+            { role: 'user', content: '角色「' + role.name + '」的角色设定：\n' + (role.desc || '') + '\n\n根据她的性格气质，用一句英文描述一张适合做微信朋友圈封面的横版照片：风景、光影、氛围感，色调与她的气质匹配。不要出现人物、文字、手机。只输出英文一句话。' }
+        ];
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
+            body: JSON.stringify({ baseUrl: llmUrl, model: llmModel, messages, temperature: 0.8, max_tokens: 120, stream: false })
+        });
+        if (!res.ok) throw new Error('LLM HTTP ' + res.status);
+        const data = await res.json();
+        const desc = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
+        const coverPrompt = desc || 'cinematic landscape, soft light, atmospheric mood';
+        // 2) 生成横版16:9封面（preOptimizedPrompt直接传入，不再二次优化）
+        const result = await generateImageWithSafety(coverPrompt, getImageModel(), null, coverPrompt, null, '16:9', '1K');
+        if (!result || !result.blob) return;
+        const dataURL = await blobToDataURLCompressed(result.blob, 1280);
+        await momentsDbSave('cover_' + role.id, dataURL, momentsKey());
+        // 朋友圈还开着就换上
+        const coverImg = document.getElementById('moments-cover-img');
+        if (coverImg && document.getElementById('moments-overlay').style.display === 'flex') {
+            coverImg.src = dataURL;
+            coverImg.style.display = 'block';
+        }
+    } catch (e) {
+        console.warn('[朋友圈封面] 生成失败:', e.message);
+    }
+}
+// 点击封面：换背景（选择本地图片）
+function uploadMomentsCover(event) {
+    if (event && event.target && event.target.closest && event.target.closest('#moments-back-btn')) return;
+    const fileInput = document.getElementById('moments-cover-file');
+    if (fileInput) fileInput.click();
+}
+async function handleMomentsCoverFile(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    const role = getCurrentRole();
+    if (!role) return;
+    try {
+        const dataURL = await blobToDataURLCompressed(file, 1280);
+        await momentsDbSave('cover_' + role.id, dataURL, momentsKey());
+        const coverImg = document.getElementById('moments-cover-img');
+        if (coverImg) {
+            coverImg.src = dataURL;
+            coverImg.style.display = 'block';
+        }
+    } catch (e) {
+        alert('背景图保存失败：' + (e.message || '稍后再试'));
+    }
 }
 function renderMoments() {
     const role = getCurrentRole();
