@@ -7482,7 +7482,7 @@ async function submitMomentComment() {
         const buildReq = () => ({
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
-            body: JSON.stringify({ baseUrl: llmUrl, model: llmModel, messages, temperature: 1.0, max_tokens: 100, stream: false })
+            body: JSON.stringify({ baseUrl: llmUrl, model: llmModel, messages, temperature: 1.0, max_tokens: 200, stream: false, thinking: { type: 'disabled' } })
         });
         let res;
         try {
@@ -7557,7 +7557,7 @@ async function patRole(event) {
         const res = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
-            body: JSON.stringify({ baseUrl: llmUrl, model: llmModel, messages, temperature: 1.0, max_tokens: 80, stream: false })
+            body: JSON.stringify({ baseUrl: llmUrl, model: llmModel, messages, temperature: 1.0, max_tokens: 200, stream: false, thinking: { type: 'disabled' } })
         });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
