@@ -7260,7 +7260,15 @@ async function postNewMoment() {
                 console.log('[朋友圈服装硬锁] 已钉入:', clothing.slice(0, 80));
             }
         } catch (e) { /* 服装提取失败不影响生图 */ }
-        const prompt = outfitPrefix + style + ', casual daily selfie, arm extended, phone front camera snapshot, ' + scene;
+        // 角色身份块：和聊天生图完全一致（复用同一个缓存身份锁，锁定发色瞳色脸型服装）
+        let identityBlock = '';
+        try {
+            if (typeof ensureIdentityBlock === 'function') {
+                identityBlock = (await ensureIdentityBlock(role)) || '';
+                console.log('[朋友圈] 身份块已加载:', identityBlock.slice(0, 60));
+            }
+        } catch (e) { /* 身份块失败不影响生图 */ }
+        const prompt = outfitPrefix + (identityBlock ? identityBlock + ', ' : '') + style + ', casual daily selfie, arm extended, phone front camera snapshot, ' + scene;
         const model = (typeof getImageModel === 'function') ? getImageModel() : 'agnes-2.1';
         // 与聊天生图完全一致的参数：1:1 + 跟随清晰度设置，排除3:4比例触发Agnes高档计费/参数拒绝
         const quality = (typeof getImageQuality === 'function') ? getImageQuality() : '1K';
@@ -7284,11 +7292,18 @@ async function postNewMoment() {
             statusEl.textContent = '带参考图失败，正在用纯文生图重试...';
             result = await generateImageWithSafety(prompt, model, (s) => { statusEl.textContent = s; }, prompt, null, '1:1', quality);
         }
-        const dataURL = await blobToDataURLCompressed(result.blob, 640);
-
+        // 存图清晰度：从640提升到1080（和聊天生图观感更接近）；若localStorage空间不足自动降级800重存
+        let dataURL = await blobToDataURLCompressed(result.blob, 1080);
         const list = loadMoments();
         list.push({ id: Date.now(), text, image: dataURL, ts: Date.now(), liked: false });
-        saveMoments(list);
+        try {
+            saveMoments(list);
+        } catch (e) {
+            console.warn('[朋友圈] 存储空间不足，降级压缩到800px:', e.message);
+            dataURL = await blobToDataURLCompressed(result.blob, 800);
+            list[list.length - 1].image = dataURL;
+            saveMoments(list);
+        }
         renderMoments();
         statusEl.textContent = '';
     } catch (e) {
