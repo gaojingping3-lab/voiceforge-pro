@@ -7264,7 +7264,15 @@ async function postNewMoment() {
         if (avatarSrc) {
             try { avatarSrc = await cropAvatarToFace(avatarSrc); } catch (e) { /* 裁剪失败用原图 */ }
         }
-        const result = await generateImageWithSafety(prompt, model, (s) => { statusEl.textContent = s; }, null, avatarSrc || null, '1:1', quality);
+        // 先生图：带参考头像（图生图）。若失败（图生图队列独立配额/限流），自动降级纯文生图重试一次
+        let result;
+        try {
+            result = await generateImageWithSafety(prompt, model, (s) => { statusEl.textContent = s; }, null, avatarSrc || null, '1:1', quality);
+        } catch (imgErr) {
+            console.warn('[朋友圈] 带参考图失败，降级纯文生图:', imgErr.message);
+            statusEl.textContent = '带参考图失败，正在用纯文生图重试...';
+            result = await generateImageWithSafety(prompt, model, (s) => { statusEl.textContent = s; }, null, null, '1:1', quality);
+        }
         const dataURL = await blobToDataURLCompressed(result.blob, 640);
 
         const list = loadMoments();
