@@ -196,6 +196,17 @@
     border-color: rgba(75, 85, 99, 0.5) !important;
     color: #f3f4f6 !important;
   }
+  /* 曜石主题下评论/个性签名等内联写死浅灰背景的输入框：反色保证文字可见 */
+  #moment-comment-input, .moment-inline-input {
+    background: #f0f0f0 !important; color: #1f2937 !important;
+  }
+  body.theme-obsidian #moment-comment-input,
+  body.theme-obsidian .moment-inline-input {
+    background: rgba(55, 65, 81, 0.85) !important;
+    color: #f3f4f6 !important;
+  }
+  body.theme-obsidian #moment-comment-input::placeholder,
+  body.theme-obsidian .moment-inline-input::placeholder { color: #9ca3af !important; }
   body.theme-obsidian .tabs-boxed { background: rgba(30, 41, 59, 0.6) !important; }
   body.theme-obsidian .tab { color: #9ca3af !important; }
   body.theme-obsidian .tab.tab-active { color: #a5b4fc !important; background: rgba(99, 102, 241, 0.15) !important; }
