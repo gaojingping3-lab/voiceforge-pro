@@ -5675,16 +5675,25 @@ function openImageLightbox(src) {
         tx = nx; ty = ny;
         applyTransform(false);
     }, { passive: false });
-    const endDrag = () => { dragging = false; clamp(); applyTransform(true); };
+    const endDrag = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        if (!moved) {
+            // 放大状态下的轻点：手动缩小（放大后触摸被拦截，click不会触发）
+            zoom = 1; tx = 0; ty = 0;
+        } else {
+            clamp();
+        }
+        applyTransform(true);
+    };
     img.addEventListener('touchend', endDrag);
     img.addEventListener('touchcancel', endDrag);
 
-    // 点图片：放大2.5倍/恢复；放大后拖动看细节
+    // 点图片（未放大时）：放大2.5倍看细节
     img.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (moved) return; // 刚拖完不算点击
-        if (zoom === 1) { zoom = 2.5; } else { zoom = 1; tx = 0; ty = 0; }
-        applyTransform(true);
+        if (moved) return;
+        if (zoom === 1) { zoom = 2.5; tx = 0; ty = 0; applyTransform(true); }
     });
     // 点黑色背景：关闭
     wrap.addEventListener('click', (e) => {
