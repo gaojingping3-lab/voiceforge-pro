@@ -5658,8 +5658,10 @@ function openImageLightbox(src) {
     }
 
     img.addEventListener('touchstart', (e) => {
+        // 未放大时完全不拦截触摸，让click正常触发放大
+        if (zoom === 1) return;
+        // 已放大：进入拖拽模式（此时才阻止默认滚动）
         e.preventDefault();
-        if (zoom === 1) return; // 未放大时不拖
         dragging = true; moved = false;
         startX = e.touches[0].clientX - tx;
         startY = e.touches[0].clientY - ty;
