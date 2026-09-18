@@ -5181,6 +5181,50 @@ function clearChat() {
     sfxSuccess();
 }
 
+// 一键清除所有角色的聊天记录 + 所有图片（聊天生图/朋友圈）
+async function clearAllChatData() {
+    if (!confirm('确定要清除「所有角色」的聊天记录和所有图片吗？\n\n包括：所有角色的聊天记录、聊天生图、朋友圈动态和图片。\n此操作不可恢复！')) return;
+    if (!confirm('再次确认：真的要全部清空吗？（角色卡和设置会保留）')) return;
+    try {
+        // 1. 清空当前聊天界面
+        const container = document.getElementById('chat-messages');
+        if (container) container.innerHTML = '';
+        chatHistory = [];
+        // 2. 清除 localStorage 里的聊天记录/朋友圈/签名/总tokens
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (!k) continue;
+            if (k.startsWith('CHAT_HISTORY_') || k.startsWith('MOMENTS_') || k === 'TOTAL_TOKENS_USED') {
+                keysToRemove.push(k);
+            }
+        }
+        keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch(e){} });
+        // 3. 清除 IndexedDB 里的全部聊天生图
+        try {
+            const db = await openImageDB();
+            await new Promise(resolve => {
+                const tx = db.transaction(CHAT_IMG_STORE, 'readwrite');
+                tx.objectStore(CHAT_IMG_STORE).clear();
+                tx.oncomplete = resolve;
+                tx.onerror = resolve;
+            });
+        } catch (e) {}
+        // 4. 清除 IndexedDB 里的全部朋友圈图片
+        await momentsDbClear(null); // null → 全库清空
+        // 5. 重置统计与状态
+        totalTokensUsed = 0;
+        try { localStorage.removeItem('TOTAL_TOKENS_USED'); } catch(e){}
+        if (typeof updateTotalTokensDisplay === 'function') updateTotalTokensDisplay();
+        if (typeof stopAllAudio === 'function') stopAllAudio();
+        if (typeof sfxSuccess === 'function') sfxSuccess();
+        alert('已清除所有角色的聊天记录和所有图片。角色卡和设置已保留。');
+    } catch (err) {
+        alert('清除出错：' + ((err && err.message) || err));
+        console.error('[ClearAll]', err);
+    }
+}
+
 // ============================================
 // 声音克隆功能
 // ============================================

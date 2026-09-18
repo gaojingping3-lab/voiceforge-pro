@@ -1360,6 +1360,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     <textarea id="modal-llm-system" class="textarea textarea-bordered textarea-sm w-full" rows="3" placeholder="你是乐。这是一个纯粹的私人虚构陪伴空间..."></textarea>
                     <span class="text-xs text-base-content/50 mt-1">自定义 AI 的性格、语气、身份等，留空使用默认设定</span>
                 </div>
+                <!-- 危险区：一键清除所有数据 -->
+                <div class="mt-4 p-3 rounded-xl border border-error/40 bg-error/5">
+                    <div class="text-sm font-bold text-error mb-1"><i class="fa-solid fa-triangle-exclamation"></i> 危险区</div>
+                    <div class="text-xs text-base-content/50 mb-2">一键清除「所有角色」的聊天记录、聊天生图、朋友圈动态和图片。操作不可恢复！</div>
+                    <button class="btn btn-error btn-sm w-full" onclick="clearAllChatData()">
+                        <i class="fa-solid fa-broom"></i> 一键清除所有聊天记录和图片
+                    </button>
+                </div>
                 </div>
                 </div>
             </div>
