@@ -5218,7 +5218,9 @@ async function clearAllChatData() {
         if (typeof updateTotalTokensDisplay === 'function') updateTotalTokensDisplay();
         if (typeof stopAllAudio === 'function') stopAllAudio();
         if (typeof sfxSuccess === 'function') sfxSuccess();
-        alert('已清除所有角色的聊天记录和所有图片。角色卡和设置已保留。');
+        // 强制刷新，确保任何缓存/定时器渲染的旧记录都被清掉
+        alert('已清除所有角色的聊天记录和所有图片。角色卡和设置已保留。页面即将刷新…');
+        setTimeout(() => { try { location.reload(); } catch(e){} }, 800);
     } catch (err) {
         alert('清除出错：' + ((err && err.message) || err));
         console.error('[ClearAll]', err);
