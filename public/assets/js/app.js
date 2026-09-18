@@ -5167,6 +5167,7 @@ function clearChat() {
     container.innerHTML = ''; // 清空，不显示默认欢迎消息
     chatHistory = []; // 清空对话记忆
     localStorage.removeItem(getChatStorageKey()); // 清除当前角色的本地永久记忆
+    localStorage.removeItem('PERM_CHAT_HISTORY'); // 清除旧版全局记录，防止刷新后自动恢复
     clearRoleChatImages(); // 联动清空当前角色保存在IndexedDB里的生图
     // 联动清空当前角色的朋友圈动态（localStorage元数据 + IndexedDB图片）
     try { localStorage.removeItem(momentsKey()); } catch (e) { /* ignore */ }
@@ -5195,7 +5196,8 @@ async function clearAllChatData() {
         for (let i = 0; i < localStorage.length; i++) {
             const k = localStorage.key(i);
             if (!k) continue;
-            if (k.startsWith('CHAT_HISTORY_') || k.startsWith('MOMENTS_') || k === 'TOTAL_TOKENS_USED') {
+            // CHAT_HISTORY_xxx / CHAT_HISTORY_DUAL / PERM_CHAT_HISTORY(旧版全局记录) / MOMENTS_xxx
+            if (k.startsWith('CHAT_HISTORY') || k === 'PERM_CHAT_HISTORY' || k.startsWith('MOMENTS') || k === 'TOTAL_TOKENS_USED') {
                 keysToRemove.push(k);
             }
         }
