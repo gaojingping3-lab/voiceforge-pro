@@ -4893,7 +4893,7 @@ function handleRoleImportFile(input) {
     input.value = '';
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
         try {
             const dataUrl = e.target.result;
             let parsed = null;
@@ -4914,6 +4914,12 @@ function handleRoleImportFile(input) {
             }
             const roleData = normalizeImportedRole(parsed, pngAvatar);
             if (!roleData || !roleData.name) { alert('导入失败：文件中没有找到有效的角色数据'); return; }
+            // 头像强制压缩成小图（酒馆卡PNG原图可能1-5MB，直接存会把localStorage撑爆）
+            if (roleData.avatar) {
+                try {
+                    roleData.avatar = await forceCompressAvatar(roleData.avatar);
+                } catch (e2) { console.warn('[RoleImport] 头像压缩失败，保留原图', e2); }
+            }
             const list = getRoleList();
             const dup = list.find(r => r.name === roleData.name);
             let mode = 'new';
@@ -4973,6 +4979,29 @@ function parseTavernPng(bytes) {
         offset = dataEnd + 4; // 跳过CRC
     }
     throw new Error('PNG中没有找到酒馆角色数据（chara字段）');
+}
+
+// 头像强制压缩（不管原图多小都压成小JPEG，避免localStorage爆满）
+function forceCompressAvatar(dataUrl, maxSide, quality) {
+    maxSide = maxSide || 400;
+    quality = quality || 0.8;
+    return new Promise(function(resolve, reject) {
+        const img = new Image();
+        img.onload = function() {
+            try {
+                let w = img.width, h = img.height;
+                const scale = Math.min(1, maxSide / Math.max(w, h));
+                w = Math.max(1, Math.round(w * scale));
+                h = Math.max(1, Math.round(h * scale));
+                const c = document.createElement('canvas');
+                c.width = w; c.height = h;
+                c.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(c.toDataURL('image/jpeg', quality));
+            } catch (err) { reject(err); }
+        };
+        img.onerror = reject;
+        img.src = dataUrl;
+    });
 }
 
 // 统一导入数据格式：本站JSON / 酒馆v2 / 酒馆v1
