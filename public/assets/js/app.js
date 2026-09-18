@@ -4854,6 +4854,96 @@ function saveRoleCard() {
     sfxSuccess();
 }
 
+// AI生成角色卡：展开/收起面板
+function toggleAiRoleGen(show) {
+    const panel = document.getElementById('ai-role-gen-panel');
+    if (!panel) return;
+    panel.classList.toggle('hidden', !show);
+    if (show) {
+        const input = document.getElementById('ai-role-desc-input');
+        if (input) setTimeout(() => input.focus(), 50);
+    }
+}
+
+// AI生成角色卡：调用LLM补全人设/开场白/记忆便签
+async function runAiRoleGen() {
+    const input = document.getElementById('ai-role-desc-input');
+    if (!input) return;
+    const wish = input.value.trim();
+    if (!wish) { alert('先描述一下你想要的角色，比如：高冷学姐，毒舌但护短…'); return; }
+    const btn = document.querySelector('#ai-role-gen-panel .btn-primary');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = '生成中…';
+    try {
+        const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+        const llmKey = localStorage.getItem('LLM_KEY') || '';
+        const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+        if (!llmKey) { alert('请先在设置里配置 LLM API Key'); return; }
+        const sys = '你是一个角色卡生成器。用户会给你一句对TA想要角色的简短描述，请补全成一张完整角色卡。' +
+            '严格只输出一个JSON对象，不要输出任何其他文字、注释或markdown代码块。JSON格式：' +
+            '{"name":"角色名（简短好听）","desc":"完整人设描述，必须包含【外貌】【性格】【身份背景】分段，描写生动细致，与用户的描述一致","opening":"开场白，第一人称，符合角色性格的一句话，口语化","memos":["记忆便签1（TA记得关于用户或自己的事）","记忆便签2","记忆便签3"]}';
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
+            body: JSON.stringify({
+                baseUrl: llmUrl,
+                model: llmModel,
+                messages: [
+                    { role: 'system', content: sys },
+                    { role: 'user', content: '我想要这样一个角色：' + wish }
+                ],
+                temperature: 0.9,
+                stream: false
+            })
+        });
+        if (!res.ok) {
+            let msg = '生成失败';
+            try { const d = await res.json(); msg = d.error || msg; } catch(e){}
+            throw new Error(msg);
+        }
+        const data = await res.json();
+        const text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '';
+        const roleData = parseAiRoleJson(text);
+        if (!roleData || !roleData.desc) { throw new Error('AI没有返回有效角色卡，请重试'); }
+        // 填入表单
+        const nameInput = document.getElementById('role-name-input');
+        if (nameInput && (!nameInput.value.trim())) nameInput.value = (roleData.name || '').trim();
+        const descInput = document.getElementById('role-desc-input');
+        if (descInput) descInput.value = roleData.desc.trim();
+        const openingInput = document.getElementById('role-opening-input');
+        if (openingInput && roleData.opening) openingInput.value = roleData.opening.trim();
+        if (Array.isArray(roleData.memos) && roleData.memos.length) {
+            const roleId = getCurrentRoleId();
+            saveRoleMemos(roleId, roleData.memos.slice(0, 5).map(String));
+            renderMemoList();
+        }
+        toggleAiRoleGen(false);
+        sfxSuccess();
+        alert('已生成！检查一下人设，微调后点保存。');
+    } catch (err) {
+        alert('生成失败：' + (err.message || err));
+        console.error('[AiRoleGen]', err);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '生成'; }
+    }
+}
+
+// 从AI返回文本里提取JSON对象（容错：AI可能包了markdown或废话）
+function parseAiRoleJson(text) {
+    if (!text) return null;
+    // 去掉可能的markdown代码块
+    let t = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+    try { return JSON.parse(t); } catch(e){}
+    // 截取第一个 { 到最后一个 }
+    const start = t.indexOf('{');
+    const end = t.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+        try { return JSON.parse(t.substring(start, end + 1)); } catch(e2){}
+    }
+    return null;
+}
+
 // 角色卡导出（单张，JSON格式，含头像+记忆便签）
 function exportRoleCard() {
     const name = (document.getElementById('role-name-input').value || '').trim() || DEFAULT_ROLE_NAME;

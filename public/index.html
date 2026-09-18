@@ -856,11 +856,26 @@ document.addEventListener('DOMContentLoaded', () => {
                         <input type="text" id="role-name-input" class="input input-bordered input-sm w-full mb-3" placeholder="例如：乐" />
                         <div class="flex items-center justify-between">
                             <label class="label py-1"><span class="label-text text-sm">人设描述</span></label>
-                            <button class="btn btn-ghost btn-xs text-error" onclick="clearRoleDescInput()" title="一键清除">
-                                <i class="fa-solid fa-eraser"></i> 一键清除
-                            </button>
+                            <div class="flex items-center gap-1">
+                                <button class="btn btn-primary btn-xs" onclick="toggleAiRoleGen(true)" title="用AI生成角色卡">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> AI生成
+                                </button>
+                                <button class="btn btn-ghost btn-xs text-error" onclick="clearRoleDescInput()" title="一键清除">
+                                    <i class="fa-solid fa-eraser"></i> 一键清除
+                                </button>
+                            </div>
                         </div>
                         <textarea id="role-desc-input" class="textarea textarea-bordered textarea-sm w-full h-32" placeholder="描述角色的性格、身份、说话风格等..."></textarea>
+                        <!-- AI生成角色卡面板（点"AI生成"展开） -->
+                        <div id="ai-role-gen-panel" class="hidden mt-2 p-3 rounded-xl border border-base-300 bg-base-200/70">
+                            <div class="text-sm font-bold mb-1">✨ AI生成角色卡</div>
+                            <div class="text-xs text-base-content/50 mb-2">描述你想要的她，AI会补全人设、开场白和记忆便签（会覆盖当前人设描述）</div>
+                            <textarea id="ai-role-desc-input" class="textarea textarea-bordered textarea-sm w-full h-20" placeholder="例如：高冷学姐，毒舌但护短，爱喝冰美式，黑长直，怕打雷…"></textarea>
+                            <div class="flex gap-2 mt-2">
+                                <button class="btn btn-primary btn-sm flex-1" onclick="runAiRoleGen()">生成</button>
+                                <button class="btn btn-ghost btn-sm" onclick="toggleAiRoleGen(false)">取消</button>
+                            </div>
+                        </div>
                         <label class="label py-1 mt-3"><span class="label-text text-sm">快捷开场白（切换角色后自动填入）</span></label>
                         <input type="text" id="role-opening-input" class="input input-bordered input-sm w-full" placeholder="例如：你来了，我等你很久了..." />
 
