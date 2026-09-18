@@ -5521,6 +5521,48 @@ function toggleAgnesKeyInput() {
             keyInput.classList.add('hidden');
         }
     }
+    const gptInput = document.getElementById('gpt-image-input');
+    if (gptInput) {
+        if (model === 'gpt-image') {
+            gptInput.classList.remove('hidden');
+        } else {
+            gptInput.classList.add('hidden');
+        }
+    }
+}
+
+// GPT Image（OpenAI/中转站）相关配置
+function getGPTImageKey() {
+    return localStorage.getItem('GPT_IMAGE_KEY') || '';
+}
+
+function saveGPTImageKey() {
+    const input = document.getElementById('gpt-image-api-key');
+    if (input) {
+        localStorage.setItem('GPT_IMAGE_KEY', input.value.trim());
+    }
+}
+
+function getGPTImageBaseURL() {
+    return localStorage.getItem('GPT_IMAGE_BASE_URL') || '';
+}
+
+function saveGPTImageBaseURL() {
+    const input = document.getElementById('gpt-image-base-url');
+    if (input) {
+        localStorage.setItem('GPT_IMAGE_BASE_URL', input.value.trim().replace(/\/+$/, ''));
+    }
+}
+
+function getGPTImageModel() {
+    return localStorage.getItem('GPT_IMAGE_MODEL') || 'gpt-image-2';
+}
+
+function saveGPTImageModel() {
+    const input = document.getElementById('gpt-image-model');
+    if (input) {
+        localStorage.setItem('GPT_IMAGE_MODEL', input.value.trim() || 'gpt-image-2');
+    }
 }
 
 function loadImageModelSelect() {
@@ -5533,6 +5575,13 @@ function loadImageModelSelect() {
     if (keyInput) {
         keyInput.value = getAgnesApiKey();
     }
+    // 恢复 GPT Image 配置
+    const gptKeyInput = document.getElementById('gpt-image-api-key');
+    if (gptKeyInput) gptKeyInput.value = getGPTImageKey();
+    const gptUrlInput = document.getElementById('gpt-image-base-url');
+    if (gptUrlInput) gptUrlInput.value = getGPTImageBaseURL();
+    const gptModelInput = document.getElementById('gpt-image-model');
+    if (gptModelInput) gptModelInput.value = getGPTImageModel();
     toggleAgnesKeyInput();
     const qselect = document.getElementById('image-quality-select');
     if (qselect) qselect.value = getImageQuality();
@@ -5704,6 +5753,93 @@ function openImageLightbox(src) {
     });
 }
 
+async function generateGPTImageDirect(prompt, ratio = '1:1', inputImage = null, quality = '1K') {
+    const apiKey = getGPTImageKey();
+    if (!apiKey) {
+        throw new Error('未配置 GPT Image API Key（设置 → AI生图 → 选 GPT Image 2 后填入）');
+    }
+    const model = getGPTImageModel();
+    const baseURL = getGPTImageBaseURL() || 'https://api.openai.com/v1';
+    const url = baseURL + '/images/generations';
+
+    // size 映射：按比例 × 清晰度档位（1K/2K/4K）
+    const base = quality === '4K' ? 4096 : (quality === '2K' ? 2048 : 1024);
+    let size = base + 'x' + base;
+    if (ratio) {
+        const r = ratio.split(':').map(Number);
+        if (r.length === 2 && r[0] && r[1]) {
+            if (r[0] / r[1] > 1.2) size = (base * 1.5) + 'x' + base;      // 横图
+            else if (r[1] / r[0] > 1.2) size = base + 'x' + (base * 1.5); // 竖图
+            else size = base + 'x' + base;                                 // 方形
+        }
+    }
+
+    const body = {
+        model: model,
+        prompt: prompt,
+        size: size,
+        response_format: 'b64_json'
+    };
+    // 图生图/参考头像：OpenAI 兼容接口用 image 参数（data URI）；中转站若用 extra_body.image 兼容 Agnes 写法
+    if (inputImage) {
+        if (Array.isArray(inputImage)) {
+            body.image = inputImage[0];
+        } else {
+            body.image = inputImage;
+        }
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 180000);
+    let response;
+    try {
+        response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + apiKey
+            },
+            body: JSON.stringify(body),
+            signal: controller.signal
+        });
+    } catch (e) {
+        clearTimeout(timeoutId);
+        if (e.name === 'AbortError') throw new Error('GPT Image 请求超时（180秒）');
+        throw new Error('请求失败: ' + (e.message || e));
+    }
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+        let errText = 'HTTP ' + response.status;
+        try {
+            const errData = await response.json();
+            if (errData.error && errData.error.message) errText += ': ' + errData.error.message;
+            else if (errData.message) errText += ': ' + errData.message;
+        } catch (e) {}
+        throw new Error('GPT Image ' + errText);
+    }
+    const data = await response.json();
+    // 兼容 b64_json 和 url 两种返回
+    let b64 = null, imgUrl = null;
+    if (data && data.data && data.data[0]) {
+        b64 = data.data[0].b64_json;
+        imgUrl = data.data[0].url;
+    }
+    let blob = null;
+    if (b64) {
+        const binary = atob(b64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        blob = new Blob([bytes], { type: 'image/png' });
+    } else if (imgUrl) {
+        const r = await fetch(imgUrl);
+        if (r.ok) blob = await r.blob();
+    }
+    if (!blob) {
+        throw new Error('GPT Image 返回中没有图片数据');
+    }
+    return { blob: blob, prompt: prompt, model: model };
+}
+
 async function generateAgnesDirect(prompt, ratio = '1:1', inputImage = null, quality = '1K') {
     const agnesApiKey = getAgnesApiKey();
     if (!agnesApiKey) {
@@ -5832,6 +5968,12 @@ async function generateImageWithSafety(prompt, model, onStatusUpdate, preOptimiz
         }
 
         try {
+            // GPT Image（OpenAI/中转站）：前端直连
+            if (currentModel === 'gpt-image') {
+                if (onStatusUpdate) onStatusUpdate('正在调用 GPT Image 生成图片（按张计费）...');
+                const directResult = await generateGPTImageDirect(optimizedPrompt, ratio, inputImage, quality);
+                return { blob: directResult.blob, prompt: optimizedPrompt, model: currentModel };
+            }
             // Agnes 模型：优先前端直连（绕过Cloudflare IP限流），失败自动降级走后端
             let directErrMsg = '';
             if (currentModel === 'agnes-2.1') {

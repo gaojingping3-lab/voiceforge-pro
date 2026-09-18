@@ -970,6 +970,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <select id="image-model-select" class="select select-bordered w-full text-sm" onchange="saveImageModel(); toggleAgnesKeyInput();">
                         <option value="auto">🤖 AI自动选模型（推荐，失败自动轮换）</option>
                         <option value="agnes-2.1">🆕 Agnes Image 2.1 Flash（免费注册，画质好，国内快）</option>
+                        <option value="gpt-image">⭐ GPT Image 2（照片级真实，可接中转站/官方）</option>
                         <option value="pollinations-flux-realism">Flux 写实（照片级，几乎无审核）</option>
                         <option value="pollinations-seedream">Seedream（中文友好，几乎无审核）</option>
                         <option value="pollinations-flux">Flux 通用（速度快，几乎无审核）</option>
@@ -977,6 +978,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div id="agnes-key-input" class="hidden mt-2">
                         <input type="password" id="agnes-api-key" placeholder="输入 Agnes API Key（注册免费获取）" class="input input-bordered w-full text-sm" onchange="saveAgnesApiKey()" />
                         <p class="text-xs text-gray-500 mt-1">注册地址：<a href="https://platform.agnes-ai.com/" target="_blank" class="link link-primary">platform.agnes-ai.com</a>（国内访问快）</p>
+                    </div>
+                    <div id="gpt-image-input" class="hidden mt-2 space-y-2">
+                        <input type="password" id="gpt-image-api-key" placeholder="输入 GPT Image API Key" class="input input-bordered w-full text-sm" onchange="saveGPTImageKey()" />
+                        <input type="text" id="gpt-image-base-url" placeholder="接口地址（留空=官方 https://api.openai.com/v1）" class="input input-bordered w-full text-sm" onchange="saveGPTImageBaseURL()" />
+                        <input type="text" id="gpt-image-model" placeholder="模型名（默认 gpt-image-2）" class="input input-bordered w-full text-sm" onchange="saveGPTImageModel()" />
+                        <p class="text-xs text-gray-500 mt-1">中转站示例：地址填 https://api.yiciyuang.com/v1，Key 填创艺坊发的 sk-...</p>
                     </div>
                 </div>
 
