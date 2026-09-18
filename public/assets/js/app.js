@@ -5627,27 +5627,70 @@ function openImageLightbox(src) {
     if (!lb) {
         lb = document.createElement('div');
         lb.id = 'img-lightbox';
-        lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:99999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+        lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:99999;overflow:hidden;cursor:zoom-out;';
         document.body.appendChild(lb);
     }
     lb.innerHTML = '';
+    // 拖动容器（全屏），图片在里面移动
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;touch-action:none;';
     const img = document.createElement('img');
     img.src = src;
-    img.style.cssText = 'max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;transition:transform 0.25s ease;transform-origin:center;';
-    lb.appendChild(img);
-    lb.style.display = 'flex';
-    // 点图片：放大2.5倍看细节，再点恢复；点黑色背景：关闭
+    img.style.cssText = 'max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;transition:transform 0.25s ease;transform-origin:center;will-change:transform;';
+    wrap.appendChild(img);
+    lb.appendChild(wrap);
+    lb.style.display = 'block';
+
     let zoom = 1;
-    img.onclick = (e) => {
+    let tx = 0, ty = 0;
+    let dragging = false, startX = 0, startY = 0, moved = false;
+
+    function applyTransform(animate) {
+        img.style.transition = animate ? 'transform 0.25s ease' : 'none';
+        img.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + zoom + ')';
+    }
+    function clamp() {
+        const rect = img.getBoundingClientRect();
+        const maxX = Math.max(0, (rect.width * zoom - rect.width) / 2);
+        const maxY = Math.max(0, (rect.height * zoom - rect.height) / 2);
+        tx = Math.min(maxX, Math.max(-maxX, tx));
+        ty = Math.min(maxY, Math.max(-maxY, ty));
+    }
+
+    img.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (zoom === 1) return; // 未放大时不拖
+        dragging = true; moved = false;
+        startX = e.touches[0].clientX - tx;
+        startY = e.touches[0].clientY - ty;
+    }, { passive: false });
+    img.addEventListener('touchmove', (e) => {
+        if (!dragging) return;
+        e.preventDefault();
+        const nx = e.touches[0].clientX - startX;
+        const ny = e.touches[0].clientY - startY;
+        if (Math.abs(nx - tx) + Math.abs(ny - ty) > 3) moved = true;
+        tx = nx; ty = ny;
+        applyTransform(false);
+    }, { passive: false });
+    const endDrag = () => { dragging = false; clamp(); applyTransform(true); };
+    img.addEventListener('touchend', endDrag);
+    img.addEventListener('touchcancel', endDrag);
+
+    // 点图片：放大2.5倍/恢复；放大后拖动看细节
+    img.addEventListener('click', (e) => {
         e.stopPropagation();
-        zoom = zoom === 1 ? 2.5 : 1;
-        img.style.transform = 'scale(' + zoom + ')';
-    };
-    lb.onclick = () => {
+        if (moved) return; // 刚拖完不算点击
+        if (zoom === 1) { zoom = 2.5; } else { zoom = 1; tx = 0; ty = 0; }
+        applyTransform(true);
+    });
+    // 点黑色背景：关闭
+    wrap.addEventListener('click', (e) => {
+        if (e.target !== wrap) return;
         lb.style.display = 'none';
-        zoom = 1;
+        zoom = 1; tx = 0; ty = 0;
         img.style.transform = '';
-    };
+    });
 }
 
 async function generateAgnesDirect(prompt, ratio = '1:1', inputImage = null, quality = '1K') {
