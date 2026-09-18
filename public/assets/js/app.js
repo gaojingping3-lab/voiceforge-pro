@@ -7167,7 +7167,7 @@ ${chatText}`;
 }
 
 async function generateImageFromChat(userInput = '', messageCount = 2, silentOpts = null) {
-    // silentOpts: { silent:true, contextAppend:'...', forceSingle:true } —— 朋友圈等复用入口，不走聊天UI，直接返回{blob,prompt}
+    // silentOpts: { silent:true, contextAppend:'...', forceSingle:true, imageModel:'agnes-2.1' } —— 朋友圈等复用入口，不走聊天UI，直接返回{blob,prompt}
     const silent = !!(silentOpts && silentOpts.silent);
     // 防重复：正在生成时静默返回，不弹alert打扰用户（silent模式不占用聊天锁，由调用方自行防重）
     if (isGeneratingChatImage && !silent) {
@@ -7396,7 +7396,9 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
         }
 
         // 第二步：用角色AI生成的提示词直接生图（跳过独立的提示词优化）
-        const result = await generateImageWithSafety(conversationText, getImageModel(), (msg) => {
+        // silentOpts.imageModel：朋友圈等入口可强制指定模型（如GPT Image模式下自动发朋友圈仍用Agnes省钱）
+        const effModel = (silentOpts && silentOpts.imageModel) || getImageModel();
+        const result = await generateImageWithSafety(conversationText, effModel, (msg) => {
             if (!silent) loadingBubble.innerHTML = `<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${msg}</span></div>`;
         }, rolePrompt, refImages, '1:1', getImageQuality());
 
@@ -8430,9 +8432,12 @@ async function postNewMoment(autoOpts) {
         // ===== 完全复用聊天生图同一条链路 =====
         // 读最近聊天记录 + 角色身份锁 + 服装硬锁 + 视角/景别/人数约束 + 参考头像(同一开关) + 同一个出图函数
         // 唯一区别：额外附加"发朋友圈配图"的场景描述，不维护任何朋友圈专属生图逻辑
+        // 模型：若当前选了 GPT Image（按张计费），自动发朋友圈强制改用 Agnes（套餐内免费额度），避免自动发动态烧钱
+        const momentImageModel = getImageModel() === 'gpt-image' ? 'agnes-2.1' : undefined;
         const result = await generateImageFromChat('', 2, {
             silent: true,
             forceSingle: true,
+            imageModel: momentImageModel,
             contextAppend: '【画面场景】' + (scene || 'casual daily photo, natural expression') + '\n这是角色准备发朋友圈的一张生活照片，请严格按照这个场景生成画面。画面中绝对不要出现手机，不要自拍姿势、不要举着手机的手、不要手机屏幕反光。'
         });
         if (!result || !result.blob) throw new Error('朋友圈生图未返回结果');
