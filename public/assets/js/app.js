@@ -4881,7 +4881,9 @@ async function runAiRoleGen() {
         const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
         if (!llmKey) { alert('请先在设置里配置 LLM API Key'); return; }
         const sys = '你是一个角色卡生成器。用户会给你一句对TA想要角色的简短描述，请补全成一张完整角色卡。' +
-            '严格只输出一个JSON对象，不要输出任何其他文字、注释或markdown代码块。JSON格式：' +
+            '严格只输出一个JSON对象，不要输出任何其他文字、注释或markdown代码块。' +
+            'JSON必须完全合法：所有键和字符串值必须用英文双引号"包裹，不要用单引号、中文引号或中文冒号，不要有末尾逗号。' +
+            'JSON格式：' +
             '{"name":"角色名（简短好听）","desc":"完整人设描述，必须包含【外貌】【性格】【身份背景】分段，描写生动细致，与用户的描述一致","opening":"开场白，第一人称，符合角色性格的一句话，口语化","memos":["记忆便签1（TA记得关于用户或自己的事）","记忆便签2","记忆便签3"]}';
         const res = await fetch('/api/chat', {
             method: 'POST',
@@ -4929,17 +4931,23 @@ async function runAiRoleGen() {
     }
 }
 
-// 从AI返回文本里提取JSON对象（容错：AI可能包了markdown或废话）
+// 从AI返回文本里提取JSON对象（容错：AI可能包了markdown、废话、中文标点）
 function parseAiRoleJson(text) {
     if (!text) return null;
     // 去掉可能的markdown代码块
     let t = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
-    try { return JSON.parse(t); } catch(e){}
-    // 截取第一个 { 到最后一个 }
+    // 提取第一个 { 到最后一个 }
     const start = t.indexOf('{');
     const end = t.lastIndexOf('}');
-    if (start >= 0 && end > start) {
-        try { return JSON.parse(t.substring(start, end + 1)); } catch(e2){}
+    if (start >= 0 && end > start) t = t.substring(start, end + 1);
+    const attempts = [
+        t,
+        t.replace(/[\u201c\u201d]/g, '"'),                    // 中文双引号 → 英文
+        t.replace(/[\u201c\u201d\u300b\u300a]/g, '"').replace(/[：]/g, ':'),  // 中文引号/冒号
+        t.replace(/['']/g, '"').replace(/[：]/g, ':'),        // 单引号/中文冒号
+    ];
+    for (const candidate of attempts) {
+        try { return JSON.parse(candidate); } catch(e){}
     }
     return null;
 }
