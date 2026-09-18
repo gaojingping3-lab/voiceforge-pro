@@ -2229,7 +2229,7 @@ function renderChatImageBubble(imageBubble, item) {
         trackChatBlobUrl(src);
     }
     imageBubble.innerHTML = `
-        <img src="${src}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
+        <img src="${src}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />
         <div class="flex gap-2 mt-2 px-1 pb-1">
             <button class="btn btn-primary btn-xs flex-1 regenerate-btn"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
             <a href="${src}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
@@ -2241,7 +2241,7 @@ function renderChatImageBubble(imageBubble, item) {
         if (item.blob && !item.dataUrl) {
             try { URL.revokeObjectURL(src); } catch (e) {}
             const fr = new FileReader();
-            fr.onload = () => { imgEl.src = fr.result; imgEl.onerror = null; imgEl.onclick = () => window.open(fr.result); dlA.href = fr.result; };
+            fr.onload = () => { imgEl.src = fr.result; imgEl.onerror = null; imgEl.onclick = () => openImageLightbox(fr.result); dlA.href = fr.result; };
             fr.onerror = () => { imgEl.src = ''; };
             fr.readAsDataURL(item.blob);
         }
@@ -2266,13 +2266,13 @@ function renderChatImageBubble(imageBubble, item) {
             if (newDataUrl) {
                 imgEl.src = newDataUrl;
                 imgEl.onerror = null;
-                imgEl.onclick = () => window.open(newDataUrl);
+                imgEl.onclick = () => openImageLightbox(newDataUrl);
                 dlA.href = newDataUrl;
             } else {
                 const newImageUrl = URL.createObjectURL(result.blob);
                 trackChatBlobUrl(newImageUrl);
                 imgEl.src = newImageUrl;
-                imgEl.onclick = () => window.open(newImageUrl);
+                imgEl.onclick = () => openImageLightbox(newImageUrl);
                 dlA.href = newImageUrl;
             }
         } catch (err) {
@@ -5628,11 +5628,26 @@ function openImageLightbox(src) {
         lb = document.createElement('div');
         lb.id = 'img-lightbox';
         lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:99999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
-        lb.onclick = () => { lb.style.display = 'none'; };
         document.body.appendChild(lb);
     }
-    lb.innerHTML = `<img src="${src}" style="max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;" />`;
+    lb.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = src;
+    img.style.cssText = 'max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;transition:transform 0.25s ease;transform-origin:center;';
+    lb.appendChild(img);
     lb.style.display = 'flex';
+    // 点图片：放大2.5倍看细节，再点恢复；点黑色背景：关闭
+    let zoom = 1;
+    img.onclick = (e) => {
+        e.stopPropagation();
+        zoom = zoom === 1 ? 2.5 : 1;
+        img.style.transform = 'scale(' + zoom + ')';
+    };
+    lb.onclick = () => {
+        lb.style.display = 'none';
+        zoom = 1;
+        img.style.transform = '';
+    };
 }
 
 async function generateAgnesDirect(prompt, ratio = '1:1', inputImage = null, quality = '1K') {
@@ -6935,7 +6950,7 @@ ${chatText}`;
                 frameDiv.className = 'mb-2';
                 // 合成失败时把原图转 base64 兜底（不用会被 revoke 的 blob URL，避免问号图）
                 const src = comicUrl || (await blobToDataURL(res.blob));
-                frameDiv.innerHTML = `<img src="${src}" alt="漫画格${i + 1}" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />`;
+                frameDiv.innerHTML = `<img src="${src}" alt="漫画格${i + 1}" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />`;
                 wrap.appendChild(frameDiv);
                 URL.revokeObjectURL(url);
             } catch (err) {
@@ -7216,7 +7231,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
         const imageBubble = document.createElement('div');
         imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-1 max-w-[80%]';
         imageBubble.innerHTML = `
-            <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="window.open(this.src)" />
+            <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />
             <div class="flex gap-2 mt-2 px-1 pb-1">
                 <button class="btn btn-primary btn-xs flex-1 regenerate-btn"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
                 <a href="${imageUrl}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
@@ -7241,7 +7256,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
                 const newImageUrl = URL.createObjectURL(result.blob);
                 trackChatBlobUrl(newImageUrl);
                 imageBubble.querySelector('img').src = newImageUrl;
-                imageBubble.querySelector('img').onclick = () => window.open(newImageUrl);
+                imageBubble.querySelector('img').onclick = () => openImageLightbox(newImageUrl);
                 imageBubble.querySelector('a[download]').href = newImageUrl;
             } catch (err) {
                 alert('重新生成失败，图片未更新（仍是原图）: ' + (err.message || err));
