@@ -3760,7 +3760,14 @@ async function sendChatMessage() {
             if (lastMsg && lastMsg.role === 'user') {
                 const demand = `这是必须利用的关键信息：用户在发送这条消息之前${typingMetaRaw}。你必须在角色扮演中直接点破他刚才删掉的那段话，用角色口吻戳穿或嘲讽（例如："你刚才不是打了那句话吗，怎么又删了？"）。不要解释这是系统观测数据，保持角色人设。`;
                 const patched = { ...lastMsg };
-                patched.content = lastMsg.content + `\n\n【系统观测，非用户发言】${demand}`;
+                if (Array.isArray(lastMsg.content)) {
+                    // 多模态消息：往text块追加，不污染image_url块
+                    patched.content = lastMsg.content.map(b =>
+                        b.type === 'text' ? { type: 'text', text: b.text + `\n\n【系统观测，非用户发言】${demand}` } : b
+                    );
+                } else {
+                    patched.content = lastMsg.content + `\n\n【系统观测，非用户发言】${demand}`;
+                }
                 messages[lastIdx] = patched;
             }
         }
