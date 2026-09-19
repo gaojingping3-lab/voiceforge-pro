@@ -1778,8 +1778,26 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
     }
 
     // 格式化对话历史（最近20条），标明发言人
+    // 视觉模型支持：把聊天里生成的图片作为 image_url 一起发给 deepseek-flash，让AI"看见"自己刚生成的图
+    const chatLlmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+    const visionEnabled = (chatLlmModel === 'deepseek-flash') || /vision/i.test(chatLlmModel);
+    const chatImageMap = visionEnabled ? await loadRecentImageDataUrls(20) : new Map();
     const formattedHistory = [];
     for (const msg of chatHistory.slice(-20)) {
+        if (msg.type === 'image') {
+            if (visionEnabled && chatImageMap.has(msg.ts)) {
+                formattedHistory.push({
+                    role: 'assistant',
+                    content: [
+                        { type: 'text', text: '（我给你发了一张照片）' },
+                        { type: 'image_url', image_url: { url: chatImageMap.get(msg.ts) } }
+                    ]
+                });
+            } else {
+                formattedHistory.push({ role: 'assistant', content: '（我给你发了一张照片）' });
+            }
+            continue;
+        }
         if (msg.role === 'user') {
             formattedHistory.push({ role: 'user', content: `【你（用户）说】${msg.content}` });
         } else if (msg.role === 'assistant') {
@@ -2206,6 +2224,32 @@ async function loadChatImageByTs(ts) {
             req.onerror = () => resolve(null);
         });
     } catch (e) { return null; }
+}
+
+// 视觉模型支持：把最近聊天里的生图从 IndexedDB 读成 dataURL，供 deepseek-flash 等多模态模型"看见"
+async function loadRecentImageDataUrls(limit = 20) {
+    const map = new Map();
+    const recent = (typeof chatHistory !== 'undefined' ? chatHistory : [])
+        .slice(-limit).filter(m => m && m.type === 'image' && m.ts);
+    await Promise.all(recent.map(async (m) => {
+        try {
+            const rec = await loadChatImageByTs(m.ts);
+            if (!rec) return;
+            let dataUrl = '';
+            if (rec.dataUrl && typeof rec.dataUrl === 'string' && rec.dataUrl.startsWith('data:')) {
+                dataUrl = rec.dataUrl;
+            } else if (rec.blob) {
+                dataUrl = await new Promise((res, rej) => {
+                    const fr = new FileReader();
+                    fr.onload = () => res(fr.result);
+                    fr.onerror = rej;
+                    fr.readAsDataURL(rec.blob);
+                });
+            }
+            if (dataUrl) map.set(m.ts, dataUrl);
+        } catch (e) { /* 单张失败不影响其他 */ }
+    }));
+    return map;
 }
 
 // 聊天生图 blob URL 回收队列：连续生成几十张时，把最老的 blob URL 释放掉，防止 iPhone Safari 内存越堆越高
@@ -4592,8 +4636,26 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
     }
 
     // 格式化对话历史：每条消息都标明发言人，让AI清楚区分三方，增加到20条上下文
+    // 视觉模型支持：双聊历史里的图片同样带给视觉模型
+    const chatLlmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+    const visionEnabled = (chatLlmModel === 'deepseek-flash') || /vision/i.test(chatLlmModel);
+    const chatImageMap = visionEnabled ? await loadRecentImageDataUrls(20) : new Map();
     const formattedHistory = [];
     for (const msg of chatHistory.slice(-20)) {
+        if (msg.type === 'image') {
+            if (visionEnabled && chatImageMap.has(msg.ts)) {
+                formattedHistory.push({
+                    role: 'assistant',
+                    content: [
+                        { type: 'text', text: '（我给你发了一张照片）' },
+                        { type: 'image_url', image_url: { url: chatImageMap.get(msg.ts) } }
+                    ]
+                });
+            } else {
+                formattedHistory.push({ role: 'assistant', content: '（我给你发了一张照片）' });
+            }
+            continue;
+        }
         if (msg.role === 'user') {
             // 用户发的消息，标记为角色C
             formattedHistory.push({ role: 'user', content: `【角色C（用户）说】${msg.content}` });
