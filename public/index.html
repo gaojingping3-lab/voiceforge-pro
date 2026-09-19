@@ -932,6 +932,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <i class="fa-solid fa-arrow-down text-sm"></i>
                 </button>
                 <div class="flex gap-2 items-end" style="padding-bottom: env(safe-area-inset-bottom);">
+                    <!-- 相册选图按钮（像微信一样发照片给AI看） -->
+                    <button class="btn btn-ghost btn-sm btn-circle self-center" onclick="document.getElementById('user-photo-input').click()" title="发照片">
+                        <i class="fa-regular fa-image text-base"></i>
+                    </button>
+                    <input type="file" id="user-photo-input" accept="image/*" hidden onchange="onUserPhotoSelected(event)" />
                     <textarea id="chat-input" placeholder="跟乐说点什么..." class="textarea textarea-bordered textarea-sm flex-1 resize-none" rows="1" style="max-height: 100px; min-height: 40px;" oninput="autoResizeInput();" onkeydown="handleChatKeydown(event)"></textarea>
                     <!-- 语音通话按钮 -->
                     <button class="btn btn-ghost btn-sm btn-circle self-center" onclick="toggleVoiceCallMode()" title="语音通话模式">

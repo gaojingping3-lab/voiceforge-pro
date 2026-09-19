@@ -1788,10 +1788,11 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
             if (visionEnabled && chatImageMap.has(msg.ts)) {
                 // DeepSeek 视觉模型要求图必须在 user 消息里（assistant 带图会400），
                 // 所以把"AI刚生成的图"以 user 视角重新呈现：让 AI 看见自己给用户拍的照片
+                const caption = (msg.role === 'user') ? '我发给你看一张照片：' : '这是你刚才给我生成的那张照片：';
                 formattedHistory.push({
                     role: 'user',
                     content: [
-                        { type: 'text', text: '这是你刚才给我生成的那张照片：' },
+                        { type: 'text', text: caption },
                         { type: 'image_url', image_url: { url: chatImageMap.get(msg.ts), detail: 'low' } }
                     ]
                 });
@@ -2254,6 +2255,36 @@ async function loadRecentImageDataUrls(limit = 20) {
     return map;
 }
 
+// 用户从相册选图发给AI（像微信发照片）：转存IndexedDB + 渲染右侧气泡 + 触发AI回复
+async function onUserPhotoSelected(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = ''; // 允许重选同一文件
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { alert('请选择图片文件'); return; }
+    try {
+        // 读成 dataURL（直接存，不再走AI生图）
+        const dataUrl = await new Promise((res, rej) => {
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result);
+            fr.onerror = rej;
+            fr.readAsDataURL(file);
+        });
+        const ts = Date.now();
+        // 存IndexedDB（复用聊天图存储）
+        await saveChatImage(file, 'user-upload', ts, '1:1');
+        // 进聊天记录（role=user，右侧气泡）
+        chatHistory.push({ role: 'user', content: '', type: 'image', ts });
+        saveChatHistory();
+        renderChatHistory();
+        // 让AI评论这张图
+        if (typeof groupChatNext === 'function') {
+            await groupChatNext(true);
+        }
+    } catch (err) {
+        alert('发送照片失败: ' + (err.message || err));
+    }
+}
+
 // 聊天生图 blob URL 回收队列：连续生成几十张时，把最老的 blob URL 释放掉，防止 iPhone Safari 内存越堆越高
 const chatBlobUrls = [];
 function trackChatBlobUrl(url) {
@@ -2477,34 +2508,50 @@ function renderChatHistory() {
     for (const msg of chatHistory) {
         if (msg.type === 'image') {
             // 图片消息：按原位置穿插渲染（占位 → 异步取blob填充）
+            const isUserPhoto = (msg.role === 'user');
             const curRole = getCurrentRole();
             const imageDiv = document.createElement('div');
-            imageDiv.className = 'chat chat-start relative gap-2';
-            imageDiv.appendChild(createChatAvatar(curRole ? curRole.name : 'AI', false));
-            const imageBubble = document.createElement('div');
-            imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-1 max-w-[80%]';
-            imageBubble.innerHTML = '<div class="text-xs opacity-60 px-2 py-3">图片加载中…</div>';
-            imageDiv.appendChild(imageBubble);
-            container.appendChild(imageDiv);
-            loadChatImageByTs(msg.ts).then(item => {
-                if (item) return item;
-                // 兜底1：精确ts没找到 → 从当前角色全部图里按时间找最接近的
-                return loadRoleChatImages().then(all => {
-                    if (!all || !all.length) return null;
-                    let best = null, bestDiff = Infinity;
-                    for (const it of all) {
-                        const d = Math.abs((it.ts || 0) - msg.ts);
-                        if (d < bestDiff) { bestDiff = d; best = it; }
+            imageDiv.className = isUserPhoto ? 'chat chat-end relative gap-2' : 'chat chat-start relative gap-2';
+            if (isUserPhoto) {
+                // 用户发的照片：右侧，主色气泡，无头像
+                const imageBubble = document.createElement('div');
+                imageBubble.className = 'chat-bubble bg-primary text-primary-content p-1 max-w-[80%]';
+                imageBubble.innerHTML = '<div class="text-xs opacity-70 px-2 py-3">图片加载中…</div>';
+                imageDiv.appendChild(imageBubble);
+                container.appendChild(imageDiv);
+                loadChatImageByTs(msg.ts).then(item => {
+                    if (item && imageBubble.isConnected) {
+                        let src = item.dataUrl || (item.blob ? URL.createObjectURL(item.blob) : '');
+                        if (src) imageBubble.innerHTML = `<img src="${src}" alt="用户发的照片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />`;
                     }
-                    return best;
                 });
-            }).then(item => {
-                if (!item || !imageBubble.isConnected) {
-                    if (imageBubble && imageBubble.isConnected) imageBubble.innerHTML = '<div class="text-xs opacity-60 px-2 py-3">图片加载失败（本地数据缺失，可清空聊天后重新生成）</div>';
-                    return;
-                }
-                renderChatImageBubble(imageBubble, item);
-            });
+            } else {
+                imageDiv.appendChild(createChatAvatar(curRole ? curRole.name : 'AI', false));
+                const imageBubble = document.createElement('div');
+                imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-1 max-w-[80%]';
+                imageBubble.innerHTML = '<div class="text-xs opacity-60 px-2 py-3">图片加载中…</div>';
+                imageDiv.appendChild(imageBubble);
+                container.appendChild(imageDiv);
+                loadChatImageByTs(msg.ts).then(item => {
+                    if (item) return item;
+                    // 兜底1：精确ts没找到 → 从当前角色全部图里按时间找最接近的
+                    return loadRoleChatImages().then(all => {
+                        if (!all || !all.length) return null;
+                        let best = null, bestDiff = Infinity;
+                        for (const it of all) {
+                            const d = Math.abs((it.ts || 0) - msg.ts);
+                            if (d < bestDiff) { bestDiff = d; best = it; }
+                        }
+                        return best;
+                    });
+                }).then(item => {
+                    if (!item || !imageBubble.isConnected) {
+                        if (imageBubble && imageBubble.isConnected) imageBubble.innerHTML = '<div class="text-xs opacity-60 px-2 py-3">图片加载失败（本地数据缺失，可清空聊天后重新生成）</div>';
+                        return;
+                    }
+                    renderChatImageBubble(imageBubble, item);
+                });
+            }
             continue;
         }
         if (msg.role === 'user') {
@@ -4646,10 +4693,11 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
     for (const msg of chatHistory.slice(-20)) {
         if (msg.type === 'image') {
             if (visionEnabled && chatImageMap.has(msg.ts)) {
+                const caption = (msg.role === 'user') ? '我发给你看一张照片：' : '这是你刚才给我生成的那张照片：';
                 formattedHistory.push({
                     role: 'user',
                     content: [
-                        { type: 'text', text: '这是你刚才给我生成的那张照片：' },
+                        { type: 'text', text: caption },
                         { type: 'image_url', image_url: { url: chatImageMap.get(msg.ts), detail: 'low' } }
                     ]
                 });
