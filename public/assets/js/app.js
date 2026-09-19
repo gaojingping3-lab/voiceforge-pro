@@ -1786,11 +1786,13 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
     for (const msg of chatHistory.slice(-20)) {
         if (msg.type === 'image') {
             if (visionEnabled && chatImageMap.has(msg.ts)) {
+                // DeepSeek 视觉模型要求图必须在 user 消息里（assistant 带图会400），
+                // 所以把"AI刚生成的图"以 user 视角重新呈现：让 AI 看见自己给用户拍的照片
                 formattedHistory.push({
-                    role: 'assistant',
+                    role: 'user',
                     content: [
-                        { type: 'text', text: '（我给你发了一张照片）' },
-                        { type: 'image_url', image_url: { url: chatImageMap.get(msg.ts) } }
+                        { type: 'text', text: '这是你刚才给我生成的那张照片：' },
+                        { type: 'image_url', image_url: { url: chatImageMap.get(msg.ts), detail: 'low' } }
                     ]
                 });
             } else {
@@ -4645,10 +4647,10 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
         if (msg.type === 'image') {
             if (visionEnabled && chatImageMap.has(msg.ts)) {
                 formattedHistory.push({
-                    role: 'assistant',
+                    role: 'user',
                     content: [
-                        { type: 'text', text: '（我给你发了一张照片）' },
-                        { type: 'image_url', image_url: { url: chatImageMap.get(msg.ts) } }
+                        { type: 'text', text: '这是你刚才给我生成的那张照片：' },
+                        { type: 'image_url', image_url: { url: chatImageMap.get(msg.ts), detail: 'low' } }
                     ]
                 });
             } else {
