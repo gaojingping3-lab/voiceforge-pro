@@ -2276,10 +2276,8 @@ async function onUserPhotoSelected(e) {
         chatHistory.push({ role: 'user', content: '', type: 'image', ts });
         saveChatHistory();
         renderChatHistory();
-        // 让AI评论这张图
-        if (typeof groupChatNext === 'function') {
-            await groupChatNext(true);
-        }
+        // 触发单聊发送流程（sendChatMessage识别到最后一条是图片就直接走LLM请求）
+        await sendChatMessage();
     } catch (err) {
         alert('发送照片失败: ' + (err.message || err));
     }
@@ -3539,7 +3537,11 @@ async function sendChatMessage() {
     await initTTSAudio(); // 激活 iOS 音频会话，保持自动播放权限
     const input = document.getElementById('chat-input');
     const text = input.value.trim();
-    if (!text) return;
+    // 允许"只发图片不打字"：刚选完照片push了图片消息到chatHistory，直接走LLM请求
+    const lastIsUserPhoto = chatHistory.length > 0 &&
+        chatHistory[chatHistory.length - 1].role === 'user' &&
+        chatHistory[chatHistory.length - 1].type === 'image';
+    if (!text && !lastIsUserPhoto) return;
 
     // 打字行为感知：发送前捕获本次输入元数据（开关开启且有明显犹豫行为才有值）
     const typingMetaRaw = getTypingSensorEnabled() ? getTypingMeta() : null;
@@ -3601,7 +3603,9 @@ async function sendChatMessage() {
         return;
     }
 
-    appendChatMessage(text, 'user');
+    if (text) {
+        appendChatMessage(text, 'user');
+    }
     scrollToBottom(); // 发消息后强制滚动到底部
     input.value = '';
     input.style.height = 'auto'; // 重置输入框高度
@@ -3611,8 +3615,10 @@ async function sendChatMessage() {
     // 发送新消息时，停止上一条AI回复的朗读
     stopAllAudio();
 
-    // 把用户消息加入永久记忆
-    chatHistory.push({ role: 'user', content: text });
+    // 把用户消息加入永久记忆（纯文字才push；图片消息已在选图时push过）
+    if (text) {
+        chatHistory.push({ role: 'user', content: text });
+    }
     saveChatHistory(); // 保存到本地，刷新不丢失
 
     // 双角色模式下：用户发消息后直接走双角色回复逻辑，用当前角色身份回复，三方身份上下文
@@ -3722,7 +3728,28 @@ async function sendChatMessage() {
         if (useConstraint) {
             messages.push({ role: 'system', content: roleConstraints });
         }
-        messages.push(...chatHistory);
+        // 视觉模型：把chatHistory里的图片条目从空content转换成多模态content（带图）
+        const singleLlmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+        const singleVisionEnabled = (singleLlmModel === 'deepseek-flash') || /vision/i.test(singleLlmModel);
+        const singleImageMap = singleVisionEnabled ? await loadRecentImageDataUrls(20) : new Map();
+        for (const msg of chatHistory) {
+            if (msg.type === 'image') {
+                if (singleVisionEnabled && singleImageMap.has(msg.ts)) {
+                    const caption = (msg.role === 'user') ? '我发给你看一张照片：' : '这是你刚才给我生成的那张照片：';
+                    messages.push({
+                        role: 'user',
+                        content: [
+                            { type: 'text', text: caption },
+                            { type: 'image_url', image_url: { url: singleImageMap.get(msg.ts), detail: 'low' } }
+                        ]
+                    });
+                } else {
+                    messages.push({ role: 'assistant', content: '（我给你发了一张照片）' });
+                }
+            } else {
+                messages.push(msg);
+            }
+        }
 
         // 打字行为感知：把输入元数据注入给模型（仅单角色聊天，双角色分支已提前return）
         // 注意：拼进最后一条用户消息的拷贝（不污染chatHistory），比单独system消息更可靠，模型必然看到
