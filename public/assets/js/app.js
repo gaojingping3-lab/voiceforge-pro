@@ -5328,36 +5328,63 @@ function clearChat() {
     sfxSuccess();
 }
 
-// 导出当前角色聊天记录：整理成纯文本，一键复制，方便粘到新窗口继续聊
-function exportChatHistory() {
+// AI总结最近对话成剧情梗概：清空聊天后粘给角色，让它接上记忆
+async function generateMemorySummary() {
     const role = getCurrentRole();
     if (!role) { alert('当前没有角色'); return; }
-    const lines = [];
-    lines.push('【角色】' + role.name);
-    if (role.desc) lines.push('【角色设定】\n' + role.desc);
-    lines.push('');
-    lines.push('【最近对话】（仅文字，图片已省略）');
-    const recent = (chatHistory || []).filter(m => m.type !== 'image' && m.content && String(m.content).trim()).slice(-50);
-    for (const m of recent) {
-        const who = m.role === 'user' ? '我' : role.name;
-        lines.push(who + '：' + String(m.content).trim());
+    const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+    const llmKey = localStorage.getItem('LLM_KEY') || '';
+    const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+    if (!llmKey) { alert('请先配置 LLM Key'); return; }
+
+    const recent = (chatHistory || []).filter(m => m.type !== 'image' && m.content && String(m.content).trim()).slice(-40);
+    if (recent.length < 4) { alert('对话太短，先聊一会儿再总结'); return; }
+    const convo = recent.map(m => (m.role === 'user' ? '我' : role.name) + '：' + String(m.content).trim()).join('\n');
+
+    const btn = event.target.closest('button');
+    const oldHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 正在总结...';
+
+    try {
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
+            body: JSON.stringify({
+                baseUrl: llmUrl,
+                model: llmModel,
+                stream: false,
+                messages: [
+                    { role: 'system', content: '你是一个剧情总结助手。请把下面我和角色的对话浓缩成一段第三人称的剧情梗概，格式要求：\n1. 用"我（用户）"和"' + role.name + '"称呼双方\n2. 按时间顺序写清楚：发生了什么、关系进展、重要对话、关键约定/情绪节点\n3. 300-500字，像小说前情提要\n4. 不要客套、不要解释、直接输出梗概正文\n5. 这段梗概会被粘到新聊天里让角色接上记忆，所以要写得让角色一看就知道之前发生了什么。' },
+                    { role: 'user', content: '角色：' + role.name + '\n对话如下：\n' + convo }
+                ]
+            })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const summary = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
+        if (!summary) throw new Error('总结为空');
+
+        const modal = document.createElement('dialog');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-box max-w-2xl">
+                <h3 class="font-bold text-lg mb-2">记忆摘要（清空后粘给${role.name}即可接上）</h3>
+                <textarea readonly class="textarea textarea-bordered w-full h-80 text-xs">${summary.replace(/</g,'&lt;')}</textarea>
+                <div class="modal-action">
+                    <button class="btn btn-sm" onclick="this.closest('dialog').close()">关闭</button>
+                    <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText(this.closest('.modal-box').querySelector('textarea').value).then(()=>alert('已复制，清空聊天后粘给${role.name}说一句"这是我们之前的经历"即可'))">一键复制</button>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        modal.showModal();
+        modal.addEventListener('close', () => modal.remove());
+    } catch (err) {
+        alert('总结失败: ' + (err.message || err));
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldHtml;
     }
-    const text = lines.join('\n');
-    // 弹个框显示，带复制按钮
-    const modal = document.createElement('dialog');
-    modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="modal-box max-w-2xl">
-            <h3 class="font-bold text-lg mb-2">聊天记录已导出（最近${recent.length}条）</h3>
-            <textarea readonly class="textarea textarea-bordered w-full h-96 text-xs" id="export-chat-text">${text.replace(/</g,'&lt;')}</textarea>
-            <div class="modal-action">
-                <button class="btn btn-sm" onclick="this.closest('dialog').close()">关闭</button>
-                <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('export-chat-text').value).then(()=>alert('已复制到剪贴板，去新窗口粘贴即可'))">一键复制</button>
-            </div>
-        </div>`;
-    document.body.appendChild(modal);
-    modal.showModal();
-    modal.addEventListener('close', () => modal.remove());
 }
 
 // 一键清除所有角色的聊天记录 + 所有图片（聊天生图/朋友圈）

@@ -1372,12 +1372,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     <textarea id="modal-llm-system" class="textarea textarea-bordered textarea-sm w-full" rows="3" placeholder="你是乐。这是一个纯粹的私人虚构陪伴空间..."></textarea>
                     <span class="text-xs text-base-content/50 mt-1">自定义 AI 的性格、语气、身份等，留空使用默认设定</span>
                 </div>
-                <!-- 导出当前角色聊天记录 -->
+                <!-- AI 总结记忆：清空聊天后粘给角色接剧情 -->
                 <div class="mt-4 p-3 rounded-xl border border-base-300">
-                    <div class="text-sm font-bold mb-1"><i class="fa-solid fa-file-export text-primary"></i> 导出聊天记录</div>
-                    <div class="text-xs text-base-content/50 mb-2">把当前角色的对话整理成纯文本，复制后可粘到新窗口继续聊。</div>
-                    <button class="btn btn-outline btn-sm w-full" onclick="exportChatHistory()">
-                        <i class="fa-solid fa-copy"></i> 导出并复制
+                    <div class="text-sm font-bold mb-1"><i class="fa-solid fa-wand-sparkles text-primary"></i> 生成记忆摘要</div>
+                    <div class="text-xs text-base-content/50 mb-2">让AI把最近对话浓缩成一段剧情梗概，清空聊天后粘给角色，它就能"记得"之前发生了什么。</div>
+                    <button class="btn btn-primary btn-sm w-full" onclick="generateMemorySummary()">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> AI总结并复制
                     </button>
                 </div>
                 <!-- 危险区：一键清除所有数据 -->
