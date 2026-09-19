@@ -5328,6 +5328,38 @@ function clearChat() {
     sfxSuccess();
 }
 
+// 导出当前角色聊天记录：整理成纯文本，一键复制，方便粘到新窗口继续聊
+function exportChatHistory() {
+    const role = getCurrentRole();
+    if (!role) { alert('当前没有角色'); return; }
+    const lines = [];
+    lines.push('【角色】' + role.name);
+    if (role.desc) lines.push('【角色设定】\n' + role.desc);
+    lines.push('');
+    lines.push('【最近对话】（仅文字，图片已省略）');
+    const recent = (chatHistory || []).filter(m => m.type !== 'image' && m.content && String(m.content).trim()).slice(-50);
+    for (const m of recent) {
+        const who = m.role === 'user' ? '我' : role.name;
+        lines.push(who + '：' + String(m.content).trim());
+    }
+    const text = lines.join('\n');
+    // 弹个框显示，带复制按钮
+    const modal = document.createElement('dialog');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-box max-w-2xl">
+            <h3 class="font-bold text-lg mb-2">聊天记录已导出（最近${recent.length}条）</h3>
+            <textarea readonly class="textarea textarea-bordered w-full h-96 text-xs" id="export-chat-text">${text.replace(/</g,'&lt;')}</textarea>
+            <div class="modal-action">
+                <button class="btn btn-sm" onclick="this.closest('dialog').close()">关闭</button>
+                <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('export-chat-text').value).then(()=>alert('已复制到剪贴板，去新窗口粘贴即可'))">一键复制</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    modal.showModal();
+    modal.addEventListener('close', () => modal.remove());
+}
+
 // 一键清除所有角色的聊天记录 + 所有图片（聊天生图/朋友圈）
 async function clearAllChatData() {
     if (!confirm('确定要清除「所有角色」的聊天记录和所有图片吗？\n\n包括：所有角色的聊天记录、聊天生图、朋友圈动态和图片。\n此操作不可恢复！')) return;
