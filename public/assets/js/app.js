@@ -3590,7 +3590,6 @@ function toggleVoiceCallMode() {
     overlay.classList.remove('hidden');
     overlay.classList.add('show');
     document.body.classList.add('voice-call-active');
-    document.getElementById('role-avatar')?.classList.add('talking');
 
     isCallMode = true;
     callSeconds = 0;
@@ -3613,7 +3612,6 @@ function toggleVoiceCallMode() {
 // 退出语音通话模式
 async function exitVoiceCallMode() {
     isCallMode = false;
-    document.getElementById('role-avatar')?.classList.remove('talking');
     isCallListening = false;
     isCallAISpeaking = false;
     callSending = false;
