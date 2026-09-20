@@ -7572,8 +7572,12 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
             }
         }
         if (strictKeywords) finalKeywords += (finalKeywords ? ', ' : '') + strictKeywords;
+        // 全身照防裁切：用户明确要全身或没指定景别（默认全身）时，强制广角+上下留白，避免头脚被切
+        const wantFullBody = /全身/.test(userInput || '');
         if (!hasShotType) {
-            finalKeywords += (finalKeywords ? ', ' : '') + 'full body shot, full body, standing full figure, entire body visible from head to toe';
+            finalKeywords += (finalKeywords ? ', ' : '') + 'wide angle shot, distant full body framing, full character entirely in frame, plenty of empty space above head, visible floor beneath feet, entire body visible from head to toe, no cropped limbs';
+        } else if (wantFullBody) {
+            finalKeywords += (finalKeywords ? ', ' : '') + 'wide angle shot, full character entirely in frame, empty space above head, visible floor beneath feet, no cropped head, no cropped feet';
         }
         // 人物数量硬锁：单人强制只有1人，双角色强制2人，前后各加一次强化
         if (isDualMode) {
