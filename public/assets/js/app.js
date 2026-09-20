@@ -2258,7 +2258,18 @@ async function loadRecentImageDataUrls(limit = 20) {
 // ===== 微信式 + 号菜单 =====
 function togglePlusMenu(e) {
     if (e) e.stopPropagation();
-    document.getElementById('plus-menu')?.classList.toggle('hidden');
+    const menu = document.getElementById('plus-menu');
+    if (!menu) return;
+    if (menu.classList.contains('hidden')) {
+        // 动态定位：在+按钮上方弹出
+        const btn = e.currentTarget;
+        const rect = btn.getBoundingClientRect();
+        menu.style.left = rect.left + 'px';
+        menu.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+        menu.classList.remove('hidden');
+    } else {
+        menu.classList.add('hidden');
+    }
 }
 function closePlusMenu() {
     document.getElementById('plus-menu')?.classList.add('hidden');
