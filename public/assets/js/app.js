@@ -3622,11 +3622,11 @@ async function sendChatMessage() {
     await initTTSAudio(); // 激活 iOS 音频会话，保持自动播放权限
     const input = document.getElementById('chat-input');
     const text = input.value.trim();
-    // 允许"只发图片不打字"：刚选完照片push了图片消息到chatHistory，直接走LLM请求
-    const lastIsUserPhoto = chatHistory.length > 0 &&
-        chatHistory[chatHistory.length - 1].role === 'user' &&
-        chatHistory[chatHistory.length - 1].type === 'image';
-    if (!text && !lastIsUserPhoto) return;
+    // 允许"只发互动卡片不打字"：刚发完图片/红包/礼物push了特殊消息到chatHistory，直接走LLM请求
+    const lastMsg = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1] : null;
+    const lastIsInteractive = lastMsg && lastMsg.role === 'user' &&
+        (lastMsg.type === 'image' || lastMsg.type === 'redpacket' || lastMsg.type === 'gift');
+    if (!text && !lastIsInteractive) return;
 
     // 打字行为感知：发送前捕获本次输入元数据（开关开启且有明显犹豫行为才有值）
     const typingMetaRaw = getTypingSensorEnabled() ? getTypingMeta() : null;
