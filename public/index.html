@@ -936,6 +936,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button class="btn btn-ghost btn-sm btn-circle self-center" onclick="document.getElementById('user-photo-input').click()" title="发照片">
                         <i class="fa-regular fa-image text-base"></i>
                     </button>
+                    <!-- 红包按钮 -->
+                    <button class="btn btn-ghost btn-sm btn-circle self-center" onclick="openRedPacket()" title="发红包">
+                        <i class="fa-solid fa-envelope-circle-check text-base" style="color:#e53e3e"></i>
+                    </button>
+                    <!-- 礼物按钮 -->
+                    <button class="btn btn-ghost btn-sm btn-circle self-center" onclick="openGiftPanel()" title="送礼物">
+                        <i class="fa-solid fa-gift text-base" style="color:#d53f8c"></i>
+                    </button>
                     <input type="file" id="user-photo-input" accept="image/*" hidden onchange="onUserPhotoSelected(event)" />
                     <textarea id="chat-input" placeholder="跟乐说点什么..." class="textarea textarea-bordered textarea-sm flex-1 resize-none" rows="1" style="max-height: 100px; min-height: 40px;" oninput="autoResizeInput();" onkeydown="handleChatKeydown(event)"></textarea>
                     <!-- 语音通话按钮 -->

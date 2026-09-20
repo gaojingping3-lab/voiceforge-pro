@@ -2255,6 +2255,63 @@ async function loadRecentImageDataUrls(limit = 20) {
     return map;
 }
 
+// ===== 红包 & 礼物（微信式虚拟互动）=====
+const REDPACKET_AMOUNTS = ['6.66', '8.88', '18.88', '52.00', '66.66', '88.88', '131.40', '520.00', '999.00'];
+const GIFTS = [
+    { emoji: '🌹', name: '玫瑰', price: '9.9' },
+    { emoji: '🍫', name: '巧克力', price: '19.9' },
+    { emoji: '🧸', name: '小熊玩偶', price: '29.9' },
+    { emoji: '🎂', name: '蛋糕', price: '88.0' },
+    { emoji: '👜', name: '包包', price: '299.0' },
+    { emoji: '💄', name: '口红', price: '199.0' },
+    { emoji: '💍', name: '戒指', price: '999.0' },
+    { emoji: '📱', name: '手机', price: '5999.0' },
+];
+
+function openRedPacket() {
+    const role = getCurrentRole();
+    const roleName = role ? role.name : '宝贝';
+    const btns = REDPACKET_AMOUNTS.map(a => `<button class="btn btn-error btn-sm m-1" onclick="sendRedPacket('${a}', '${roleName}')">¥${a}</button>`).join('');
+    const modal = document.createElement('dialog');
+    modal.className = 'modal';
+    modal.innerHTML = `<div class="modal-box"><h3 class="font-bold text-lg mb-2 text-error">🧧 发红包给${roleName}</h3><div class="flex flex-wrap justify-center">${btns}</div><div class="modal-action"><button class="btn btn-sm" onclick="this.closest('dialog').close()">取消</button></div></div>`;
+    document.body.appendChild(modal);
+    modal.showModal();
+    modal.addEventListener('close', () => modal.remove());
+}
+
+async function sendRedPacket(amount, roleName) {
+    document.querySelectorAll('.modal').forEach(m => m.close());
+    // 红包卡片进聊天记录（content写清楚事件，LLM看历史就知道）
+    chatHistory.push({ role: 'user', type: 'redpacket', content: `（我给你发了一个¥${amount}的红包）`, amount, ts: Date.now() });
+    saveChatHistory();
+    renderChatHistory();
+    scrollToBottom();
+    // 触发AI反应
+    await sendChatMessage();
+}
+
+function openGiftPanel() {
+    const role = getCurrentRole();
+    const roleName = role ? role.name : '宝贝';
+    const items = GIFTS.map(g => `<button class="btn btn-outline btn-sm m-1" onclick="sendGift('${g.emoji}','${g.name}','${g.price}','${roleName}')">${g.emoji}<br>¥${g.price}</button>`).join('');
+    const modal = document.createElement('dialog');
+    modal.className = 'modal';
+    modal.innerHTML = `<div class="modal-box"><h3 class="font-bold text-lg mb-2 text-pink-500">🎁 送礼物给${roleName}</h3><div class="flex flex-wrap justify-center">${items}</div><div class="modal-action"><button class="btn btn-sm" onclick="this.closest('dialog').close()">取消</button></div></div>`;
+    document.body.appendChild(modal);
+    modal.showModal();
+    modal.addEventListener('close', () => modal.remove());
+}
+
+async function sendGift(emoji, name, price, roleName) {
+    document.querySelectorAll('.modal').forEach(m => m.close());
+    chatHistory.push({ role: 'user', type: 'gift', content: `（我送了你一个${emoji}${name}，价值¥${price}）`, emoji, giftName: name, price, ts: Date.now() });
+    saveChatHistory();
+    renderChatHistory();
+    scrollToBottom();
+    await sendChatMessage();
+}
+
 // 用户从相册选图发给AI（像微信发照片）：转存IndexedDB + 渲染右侧气泡 + 触发AI回复
 async function onUserPhotoSelected(e) {
     const file = e.target.files && e.target.files[0];
@@ -2504,6 +2561,34 @@ function renderChatHistory() {
         return; // 空聊天，不显示默认欢迎消息
     }
     for (const msg of chatHistory) {
+        // 红包卡片（右侧，红色封面）
+        if (msg.type === 'redpacket') {
+            const rpDiv = document.createElement('div');
+            rpDiv.className = 'chat chat-end relative gap-2';
+            rpDiv.innerHTML = `<div class="chat-bubble p-0 overflow-hidden" style="background:linear-gradient(135deg,#e53e3e,#c53030);min-width:160px;border-radius:12px;">
+                <div style="padding:12px 16px;color:#fff;">
+                    <div style="font-size:28px;">🧧</div>
+                    <div style="font-size:13px;margin-top:4px;">恭喜发财，大吉大利</div>
+                    <div style="font-size:11px;opacity:0.8;margin-top:8px;">¥${msg.amount}</div>
+                </div>
+            </div>`;
+            container.appendChild(rpDiv);
+            continue;
+        }
+        // 礼物卡片（右侧）
+        if (msg.type === 'gift') {
+            const gDiv = document.createElement('div');
+            gDiv.className = 'chat chat-end relative gap-2';
+            gDiv.innerHTML = `<div class="chat-bubble p-0 overflow-hidden" style="background:linear-gradient(135deg,#d53f8c,#b83280);min-width:160px;border-radius:12px;">
+                <div style="padding:12px 16px;color:#fff;">
+                    <div style="font-size:28px;">${msg.emoji}</div>
+                    <div style="font-size:13px;margin-top:4px;">${msg.giftName}</div>
+                    <div style="font-size:11px;opacity:0.8;margin-top:8px;">价值 ¥${msg.price}</div>
+                </div>
+            </div>`;
+            container.appendChild(gDiv);
+            continue;
+        }
         if (msg.type === 'image') {
             // 图片消息：按原位置穿插渲染（占位 → 异步取blob填充）
             const isUserPhoto = (msg.role === 'user');
