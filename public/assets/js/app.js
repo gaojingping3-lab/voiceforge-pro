@@ -2298,10 +2298,27 @@ const GIFTS = [
 function openRedPacket() {
     const role = getCurrentRole();
     const roleName = role ? role.name : '宝贝';
-    const btns = REDPACKET_AMOUNTS.map(a => `<button class="btn btn-error btn-sm m-1" onclick="sendRedPacket('${a}', '${roleName}')">¥${a}</button>`).join('');
     const modal = document.createElement('dialog');
     modal.className = 'modal';
-    modal.innerHTML = `<div class="modal-box"><h3 class="font-bold text-lg mb-2 text-error">🧧 发红包给${roleName}</h3><div class="flex flex-wrap justify-center">${btns}</div><div class="modal-action"><button class="btn btn-sm" onclick="this.closest('dialog').close()">取消</button></div></div>`;
+    modal.innerHTML = `
+        <div class="modal-box max-w-sm">
+            <h3 class="font-bold text-lg mb-2 text-error">🧧 发红包给${roleName}</h3>
+            <div class="form-control mb-3">
+                <label class="label"><span class="label-text">金额（元）</span></label>
+                <input type="number" id="rp-amount" class="input input-bordered" placeholder="例如 52.00" min="0.01" step="0.01" value="52.00" />
+            </div>
+            <div class="flex flex-wrap gap-2 mb-3">
+                ${['6.66','8.88','18.88','52.00','88.88','131.40','520.00','999.00'].map(a => `<button class="btn btn-ghost btn-xs" onclick="document.getElementById('rp-amount').value='${a}'">¥${a}</button>`).join('')}
+            </div>
+            <div class="modal-action">
+                <button class="btn btn-sm" onclick="this.closest('dialog').close()">取消</button>
+                <button class="btn btn-error btn-sm" onclick="
+                    const v=document.getElementById('rp-amount').value;
+                    if(!v||parseFloat(v)<=0){alert('请输入有效金额');return;}
+                    sendRedPacket(parseFloat(v).toFixed(2), '${roleName}');
+                ">塞红包</button>
+            </div>
+        </div>`;
     document.body.appendChild(modal);
     modal.showModal();
     modal.addEventListener('close', () => modal.remove());
