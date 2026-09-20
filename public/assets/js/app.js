@@ -2328,7 +2328,18 @@ async function sendRedPacket(amount, roleName) {
     document.querySelectorAll('.modal').forEach(m => m.close());
     chatHistory.push({ role: 'user', type: 'redpacket', content: `【互动事件：我给你发了一个¥${amount}的红包，你现在可以收】`, amount, ts: Date.now() });
     saveChatHistory();
-    renderChatHistory();
+    // 只追加卡片DOM，不全量render，避免跳页
+    const container = document.getElementById('chat-messages');
+    const rpDiv = document.createElement('div');
+    rpDiv.className = 'chat chat-end relative gap-2';
+    rpDiv.innerHTML = `<div class="chat-bubble p-0 overflow-hidden" style="background:linear-gradient(135deg,#e53e3e,#c53030);min-width:160px;border-radius:12px;">
+        <div style="padding:12px 16px;color:#fff;">
+            <div style="font-size:28px;">🧧</div>
+            <div style="font-size:13px;margin-top:4px;">恭喜发财，大吉大利</div>
+            <div style="font-size:11px;opacity:0.8;margin-top:8px;">¥${amount}</div>
+        </div>
+    </div>`;
+    container.appendChild(rpDiv);
     scrollToBottom();
     await sendChatMessage();
 }
@@ -2349,7 +2360,17 @@ async function sendGift(emoji, name, price, roleName) {
     document.querySelectorAll('.modal').forEach(m => m.close());
     chatHistory.push({ role: 'user', type: 'gift', content: `【互动事件：我送了你一个${emoji}${name}，价值¥${price}】`, emoji, giftName: name, price, ts: Date.now() });
     saveChatHistory();
-    renderChatHistory();
+    const container = document.getElementById('chat-messages');
+    const gDiv = document.createElement('div');
+    gDiv.className = 'chat chat-end relative gap-2';
+    gDiv.innerHTML = `<div class="chat-bubble p-0 overflow-hidden" style="background:linear-gradient(135deg,#d53f8c,#b83280);min-width:160px;border-radius:12px;">
+        <div style="padding:12px 16px;color:#fff;">
+            <div style="font-size:28px;">${emoji}</div>
+            <div style="font-size:13px;margin-top:4px;">${name}</div>
+            <div style="font-size:11px;opacity:0.8;margin-top:8px;">价值 ¥${price}</div>
+        </div>
+    </div>`;
+    container.appendChild(gDiv);
     scrollToBottom();
     await sendChatMessage();
 }
