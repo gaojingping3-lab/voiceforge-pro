@@ -2326,12 +2326,10 @@ function openRedPacket() {
 
 async function sendRedPacket(amount, roleName) {
     document.querySelectorAll('.modal').forEach(m => m.close());
-    // 红包卡片进聊天记录（content写清楚事件，LLM看历史就知道）
-    chatHistory.push({ role: 'user', type: 'redpacket', content: `（我给你发了一个¥${amount}的红包）`, amount, ts: Date.now() });
+    chatHistory.push({ role: 'user', type: 'redpacket', content: `【互动事件：我给你发了一个¥${amount}的红包，你现在可以收】`, amount, ts: Date.now() });
     saveChatHistory();
     renderChatHistory();
     scrollToBottom();
-    // 触发AI反应
     await sendChatMessage();
 }
 
@@ -2349,7 +2347,7 @@ function openGiftPanel() {
 
 async function sendGift(emoji, name, price, roleName) {
     document.querySelectorAll('.modal').forEach(m => m.close());
-    chatHistory.push({ role: 'user', type: 'gift', content: `（我送了你一个${emoji}${name}，价值¥${price}）`, emoji, giftName: name, price, ts: Date.now() });
+    chatHistory.push({ role: 'user', type: 'gift', content: `【互动事件：我送了你一个${emoji}${name}，价值¥${price}】`, emoji, giftName: name, price, ts: Date.now() });
     saveChatHistory();
     renderChatHistory();
     scrollToBottom();
