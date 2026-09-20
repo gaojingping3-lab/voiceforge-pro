@@ -932,18 +932,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     <i class="fa-solid fa-arrow-down text-sm"></i>
                 </button>
                 <div class="flex gap-2 items-end" style="padding-bottom: env(safe-area-inset-bottom);">
-                    <!-- 相册选图按钮（像微信一样发照片给AI看） -->
-                    <button class="btn btn-ghost btn-sm btn-circle self-center" onclick="document.getElementById('user-photo-input').click()" title="发照片">
-                        <i class="fa-regular fa-image text-base"></i>
-                    </button>
-                    <!-- 红包按钮 -->
-                    <button class="btn btn-ghost btn-sm btn-circle self-center" onclick="openRedPacket()" title="发红包">
-                        <i class="fa-solid fa-envelope-circle-check text-base" style="color:#e53e3e"></i>
-                    </button>
-                    <!-- 礼物按钮 -->
-                    <button class="btn btn-ghost btn-sm btn-circle self-center" onclick="openGiftPanel()" title="送礼物">
-                        <i class="fa-solid fa-gift text-base" style="color:#d53f8c"></i>
-                    </button>
+                    <!-- 微信式 + 号菜单 -->
+                    <div class="relative self-center">
+                        <button class="btn btn-ghost btn-sm btn-circle" onclick="togglePlusMenu(event)" title="更多">
+                            <i class="fa-solid fa-plus text-base"></i>
+                        </button>
+                        <div id="plus-menu" class="hidden absolute right-0 bottom-full mb-2 z-50 bg-base-100 border border-base-300 rounded-box shadow-xl p-2 w-40">
+                            <button class="btn btn-ghost btn-sm w-full justify-start mb-1" onclick="document.getElementById('user-photo-input').click(); closePlusMenu()">
+                                <i class="fa-regular fa-image mr-2"></i>发照片
+                            </button>
+                            <button class="btn btn-ghost btn-sm w-full justify-start mb-1" onclick="openRedPacket(); closePlusMenu()">
+                                <i class="fa-solid fa-envelope-circle-check mr-2 text-error"></i>发红包
+                            </button>
+                            <button class="btn btn-ghost btn-sm w-full justify-start" onclick="openGiftPanel(); closePlusMenu()">
+                                <i class="fa-solid fa-gift mr-2 text-pink-500"></i>送礼物
+                            </button>
+                        </div>
+                    </div>
                     <input type="file" id="user-photo-input" accept="image/*" hidden onchange="onUserPhotoSelected(event)" />
                     <textarea id="chat-input" placeholder="跟乐说点什么..." class="textarea textarea-bordered textarea-sm flex-1 resize-none" rows="1" style="max-height: 100px; min-height: 40px;" oninput="autoResizeInput();" onkeydown="handleChatKeydown(event)"></textarea>
                     <!-- 语音通话按钮 -->

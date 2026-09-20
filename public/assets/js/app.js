@@ -2255,6 +2255,22 @@ async function loadRecentImageDataUrls(limit = 20) {
     return map;
 }
 
+// ===== 微信式 + 号菜单 =====
+function togglePlusMenu(e) {
+    if (e) e.stopPropagation();
+    document.getElementById('plus-menu')?.classList.toggle('hidden');
+}
+function closePlusMenu() {
+    document.getElementById('plus-menu')?.classList.add('hidden');
+}
+// 点空白处关闭 + 菜单
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('plus-menu');
+    if (menu && !menu.classList.contains('hidden') && !e.target.closest('#plus-menu') && !e.target.closest('button[onclick*="togglePlusMenu"]')) {
+        menu.classList.add('hidden');
+    }
+});
+
 // ===== 红包 & 礼物（微信式虚拟互动）=====
 const REDPACKET_AMOUNTS = ['6.66', '8.88', '18.88', '52.00', '66.66', '88.88', '131.40', '520.00', '999.00'];
 const GIFTS = [
