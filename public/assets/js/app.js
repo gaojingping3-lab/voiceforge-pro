@@ -6512,7 +6512,8 @@ const IMAGE_STYLES = {
     anime: { name: '动漫二次元', prefix: 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality, simple clean background, no extra objects' },
     japanese_anime: { name: '日系动漫插画', prefix: 'anime style, semi-realistic, cel shading, clean lineart, vibrant colors, soft natural lighting, cinematic composition, high quality, masterpiece, studio anime key visual, simple clean background, no extra objects' }
 };
-const ANATOMY_LOCK = 'masterpiece, high quality, detailed, anatomically correct, exactly two arms and two legs, correct hands and feet, five fingers per hand, correct number of limbs, no extra limbs, natural posture, proper anatomy';
+// 合并后的画质+防崩锁（原来FIXED_IMAGE_STYLE和ANATOMY_LOCK重复的 anatomically correct / five fingers / natural posture 已去重）
+const CORE_QUALITY_LOCK = 'masterpiece, high quality, detailed, photorealistic, candid photo, shot on Canon EOS R5, 50mm f/1.8, soft natural lighting, authentic skin texture, anatomically correct limbs, correct hands and feet, natural posture';
 
 function getImageStyle() {
     const s = localStorage.getItem('IMAGE_STYLE') || 'photorealistic';
@@ -6526,7 +6527,7 @@ function getImageStyle() {
 
 function getFixedStyleByMode() {
     const style = IMAGE_STYLES[getImageStyle()] || IMAGE_STYLES.photorealistic;
-    return style.prefix + ', ' + ANATOMY_LOCK;
+    return style.prefix + ', ' + CORE_QUALITY_LOCK;
 }
 
 // 生图提示词确认弹窗：返回 {confirmed, text}
@@ -6968,6 +6969,7 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
 6. 【人物起手式】必须使用 ${dualTag}，性别已由系统确定，禁止更改；画面必须同时包含两个人物，不能只画一个
 7. 不要添加风格词（系统已有固定写实前缀）
 8. 除两个固定身份块外，动作/构图/场景/光线部分合计控制在180-280个英文单词，按结构精炼有序，不要堆砌无关形容词
+9. 【动作冲突清洗】每个角色只能有一个连贯动作，严禁同时出现互斥姿态；不要重复2girls/2boys等词；全部输出纯英文，禁止出现中文字符或中文标点
 ${viewRule}`;
         } else {
             // 单人模式
@@ -6990,6 +6992,7 @@ ${viewRule}`;
 6. 不要添加风格词（系统已有固定写实前缀）
 7. 除固定身份块外，动作/场景/光线部分合计控制在120-200个英文单词，按结构精炼有序，不要堆砌无关形容词
 8. 【景别最高优先级】若有【用户拍摄要求】，其景别（全身full body/半身half body/特写close-up）必须100%遵守并放在最前；要求全身时禁止写half body、bust、portrait、close-up
+9. 【动作冲突清洗】一个角色只能有一个连贯动作，严禁同时出现互斥姿态（如同时站立+蹲下+扶膝）；不要重复solo、full body、1girl等词；全部输出纯英文，禁止出现中文字符或中文标点
 ${viewRule}`;
         }
 
@@ -7579,8 +7582,9 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
             finalKeywords += (finalKeywords ? ', ' : '') + 'only one person in the entire image, absolutely no other people, no duplicates, no clones, no second person';
         }
         if (finalKeywords) {
-            rolePrompt = finalKeywords + ', ' + rolePrompt + ', ' + finalKeywords;
-            console.log('[严格执行] 已强制加入视角/拍摄要求:', finalKeywords);
+            // 重构：只在末尾加一次硬约束，不再前后夹击（避免注意力稀释）
+            rolePrompt = rolePrompt + ', ' + finalKeywords;
+            console.log('[严格执行] 已追加视角/拍摄要求:', finalKeywords);
         }
 
         // 头像参考降级约束：参考图只看脸，画面完全按文字描述（避免参考图带节奏）
