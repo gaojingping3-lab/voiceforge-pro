@@ -4912,6 +4912,17 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
             }
         }
     }
+    // 在对话历史的固定深度（倒数第3条）插入角色笔记，防止角色漂移
+    const roleNote = dualRoleA && dualRoleB
+        ? `[你是${currentRole.name}，你不是${otherRole.name}。你的性格、语气、口头禅只来自你自己的角色卡，不要学${otherRole.name}的说话方式。]`
+        : `[你是${currentRole.name}，保持你的性格和语气，不要跑偏。]`;
+    
+    if (formattedHistory.length >= 3) {
+        formattedHistory.splice(-2, 0, { role: "system", content: roleNote });
+    } else {
+        formattedHistory.push({ role: "system", content: roleNote });
+    }
+
     messages.push(...formattedHistory);
 
     // 显示思考中
