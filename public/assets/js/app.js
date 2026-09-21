@@ -4855,7 +4855,7 @@ ${isUserInterruption ? '⚠️ 现在有用户（角色C）在插话，请直接
             if (relationAB) relationPrompt += `${dualRoleA.name}和${dualRoleB.name}：${relationAB}\n`;
             if (relationAUser) relationPrompt += `${dualRoleA.name}和你（用户）：${relationAUser}\n`;
             if (relationBUser) relationPrompt += `${dualRoleB.name}和你（用户）：${relationBUser}\n`;
-            relationPrompt += `\n说话时记得这些关系，自然体现。`;
+            relationPrompt += `\n【重要】请准确理解这些关系的方向！谁是支配方、谁是服从方，谁对谁怎么样，绝对不要搞反！说话时严格按照这些关系来体现。`;
         }
         
         messages.push({ role: 'system', content: `【角色C（用户）的设定】
