@@ -4829,16 +4829,14 @@ ${isUserInterruption ? '⚠️ 现在有用户（角色C）在插话，请直接
 - 你只对你的角色卡负责，人设冲突时以你的角色卡为准。` },
     ];
 
-    // 用户插话时，才加入用户设定和身份强调
-    if (isUserInterruption) {
-        messages.push({ role: 'system', content: `【角色C（用户）的设定，回复用户时必须严格参考】
-${userRoleDesc || '用户没有填写特别设定，请把用户当作这个场景的观察者。'}
+    // 不管是不是插话，都加入用户设定
+    if (dualRoleA && dualRoleB) {
+        messages.push({ role: 'system', content: `【角色C（用户）的设定】
+${userRoleDesc || '用户没有填写特别设定。'}
 
-⚠️ 重要规则：
-- 用户就是角色C，是独立的第三个人，不是角色A也不是角色B
-- 当用户问"我是谁"、"你知道我是谁吗"这类问题时，必须根据上面的用户设定来回答
-- 回复用户时，要符合你扮演的角色身份，同时参考用户设定
-- 绝对不能把用户当成角色A或角色B，也不能假装不知道用户是谁` });
+- 用户就是角色C，是独立的第三个人
+- 当用户说话时，你可以直接回应他
+- 记住用户是谁，不要把他当成角色A或角色B` });
     }
 
     // 当前角色人设（正常聊天去掉外貌部分，减少system prompt长度加快回复）
@@ -4914,7 +4912,7 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
     }
     // 在对话历史的固定深度（倒数第3条）插入角色笔记，防止角色漂移
     const roleNote = dualRoleA && dualRoleB
-        ? `[你是${currentRole.name}，你不是${otherRole.name}。你的性格、语气、口头禅只来自你自己的角色卡，不要学${otherRole.name}的说话方式。]`
+        ? `[你是${currentRole.name}，你不是${otherRole.name}。你的性格、语气、口头禅只来自你自己的角色卡，不要学${otherRole.name}的说话方式。用户是角色C，记住他是谁。]`
         : `[你是${currentRole.name}，保持你的性格和语气，不要跑偏。]`;
     
     if (formattedHistory.length >= 3) {
