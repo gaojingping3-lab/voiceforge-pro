@@ -4881,6 +4881,7 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
     if (localStorage.getItem('ROLE_CONSTRAINT') !== '0') {
         messages.push({ role: 'system', content: `【第一人称】只写你自己（${currentRole.name}）的反应和台词，不要替${otherRole.name}或用户说话/行动，说完即停。
 【格式】通常用*（神态、动作）* + 「台词」，简短回应可以只有台词，不用每句都硬凑动作。
+【禁止碎动作】不要生成太多一行一个的碎动作！动作要自然连贯，和台词结合在一起，不要像分镜脚本一样一行一个动作。
 【自然】像真人聊天一样，不要太刻意，不要总结，不要AI腔。` });
     }
 
