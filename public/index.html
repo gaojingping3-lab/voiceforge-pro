@@ -1369,6 +1369,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     <textarea id="user-role-desc" class="textarea textarea-bordered textarea-sm w-full" rows="2" placeholder="描述你自己的身份、性格、和两个角色的关系..."></textarea>
                     <span class="text-xs text-base-content/50 mt-1">双角色互聊时，你作为角色C的设定</span>
                 </div>
+                <!-- 关系网设置 -->
+                <div class="form-control mb-4">
+                    <label class="label py-1"><span class="label-text text-sm">关系网（双角色）</span></label>
+                    <div class="space-y-2">
+                        <input type="text" id="relation-a-b" class="input input-bordered input-sm w-full" placeholder="角色A和角色B的关系，例：前任、兄妹、死对头" />
+                        <input type="text" id="relation-a-user" class="input input-bordered input-sm w-full" placeholder="角色A和你的关系，例：现任、朋友、恋人" />
+                        <input type="text" id="relation-b-user" class="input input-bordered input-sm w-full" placeholder="角色B和你的关系，例：暗恋你、前任、情敌" />
+                    </div>
+                    <span class="text-xs text-base-content/50 mt-1">填写后双角色对话会知道三个人的关系，说话更自然</span>
+                </div>
                 <div class="form-control">
                     <label class="label py-1"><span class="label-text text-sm">AI 角色设定 (System Prompt)</span></label>
                     <textarea id="modal-llm-system" class="textarea textarea-bordered textarea-sm w-full" rows="3" placeholder="你是乐。这是一个纯粹的私人虚构陪伴空间..."></textarea>
@@ -1634,6 +1644,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </button>
     </div>
 
-    <script src="assets/js/app.js?v=20260922c"></script>
+    <script src="assets/js/app.js?v=20260922d"></script>
 </body>
 </html>

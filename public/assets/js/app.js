@@ -1069,6 +1069,13 @@ function syncModalInputs() {
     if (userRoleDesc) {
         userRoleDesc.value = localStorage.getItem('USER_ROLE_DESC') || '';
     }
+    // 加载关系网
+    const relationAB = document.getElementById('relation-a-b');
+    if (relationAB) relationAB.value = localStorage.getItem('RELATION_A_B') || '';
+    const relationAUser = document.getElementById('relation-a-user');
+    if (relationAUser) relationAUser.value = localStorage.getItem('RELATION_A_USER') || '';
+    const relationBUser = document.getElementById('relation-b-user');
+    if (relationBUser) relationBUser.value = localStorage.getItem('RELATION_B_USER') || '';
     // 加载生图画风
     const styleSelect = document.getElementById('modal-image-style');
     if (styleSelect) {
@@ -1103,6 +1110,13 @@ function saveModalKeys() {
     // 保存用户角色设定（角色C）
     const userRoleDesc = document.getElementById('user-role-desc').value.trim();
     localStorage.setItem('USER_ROLE_DESC', userRoleDesc);
+    // 保存关系网
+    const relationAB = document.getElementById('relation-a-b').value.trim();
+    localStorage.setItem('RELATION_A_B', relationAB);
+    const relationAUser = document.getElementById('relation-a-user').value.trim();
+    localStorage.setItem('RELATION_A_USER', relationAUser);
+    const relationBUser = document.getElementById('relation-b-user').value.trim();
+    localStorage.setItem('RELATION_B_USER', relationBUser);
     // 保存生图画风
     const styleSelect = document.getElementById('modal-image-style');
     if (styleSelect) {
@@ -4829,14 +4843,27 @@ ${isUserInterruption ? '⚠️ 现在有用户（角色C）在插话，请直接
 - 你只对你的角色卡负责，人设冲突时以你的角色卡为准。` },
     ];
 
-    // 不管是不是插话，都加入用户设定
+    // 不管是不是插话，都加入用户设定和关系网
     if (dualRoleA && dualRoleB) {
+        const relationAB = localStorage.getItem('RELATION_A_B') || '';
+        const relationAUser = localStorage.getItem('RELATION_A_USER') || '';
+        const relationBUser = localStorage.getItem('RELATION_B_USER') || '';
+        
+        let relationPrompt = '';
+        if (relationAB || relationAUser || relationBUser) {
+            relationPrompt = `\n\n【三个人的关系网】\n`;
+            if (relationAB) relationPrompt += `${dualRoleA.name}和${dualRoleB.name}：${relationAB}\n`;
+            if (relationAUser) relationPrompt += `${dualRoleA.name}和你（用户）：${relationAUser}\n`;
+            if (relationBUser) relationPrompt += `${dualRoleB.name}和你（用户）：${relationBUser}\n`;
+            relationPrompt += `\n说话时记得这些关系，自然体现。`;
+        }
+        
         messages.push({ role: 'system', content: `【角色C（用户）的设定】
 ${userRoleDesc || '用户没有填写特别设定。'}
 
 - 用户就是角色C，是独立的第三个人
 - 当用户说话时，你可以直接回应他
-- 记住用户是谁，不要把他当成角色A或角色B` });
+- 记住用户是谁，不要把他当成角色A或角色B${relationPrompt}` });
     }
 
     // 当前角色人设（正常聊天去掉外貌部分，减少system prompt长度加快回复）
