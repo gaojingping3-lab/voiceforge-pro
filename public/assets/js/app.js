@@ -2385,19 +2385,53 @@ document.addEventListener('click', (e) => {
 });
 
 // 生成专属表情包
+// 给表情包图叠加文字（程序写，100%正确）
+async function addTextToEmoji(dataUrl, text) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            
+            // 画原图
+            ctx.drawImage(img, 0, 0);
+            
+            // 画文字：顶部居中，可爱字体，黑色带白边
+            ctx.font = `bold ${Math.floor(img.width * 0.12)}px "Comic Sans MS", cursive, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            
+            // 白色描边
+            ctx.lineWidth = Math.floor(img.width * 0.02);
+            ctx.strokeStyle = 'white';
+            ctx.strokeText(text, img.width / 2, img.height * 0.05);
+            
+            // 黑色文字
+            ctx.fillStyle = 'black';
+            ctx.fillText(text, img.width / 2, img.height * 0.05);
+            
+            resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = () => resolve(dataUrl); // 失败了就返回原图
+        img.src = dataUrl;
+    });
+}
+
 async function generateCustomEmojis() {
     const btn = document.getElementById('generate-emoji-btn');
     if (!btn) return;
     
     const emojis = [
-        { key: 'happy', prompt: '开心微笑，眼睛弯成月牙，图片顶部用大号可爱的手写体中文写着：好耶！文字清晰可见' },
-        { key: 'love', prompt: '比心，脸红红的，图片顶部用大号可爱的手写体中文写着：爱你~文字清晰可见' },
-        { key: 'wink', prompt: '眨眼wink，俏皮，图片顶部用大号可爱的手写体中文写着：嘿嘿文字清晰可见' },
-        { key: 'angry', prompt: '嘟嘴生气，鼓包子脸，图片顶部用大号可爱的手写体中文写着：哼！文字清晰可见' },
-        { key: 'cry', prompt: '大哭，眼泪哗哗，图片顶部用大号可爱的手写体中文写着：呜呜呜文字清晰可见' },
-        { key: 'shy', prompt: '害羞，脸红到耳朵，图片顶部用大号可爱的手写体中文写着：///文字清晰可见' },
-        { key: 'sleepy', prompt: '睡觉打哈欠，图片顶部用大号可爱的手写体中文写着：zzz文字清晰可见' },
-        { key: 'surprised', prompt: '惊讶，眼睛瞪得圆圆的，图片顶部用大号可爱的手写体中文写着：诶？！文字清晰可见' },
+        { key: 'happy', prompt: '开心微笑，眼睛弯成月牙', text: '好耶！' },
+        { key: 'love', prompt: '比心，脸红红的', text: '爱你~' },
+        { key: 'wink', prompt: '眨眼wink，俏皮', text: '嘿嘿' },
+        { key: 'angry', prompt: '嘟嘴生气，鼓包子脸', text: '哼！' },
+        { key: 'cry', prompt: '大哭，眼泪哗哗', text: '呜呜呜' },
+        { key: 'shy', prompt: '害羞，脸红到耳朵', text: '///' },
+        { key: 'sleepy', prompt: '睡觉打哈欠', text: 'zzz' },
+        { key: 'surprised', prompt: '惊讶，眼睛瞪得圆圆的', text: '诶？！' },
     ];
     
     btn.disabled = true;
@@ -2431,12 +2465,17 @@ async function generateCustomEmojis() {
             const result = await generateImageWithSafety(prompt, getImageModel(), null, prompt, null, '1:1', '1K');
             
             // 转成dataURL存起来
-            const dataUrl = await new Promise((resolve) => {
+            let dataUrl = await new Promise((resolve) => {
                 const fr = new FileReader();
                 fr.onload = () => resolve(fr.result);
                 fr.onerror = () => resolve(null);
                 fr.readAsDataURL(result.blob);
             });
+            
+            // 叠加文字（程序写，100%正确）
+            if (dataUrl && emoji.text) {
+                dataUrl = await addTextToEmoji(dataUrl, emoji.text);
+            }
             
             if (dataUrl) {
                 results[emoji.key] = dataUrl;
