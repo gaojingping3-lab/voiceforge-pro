@@ -2467,7 +2467,7 @@ async function generateCustomEmojis() {
 // 加载专属表情包到面板
 async function loadCustomEmojis() {
     try {
-        const panel = document.querySelector('#emoji-panel .grid');
+        const panel = document.getElementById('emoji-grid');
         if (!panel) return;
         
         // 从IndexedDB读取表情包
@@ -2483,8 +2483,8 @@ async function loadCustomEmojis() {
                 for (const emoji of emojis) {
                     const key = emoji.prompt.replace('emoji_', '');
                     const btn = document.createElement('button');
-                    btn.className = 'emoji-item';
-                    btn.innerHTML = `<img src="${emoji.dataUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+                    btn.className = 'emoji-item aspect-square rounded-xl overflow-hidden bg-gray-50';
+                    btn.innerHTML = `<img src="${emoji.dataUrl}" style="width:100%;height:100%;object-fit:cover;">`;
                     btn.onclick = () => sendEmoji(key);
                     panel.appendChild(btn);
                 }
