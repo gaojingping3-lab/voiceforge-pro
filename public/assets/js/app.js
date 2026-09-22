@@ -4856,7 +4856,7 @@ ${isUserInterruption ? '⚠️ 现在有用户（角色C）在插话，请直接
             if (relationAB) relationPrompt += `1. ${dualRoleA.name} ↔ ${dualRoleB.name}：${relationAB}\n`;
             if (relationAUser) relationPrompt += `2. ${dualRoleA.name} ↔ 你（用户）：${relationAUser}\n`;
             if (relationBUser) relationPrompt += `3. ${dualRoleB.name} ↔ 你（用户）：${relationBUser}\n`;
-            relationPrompt += `\n【最重要的规则】支配和服从的方向绝对不能搞反！谁命令谁，谁服从谁，谁主动谁被动，必须严格按照上面写的来，绝对不能互换身份！说话时必须体现这些关系，不能违反规则！`;
+            relationPrompt += `\n【最重要的规则】关系的方向绝对不能搞反！谁喜欢谁、谁讨厌谁、谁命令谁、谁服从谁、谁主动谁被动，必须严格按照上面写的来，绝对不能互换身份！说话时必须体现这些关系，不能违反规则！`;
         }
         
         messages.push({ role: 'system', content: `【角色C（用户）的设定】
