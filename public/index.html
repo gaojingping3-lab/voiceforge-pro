@@ -2,7 +2,7 @@
 <html lang="zh-CN" data-theme="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content, maximum-scale=1.0">
     <title>乐乐大人专用 | 多模态语音合成与克隆</title>
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -991,7 +991,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <i class="fa-solid fa-phone text-base" style="color: #555;"></i>
                     </button>
                     <!-- 输入框 -->
-                    <textarea id="chat-input" placeholder="" class="flex-1 resize-none" rows="1" style="max-height: 100px; min-height: 40px; border-radius: 20px; background: #fff; border: none; padding: 10px 16px; font-size: 16px; outline: none;" oninput="autoResizeInput();" onkeydown="handleChatKeydown(event)"></textarea>
+                    <textarea id="chat-input" placeholder="" class="flex-1 resize-none" rows="1" style="max-height: 100px; min-height: 40px; border-radius: 20px; background: #fff; border: none; padding: 10px 16px; font-size: 16px; outline: none;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" oninput="autoResizeInput();" onkeydown="handleChatKeydown(event)"></textarea>
                     <input type="file" id="user-photo-input" accept="image/*" hidden onchange="onUserPhotoSelected(event)" />
                     <!-- 思考程度按钮 -->
                     <div class="relative flex-shrink-0">
