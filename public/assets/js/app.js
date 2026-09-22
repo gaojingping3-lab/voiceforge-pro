@@ -4235,9 +4235,8 @@ function createChatAvatar(name, isUser) {
 
 // 打开角色相册
 async function openCharacterAlbum(roleName) {
-    // 从聊天记录里找这个角色发过的所有图片
-    const imageMsgs = chatHistory
-        .filter(msg => msg.type === 'image' && msg.role === 'assistant');
+    // 直接从IndexedDB加载当前角色的所有图片
+    const allImages = await loadRoleChatImages();
     
     // 弹窗
     const modal = document.createElement('div');
@@ -4245,7 +4244,7 @@ async function openCharacterAlbum(roleName) {
     modal.onclick = () => modal.remove();
     
     const content = document.createElement('div');
-    content.className = 'bg-base-100 rounded-2xl p-4 max-w-lg w-full max-h-[80vh] overflow-y-auto';
+    content.className = 'bg-base-100 rounded-2xl p-4 max-w-lg w-full max-h-[80vh] overflow-y-auto relative';
     content.onclick = (e) => e.stopPropagation();
     
     const title = document.createElement('div');
@@ -4260,60 +4259,33 @@ async function openCharacterAlbum(roleName) {
     const grid = document.createElement('div');
     grid.className = 'grid grid-cols-3 gap-2';
     
-    if (imageMsgs.length === 0) {
+    if (allImages.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'text-center text-base-content/50 py-10 col-span-3';
         empty.innerText = '还没有照片';
         grid.appendChild(empty);
     } else {
-        // 异步加载所有图片
-        for (const msg of imageMsgs) {
-            const placeholder = document.createElement('div');
-            placeholder.className = 'w-full h-32 bg-base-200 rounded-lg animate-pulse';
-            grid.appendChild(placeholder);
+        // 按时间倒序，最新的在前
+        allImages.reverse().forEach((item) => {
+            let src = item.dataUrl || (item.blob ? URL.createObjectURL(item.blob) : '');
+            if (!src) return;
             
-            try {
-                // 和聊天里一样的逻辑：先精确匹配，找不到就找最接近的
-                let item = await loadChatImageByTs(msg.ts);
-                if (!item) {
-                    // 兜底：找当前角色所有图片里最接近的
-                    const allImages = await loadRoleChatImages();
-                    if (allImages && allImages.length) {
-                        let best = null, bestDiff = Infinity;
-                        for (const it of allImages) {
-                            const d = Math.abs((it.ts || 0) - (msg.ts || 0));
-                            if (d < bestDiff) { bestDiff = d; best = it; }
-                        }
-                        item = best;
-                    }
-                }
-                
-                if (item && grid.isConnected) {
-                    let src = item.dataUrl || (item.blob ? URL.createObjectURL(item.blob) : '');
-                    if (src) {
-                        const img = document.createElement('img');
-                        img.src = src;
-                        img.className = 'w-full h-32 object-cover rounded-lg cursor-pointer';
-                        img.onclick = () => {
-                            // 点击看大图
-                            const bigImg = document.createElement('img');
-                            bigImg.src = src;
-                            bigImg.className = 'max-w-full max-h-full object-contain';
-                            const bigModal = document.createElement('div');
-                            bigModal.className = 'fixed inset-0 bg-black/90 z-60 flex items-center justify-center p-4';
-                            bigModal.onclick = () => bigModal.remove();
-                            bigModal.appendChild(bigImg);
-                            document.body.appendChild(bigModal);
-                        };
-                        grid.replaceChild(img, placeholder);
-                    }
-                } else {
-                    placeholder.remove();
-                }
-            } catch (e) {
-                placeholder.remove();
-            }
-        }
+            const img = document.createElement('img');
+            img.src = src;
+            img.className = 'w-full h-32 object-cover rounded-lg cursor-pointer';
+            img.onclick = () => {
+                // 点击看大图
+                const bigImg = document.createElement('img');
+                bigImg.src = src;
+                bigImg.className = 'max-w-full max-h-full object-contain';
+                const bigModal = document.createElement('div');
+                bigModal.className = 'fixed inset-0 bg-black/90 z-60 flex items-center justify-center p-4';
+                bigModal.onclick = () => bigModal.remove();
+                bigModal.appendChild(bigImg);
+                document.body.appendChild(bigModal);
+            };
+            grid.appendChild(img);
+        });
     }
     
     content.appendChild(title);
