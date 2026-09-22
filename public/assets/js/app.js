@@ -2325,13 +2325,18 @@ async function generateCustomEmojis() {
     ];
     
     btn.disabled = true;
-    btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中 0/8...';
+    btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 准备中...';
     
     const results = {};
     
     for (let i = 0; i < emojis.length; i++) {
         const emoji = emojis[i];
-        btn.innerHTML = `<span class="loading loading-spinner loading-xs"></span> 生成中 ${i+1}/8...`;
+        btn.innerHTML = `<span class="loading loading-spinner loading-xs"></span> 正在生成：${emoji.prompt} (${i+1}/8)`;
+        
+        // 弹个toast提示进度
+        if (typeof showToast === 'function') {
+            showToast(`正在生成第${i+1}个表情：${emoji.prompt}`);
+        }
         
         try {
             // 获取当前角色的外貌描述
