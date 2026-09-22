@@ -2380,14 +2380,14 @@ async function generateCustomEmojis() {
     if (!btn) return;
     
     const emojis = [
-        { key: 'happy', prompt: '开心微笑，眼睛弯成月牙，图片上加可爱的手写体文字"好耶！"' },
-        { key: 'love', prompt: '比心，脸红红的，图片上加可爱的手写体文字"爱你~"' },
-        { key: 'wink', prompt: '眨眼wink，俏皮，图片上加可爱的手写体文字"嘿嘿"' },
-        { key: 'angry', prompt: '嘟嘴生气，鼓包子脸，图片上加可爱的手写体文字"哼！"' },
-        { key: 'cry', prompt: '大哭，眼泪哗哗，图片上加可爱的手写体文字"呜呜呜"' },
-        { key: 'shy', prompt: '害羞，脸红到耳朵，图片上加可爱的手写体文字"///"' },
-        { key: 'sleepy', prompt: '睡觉打哈欠，图片上加可爱的手写体文字"zzz"' },
-        { key: 'surprised', prompt: '惊讶，眼睛瞪得圆圆的，图片上加可爱的手写体文字"诶？！"' },
+        { key: 'happy', prompt: '开心微笑，眼睛弯成月牙，图片顶部用大号可爱的手写体中文写着：好耶！文字清晰可见' },
+        { key: 'love', prompt: '比心，脸红红的，图片顶部用大号可爱的手写体中文写着：爱你~文字清晰可见' },
+        { key: 'wink', prompt: '眨眼wink，俏皮，图片顶部用大号可爱的手写体中文写着：嘿嘿文字清晰可见' },
+        { key: 'angry', prompt: '嘟嘴生气，鼓包子脸，图片顶部用大号可爱的手写体中文写着：哼！文字清晰可见' },
+        { key: 'cry', prompt: '大哭，眼泪哗哗，图片顶部用大号可爱的手写体中文写着：呜呜呜文字清晰可见' },
+        { key: 'shy', prompt: '害羞，脸红到耳朵，图片顶部用大号可爱的手写体中文写着：///文字清晰可见' },
+        { key: 'sleepy', prompt: '睡觉打哈欠，图片顶部用大号可爱的手写体中文写着：zzz文字清晰可见' },
+        { key: 'surprised', prompt: '惊讶，眼睛瞪得圆圆的，图片顶部用大号可爱的手写体中文写着：诶？！文字清晰可见' },
     ];
     
     btn.disabled = true;
