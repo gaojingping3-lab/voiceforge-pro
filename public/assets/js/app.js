@@ -2942,6 +2942,7 @@ function loadChatHistory() {
 function renderChatHistory() {
     const container = document.getElementById('chat-messages');
     if (!container) return;
+    applyChatBg(); // 应用聊天背景
     container.innerHTML = '';
     if (chatHistory.length === 0) {
         return; // 空聊天，不显示默认欢迎消息
@@ -5956,6 +5957,108 @@ function updateModeHint() {
     } else {
         hint.className = 'alert alert-success py-1 px-3 text-xs mb-3';
         text.innerText = '当前模式：全量历史（AI记住全部对话）';
+    }
+}
+
+// ===== 聊天背景更换 =====
+function openChatBgPicker() {
+    const role = getCurrentRole();
+    const roleId = role ? role.id : 'default';
+    const currentBg = localStorage.getItem(`chatBg_${roleId}`) || 'default';
+    
+    const modal = document.createElement('dialog');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-box max-w-sm">
+            <h3 class="font-bold text-lg mb-4">🖼️ 聊天背景</h3>
+            <div class="grid grid-cols-3 gap-3 mb-4">
+                <div class="aspect-square rounded-lg cursor-pointer border-2 ${currentBg === 'default' ? 'border-green-500' : 'border-transparent'}" 
+                     style="background:#f2f2f7;display:flex;align-items:center;justify-content:center;font-size:12px" 
+                     onclick="selectChatBg('default')">
+                    默认
+                </div>
+                <div class="aspect-square rounded-lg cursor-pointer border-2 ${currentBg === 'pink' ? 'border-green-500' : 'border-transparent'}" 
+                     style="background:linear-gradient(135deg,#ffdde1,#ee9ca7);display:flex;align-items:center;justify-content:center;font-size:12px;color:white" 
+                     onclick="selectChatBg('pink')">
+                    粉色
+                </div>
+                <div class="aspect-square rounded-lg cursor-pointer border-2 ${currentBg === 'blue' ? 'border-green-500' : 'border-transparent'}" 
+                     style="background:linear-gradient(135deg,#a1c4fd,#c2e9fb);display:flex;align-items:center;justify-content:center;font-size:12px;color:white" 
+                     onclick="selectChatBg('blue')">
+                    蓝色
+                </div>
+                <div class="aspect-square rounded-lg cursor-pointer border-2 ${currentBg === 'sakura' ? 'border-green-500' : 'border-transparent'}" 
+                     style="background:linear-gradient(135deg,#fbc2eb,#a6c1ee);display:flex;align-items:center;justify-content:center;font-size:12px;color:white" 
+                     onclick="selectChatBg('sakura')">
+                    樱花
+                </div>
+                <div class="aspect-square rounded-lg cursor-pointer border-2 ${currentBg === 'dark' ? 'border-green-500' : 'border-transparent'}" 
+                     style="background:linear-gradient(135deg,#232526,#414345);display:flex;align-items:center;justify-content:center;font-size:12px;color:white" 
+                     onclick="selectChatBg('dark')">
+                    黑色
+                </div>
+                <div class="aspect-square rounded-lg cursor-pointer border-2 border-dashed border-gray-300 flex flex-col items-center justify-center" 
+                     onclick="document.getElementById('bg-upload-input').click()">
+                    <i class="fa-solid fa-plus text-xl text-gray-400 mb-1"></i>
+                    <span class="text-xs text-gray-500">相册上传</span>
+                </div>
+            </div>
+            <input type="file" id="bg-upload-input" accept="image/*" class="hidden" onchange="uploadChatBg(this)" />
+            <div class="modal-action">
+                <button class="btn btn-sm" onclick="this.closest('dialog').close()">关闭</button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    modal.showModal();
+    modal.addEventListener('close', () => modal.remove());
+}
+
+function selectChatBg(bgKey) {
+    const role = getCurrentRole();
+    const roleId = role ? role.id : 'default';
+    localStorage.setItem(`chatBg_${roleId}`, bgKey);
+    applyChatBg();
+    // 刷新弹窗的选中状态
+    document.querySelectorAll('#chat-more-menu').forEach(m => m.classList.add('hidden'));
+    openChatBgPicker();
+}
+
+function uploadChatBg(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const dataUrl = e.target.result;
+        const role = getCurrentRole();
+        const roleId = role ? role.id : 'default';
+        localStorage.setItem(`chatBg_${roleId}`, dataUrl);
+        applyChatBg();
+        // 关闭弹窗
+        document.querySelectorAll('.modal').forEach(m => m.close());
+    };
+    reader.readAsDataURL(file);
+}
+
+function applyChatBg() {
+    const role = getCurrentRole();
+    const roleId = role ? role.id : 'default';
+    const bg = localStorage.getItem(`chatBg_${roleId}`) || 'default';
+    const chatContainer = document.getElementById('chat-messages');
+    
+    if (bg === 'default') {
+        chatContainer.style.background = '';
+        chatContainer.style.backgroundImage = '';
+    } else if (bg === 'pink') {
+        chatContainer.style.background = 'linear-gradient(135deg,#ffdde1,#ee9ca7)';
+    } else if (bg === 'blue') {
+        chatContainer.style.background = 'linear-gradient(135deg,#a1c4fd,#c2e9fb)';
+    } else if (bg === 'sakura') {
+        chatContainer.style.background = 'linear-gradient(135deg,#fbc2eb,#a6c1ee)';
+    } else if (bg === 'dark') {
+        chatContainer.style.background = 'linear-gradient(135deg,#232526,#414345)';
+    } else {
+        // 用户上传的图片
+        chatContainer.style.background = `url(${bg}) center/cover no-repeat`;
     }
 }
 
