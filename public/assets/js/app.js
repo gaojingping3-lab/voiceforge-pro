@@ -2363,12 +2363,40 @@ async function generateCustomEmojis() {
         }
     }
     
-    // 保存到localStorage
+    // 保存到IndexedDB（不是localStorage，那个只有5MB）
     try {
-        localStorage.setItem('custom_emojis', JSON.stringify(results));
+        const db = await openImageDB();
+        const tx = db.transaction(CHAT_IMG_STORE, 'readwrite');
+        const store = tx.objectStore(CHAT_IMG_STORE);
+        
+        // 先清空旧的表情包
+        const oldReq = store.index('roleKey').openCursor(IDBKeyRange.only('custom_emoji'));
+        oldReq.onsuccess = (e) => {
+            const cursor = e.target.result;
+            if (cursor) {
+                cursor.delete();
+                cursor.continue();
+            }
+        };
+        
+        // 存新的表情包
+        for (const [key, dataUrl] of Object.entries(results)) {
+            store.add({
+                dataUrl: dataUrl,
+                ts: Date.now(),
+                roleKey: 'custom_emoji',
+                prompt: 'emoji_' + key,
+                ratio: '1:1'
+            });
+        }
+        
+        // 标记已生成
+        localStorage.setItem('custom_emojis_generated', '1');
+        
         alert('专属表情包生成完成！共成功' + Object.keys(results).length + '/8个');
     } catch (e) {
-        alert('表情包保存失败，可能是内存不够');
+        console.error('表情包保存失败:', e);
+        alert('表情包保存失败: ' + e.message);
     }
     
     btn.disabled = false;
@@ -2379,23 +2407,31 @@ async function generateCustomEmojis() {
 }
 
 // 加载专属表情包到面板
-function loadCustomEmojis() {
+async function loadCustomEmojis() {
     try {
-        const customEmojis = JSON.parse(localStorage.getItem('custom_emojis') || '{}');
         const panel = document.querySelector('#emoji-panel .grid');
         if (!panel) return;
         
-        // 如果有自定义表情包，替换掉系统emoji
-        if (Object.keys(customEmojis).length > 0) {
-            panel.innerHTML = '';
-            for (const [key, src] of Object.entries(customEmojis)) {
-                const btn = document.createElement('button');
-                btn.className = 'emoji-item';
-                btn.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
-                btn.onclick = () => sendEmoji(`[表情:${key}]`);
-                panel.appendChild(btn);
+        // 从IndexedDB读取表情包
+        const db = await openImageDB();
+        const tx = db.transaction(CHAT_IMG_STORE, 'readonly');
+        const index = tx.objectStore(CHAT_IMG_STORE).index('roleKey');
+        const req = index.getAll('custom_emoji');
+        
+        req.onsuccess = async () => {
+            const emojis = req.result;
+            if (emojis.length > 0) {
+                panel.innerHTML = '';
+                for (const emoji of emojis) {
+                    const key = emoji.prompt.replace('emoji_', '');
+                    const btn = document.createElement('button');
+                    btn.className = 'emoji-item';
+                    btn.innerHTML = `<img src="${emoji.dataUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+                    btn.onclick = () => sendEmoji(`[表情:${key}]`);
+                    panel.appendChild(btn);
+                }
             }
-        }
+        };
     } catch (e) {
         console.error('加载自定义表情失败:', e);
     }
