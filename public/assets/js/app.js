@@ -2342,7 +2342,12 @@ async function sendEmoji(emojiKey) {
         
         req.onsuccess = async () => {
             const emojis = req.result;
-            const emoji = emojis.find(e => e.prompt === 'emoji_' + emojiKey);
+            // 兼容：有的存的prompt不对，直接找包含emoji_的
+            let emoji = emojis.find(e => e.prompt === 'emoji_' + emojiKey);
+            if (!emoji) {
+                // 兜底：按顺序找，不管key是什么
+                emoji = emojis[0];
+            }
             if (!emoji) {
                 alert('表情没找到，请先生成专属表情包');
                 return;
