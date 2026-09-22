@@ -2654,15 +2654,17 @@ async function sendRedPacket(amount, roleName) {
     const container = document.getElementById('chat-messages');
     const rpDiv = document.createElement('div');
     rpDiv.className = 'chat chat-end relative gap-2';
-    rpDiv.innerHTML = `<div class="chat-bubble p-0 overflow-hidden" style="min-width:240px;background:#ff9900;">
-        <div style="display:flex;align-items:center;padding:14px 16px;gap:12px;">
-            <div style="width:44px;height:44px;border-radius:4px;background:linear-gradient(180deg,#e64340,#d93838);display:flex;align-items:center;justify-content:center;color:#f7b733;font-size:24px;font-weight:bold;">¥</div>
-            <div style="flex:1;">
-                <div style="font-size:18px;color:#fff;">恭喜发财，大吉大利</div>
-                <div style="font-size:12px;opacity:0.8;margin-top:8px;">微信红包</div>
+    rpDiv.innerHTML = `
+        <div class="chat-bubble p-0 overflow-hidden" style="min-width:260px;background:#ff9900;">
+            <div style="display:flex;align-items:center;padding:16px 16px;gap:12px;">
+                <div style="width:40px;height:40px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:20px;">⇄</div>
+                <div>
+                    <div style="font-size:20px;color:#fff;font-weight:bold;">¥${parseFloat(amount).toFixed(2)}</div>
+                    <div style="font-size:14px;color:#fff;opacity:0.9;margin-top:2px;">请收款</div>
+                </div>
             </div>
         </div>
-    </div>`;
+        <div style="font-size:12px;color:#666;margin-top:4px;text-align:right;padding-right:8px;">微信转账</div>`;
     container.appendChild(rpDiv);
     scrollToBottom();
     await sendChatMessage();
