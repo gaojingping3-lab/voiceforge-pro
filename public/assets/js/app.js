@@ -2751,7 +2751,13 @@ function renderChatHistory() {
                 div.appendChild(createChatAvatar(speakerName, false));
                 const bubble = document.createElement('div');
                 bubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
-                bubble.innerHTML = '<span class="text-xs font-bold block mb-1" style="color:' + color + '">' + escapeHtml(speakerName) + '</span>' + formatChatText(content);
+                // 群聊的时候显示角色名，单角色和双角色不显示
+                let bubbleContent = '';
+                if (groupChatActive && groupRoles.length > 0) {
+                    bubbleContent = '<span class="text-xs font-bold block mb-1" style="color:' + color + '">' + escapeHtml(speakerName) + '</span>';
+                }
+                bubbleContent += formatChatText(content);
+                bubble.innerHTML = bubbleContent;
                 div.appendChild(bubble);
                 const playBtn = document.createElement('button');
                 playBtn.className = 'play-voice-btn absolute bottom-1 right-1 btn btn-ghost btn-sm btn-circle opacity-70 hover:opacity-100';
