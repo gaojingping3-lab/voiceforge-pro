@@ -2452,23 +2452,23 @@ function renderChatImageBubble(imageBubble, item) {
         trackChatBlobUrl(src);
     }
     imageBubble.innerHTML = `
-        <img src="${src}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />
-        <div class="flex gap-2 mt-2 px-1 pb-1">
-            <button class="btn btn-primary btn-xs flex-1 regenerate-btn"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
-            <a href="${src}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
-        </div>`;
+        <img src="${src}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />`;
     const imgEl = imageBubble.querySelector('img');
-    const dlA = imageBubble.querySelector('a[download]');
     // 旧 blob 数据且加载失败：转 dataURL 兜底
     imgEl.onerror = () => {
         if (item.blob && !item.dataUrl) {
             try { URL.revokeObjectURL(src); } catch (e) {}
             const fr = new FileReader();
-            fr.onload = () => { imgEl.src = fr.result; imgEl.onerror = null; imgEl.onclick = () => openImageLightbox(fr.result); dlA.href = fr.result; };
+            fr.onload = () => { imgEl.src = fr.result; imgEl.onerror = null; imgEl.onclick = () => openImageLightbox(fr.result); };
             fr.onerror = () => { imgEl.src = ''; };
             fr.readAsDataURL(item.blob);
         }
     };
+    // 保留 dataset 供其他功能使用
+    imageBubble.dataset.savedPrompt = item.prompt || '';
+    imageBubble.dataset.ratio = item.ratio || '1:1';
+    // 重新生成按钮已隐藏，后续可加到长按菜单
+    /*
     const regBtn = imageBubble.querySelector('.regenerate-btn');
     if (!item.prompt) { regBtn.style.display = 'none'; return; }
     imageBubble.dataset.savedPrompt = item.prompt;
@@ -2505,6 +2505,7 @@ function renderChatImageBubble(imageBubble, item) {
             btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> 重新生成';
         }
     };
+    */
 }
 
 async function trimChatImages() {
