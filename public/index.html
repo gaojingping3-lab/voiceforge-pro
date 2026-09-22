@@ -976,34 +976,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button id="scroll-to-bottom-btn" onclick="scrollToBottom()" class="absolute bottom-20 right-6 z-20 btn btn-circle btn-sm bg-base-200/90 backdrop-blur shadow-lg opacity-0 pointer-events-none transition-all duration-200 hover:scale-110" title="回到底部">
                     <i class="fa-solid fa-arrow-down text-sm"></i>
                 </button>
-                <div class="flex gap-2 items-end" style="padding-bottom: env(safe-area-inset-bottom);">
-                    <input type="file" id="user-photo-input" accept="image/*" hidden onchange="onUserPhotoSelected(event)" />
-                    <textarea id="chat-input" placeholder="跟乐说点什么..." class="textarea textarea-bordered textarea-sm flex-1 resize-none" rows="1" style="max-height: 100px; min-height: 40px;" oninput="autoResizeInput();" onkeydown="handleChatKeydown(event)"></textarea>
+                <div class="flex gap-2 items-center" style="padding-bottom: env(safe-area-inset-bottom); padding: 10px 12px; background: #f7f7f7;">
                     <!-- 语音通话按钮 -->
-                    <button class="btn btn-ghost btn-sm btn-circle self-center" onclick="toggleVoiceCallMode()" title="语音通话模式">
-                        <i class="fa-solid fa-phone-volume text-base"></i>
+                    <button class="btn btn-ghost btn-sm btn-circle flex-shrink-0" onclick="toggleVoiceCallMode()" title="语音通话" style="width: 40px; height: 40px; background: #fff; border: 1px solid #e5e5e5;">
+                        <i class="fa-solid fa-phone text-base" style="color: #555;"></i>
                     </button>
-                    <!-- 思考程度切换 -->
-                    <div class="relative self-center">
-                        <button id="btn-reasoning" class="btn btn-ghost btn-sm btn-circle" onclick="toggleReasoningMenu()" title="思考程度">
-                            <i class="fa-solid fa-brain text-base"></i>
+                    <!-- 输入框 -->
+                    <textarea id="chat-input" placeholder="" class="flex-1 resize-none" rows="1" style="max-height: 100px; min-height: 40px; border-radius: 20px; background: #fff; border: none; padding: 10px 16px; font-size: 16px; outline: none;" oninput="autoResizeInput();" onkeydown="handleChatKeydown(event)"></textarea>
+                    <input type="file" id="user-photo-input" accept="image/*" hidden onchange="onUserPhotoSelected(event)" />
+                    <!-- 思考程度按钮 -->
+                    <div class="relative flex-shrink-0">
+                        <button id="btn-reasoning" class="btn btn-ghost btn-sm btn-circle" onclick="toggleReasoningMenu()" title="思考程度" style="width: 40px; height: 40px; background: #fff; border: 1px solid #e5e5e5;">
+                            <i class="fa-solid fa-brain text-base" style="color: #555;"></i>
                         </button>
-                        <div id="reasoning-menu" class="hidden absolute bottom-full right-0 mb-2 bg-base-200 rounded-xl shadow-xl border border-base-300 py-1 w-36 z-50">
-                            <div class="px-3 py-1 text-xs font-bold text-gray-500 border-b border-base-300 mb-1">思考程度</div>
-                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-base-300 rounded-none reasoning-option" data-level="off" onclick="setReasoning('off')">关闭（秒回）</button>
-                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-base-300 rounded-none reasoning-option" data-level="low" onclick="setReasoning('low')">低</button>
-                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-base-300 rounded-none reasoning-option" data-level="high" onclick="setReasoning('high')">高</button>
-                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-base-300 rounded-none reasoning-option" data-level="max" onclick="setReasoning('max')">Max</button>
+                        <div id="reasoning-menu" class="hidden absolute bottom-full right-0 mb-2 bg-white rounded-xl shadow-xl border border-gray-200 py-1 w-36 z-[1001]">
+                            <div class="px-3 py-1 text-xs font-bold text-gray-500 border-b border-gray-200 mb-1">思考程度</div>
+                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 reasoning-option" data-level="off" onclick="setReasoning('off')">关闭（秒回）</button>
+                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 reasoning-option" data-level="low" onclick="setReasoning('low')">低</button>
+                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 reasoning-option" data-level="high" onclick="setReasoning('high')">高</button>
+                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 reasoning-option" data-level="max" onclick="setReasoning('max')">Max</button>
                         </div>
                     </div>
-                    <!-- 微信式 + 号菜单 -->
-                    <div class="self-center">
-                        <button class="btn btn-ghost btn-sm btn-circle" onclick="togglePlusMenu(event)" title="更多">
-                            <i class="fa-solid fa-plus text-base"></i>
-                        </button>
-                    </div>
-                    <button id="btn-chat-send" class="btn btn-primary btn-sm px-5 rounded-full self-center" onclick="sendChatMessage()">
-                        <i class="fa-solid fa-paper-plane"></i>
+                    <!-- +按钮 -->
+                    <button class="btn btn-ghost btn-sm btn-circle flex-shrink-0" onclick="togglePlusMenu(event)" title="更多" style="width: 40px; height: 40px; background: #fff; border: 1px solid #e5e5e5;">
+                        <i class="fa-solid fa-plus text-base" style="color: #555;"></i>
+                    </button>
+                    <!-- 发送按钮（输入文字后显示） -->
+                    <button id="btn-chat-send" class="btn btn-primary btn-sm flex-shrink-0" onclick="sendChatMessage()" style="border-radius: 6px; padding: 0 16px; height: 40px; display: none;">
+                        发送
                     </button>
                 </div>
             </div>

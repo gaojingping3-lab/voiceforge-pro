@@ -3159,6 +3159,16 @@ function autoResizeInput() {
     if (!input) return;
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+    
+    // 控制发送按钮显示/隐藏
+    const sendBtn = document.getElementById('btn-chat-send');
+    if (sendBtn) {
+        if (input.value.trim().length > 0) {
+            sendBtn.style.display = 'block';
+        } else {
+            sendBtn.style.display = 'none';
+        }
+    }
 }
 
 // 输入框键盘事件：Enter发送，Shift+Enter换行
