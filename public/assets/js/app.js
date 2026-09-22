@@ -6018,9 +6018,8 @@ function selectChatBg(bgKey) {
     const roleId = role ? role.id : 'default';
     localStorage.setItem(`chatBg_${roleId}`, bgKey);
     applyChatBg();
-    // 刷新弹窗的选中状态
-    document.querySelectorAll('#chat-more-menu').forEach(m => m.classList.add('hidden'));
-    openChatBgPicker();
+    // 选完直接关闭弹窗
+    document.querySelectorAll('.modal').forEach(m => m.close());
 }
 
 function uploadChatBg(input) {
