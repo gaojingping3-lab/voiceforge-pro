@@ -2380,14 +2380,14 @@ async function generateCustomEmojis() {
     if (!btn) return;
     
     const emojis = [
-        { key: 'happy', prompt: '开心微笑，眼睛弯成月牙' },
-        { key: 'love', prompt: '比心，脸红红的' },
-        { key: 'wink', prompt: '眨眼wink，俏皮' },
-        { key: 'angry', prompt: '嘟嘴生气，鼓包子脸' },
-        { key: 'cry', prompt: '大哭，眼泪哗哗' },
-        { key: 'shy', prompt: '害羞，脸红到耳朵' },
-        { key: 'sleepy', prompt: '睡觉打哈欠' },
-        { key: 'surprised', prompt: '惊讶，眼睛瞪得圆圆的' },
+        { key: 'happy', prompt: '开心微笑，眼睛弯成月牙，图片上加可爱的手写体文字"好耶！"' },
+        { key: 'love', prompt: '比心，脸红红的，图片上加可爱的手写体文字"爱你~"' },
+        { key: 'wink', prompt: '眨眼wink，俏皮，图片上加可爱的手写体文字"嘿嘿"' },
+        { key: 'angry', prompt: '嘟嘴生气，鼓包子脸，图片上加可爱的手写体文字"哼！"' },
+        { key: 'cry', prompt: '大哭，眼泪哗哗，图片上加可爱的手写体文字"呜呜呜"' },
+        { key: 'shy', prompt: '害羞，脸红到耳朵，图片上加可爱的手写体文字"///"' },
+        { key: 'sleepy', prompt: '睡觉打哈欠，图片上加可爱的手写体文字"zzz"' },
+        { key: 'surprised', prompt: '惊讶，眼睛瞪得圆圆的，图片上加可爱的手写体文字"诶？！"' },
     ];
     
     btn.disabled = true;
