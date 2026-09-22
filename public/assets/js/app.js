@@ -2656,15 +2656,15 @@ async function sendRedPacket(amount, roleName) {
     rpDiv.className = 'chat chat-end relative gap-2';
     rpDiv.innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0;">
-            <div class="chat-bubble p-0 overflow-hidden" style="min-width:280px;background:#ffd3b0 !important;">
-                <div style="display:flex;align-items:center;padding:16px 16px 8px;gap:12px;">
-                    <div style="width:44px;height:44px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:24px;">✓</div>
+            <div class="chat-bubble p-0 overflow-hidden" style="min-width:220px;background:#ffd3b0 !important;">
+                <div style="display:flex;align-items:center;padding:12px 14px 6px;gap:10px;">
+                    <div style="width:36px;height:36px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:18px;">✓</div>
                     <div>
-                        <div style="font-size:22px;color:#fff;font-weight:bold;">¥${parseFloat(amount).toFixed(2)}</div>
-                        <div style="font-size:15px;color:#fff;opacity:0.9;margin-top:2px;">请收款</div>
+                        <div style="font-size:18px;color:#fff;font-weight:bold;">¥${parseFloat(amount).toFixed(2)}</div>
+                        <div style="font-size:13px;color:#fff;opacity:0.9;margin-top:1px;">请收款</div>
                     </div>
                 </div>
-                <div style="padding:0 16px 12px;font-size:12px;color:#fff;opacity:0.8;">转账</div>
+                <div style="padding:0 14px 10px;font-size:11px;color:#fff;opacity:0.8;">转账</div>
             </div>
         </div>`;
     // 加上用户头像
