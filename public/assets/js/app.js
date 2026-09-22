@@ -6048,21 +6048,17 @@ function applyChatBg() {
     if (bg === 'default') {
         chatContainer.style.background = '';
         chatContainer.style.backgroundImage = '';
-        chatContainer.classList.remove('chat-bg-custom');
+    } else if (bg === 'pink') {
+        chatContainer.style.background = 'linear-gradient(135deg,#ffdde1,#ee9ca7)';
+    } else if (bg === 'blue') {
+        chatContainer.style.background = 'linear-gradient(135deg,#a1c4fd,#c2e9fb)';
+    } else if (bg === 'sakura') {
+        chatContainer.style.background = 'linear-gradient(135deg,#fbc2eb,#a6c1ee)';
+    } else if (bg === 'dark') {
+        chatContainer.style.background = 'linear-gradient(135deg,#232526,#414345)';
     } else {
-        chatContainer.classList.add('chat-bg-custom');
-        if (bg === 'pink') {
-            chatContainer.style.background = 'linear-gradient(135deg,#ffdde1,#ee9ca7)';
-        } else if (bg === 'blue') {
-            chatContainer.style.background = 'linear-gradient(135deg,#a1c4fd,#c2e9fb)';
-        } else if (bg === 'sakura') {
-            chatContainer.style.background = 'linear-gradient(135deg,#fbc2eb,#a6c1ee)';
-        } else if (bg === 'dark') {
-            chatContainer.style.background = 'linear-gradient(135deg,#232526,#414345)';
-        } else {
-            // 用户上传的图片
-            chatContainer.style.background = `url(${bg}) center/cover no-repeat`;
-        }
+        // 用户上传的图片
+        chatContainer.style.background = `url(${bg}) center/cover no-repeat`;
     }
 }
 
