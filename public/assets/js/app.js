@@ -8292,44 +8292,12 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
         imageDiv.className = 'chat chat-start relative gap-2';
         imageDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
 
-        const imageBubble = document.createElement('div');
-        imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-1 max-w-[80%]';
-        imageBubble.innerHTML = `
+        const imgWrap = document.createElement('div');
+        imgWrap.className = 'max-w-[80%]';
+        imgWrap.innerHTML = `
             <img src="${imageUrl}" alt="生成的图片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />
-            <div class="flex gap-2 mt-2 px-1 pb-1">
-                <button class="btn btn-primary btn-xs flex-1 regenerate-btn"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
-                <a href="${imageUrl}" download="chat-generated.png" class="btn btn-ghost btn-xs flex-1"><i class="fa-solid fa-download"></i> 下载</a>
-            </div>
         `;
-        // 保存优化后的提示词，用于重新生成（直接用，不再优化）
-        imageBubble.dataset.savedPrompt = savedPrompt;
-        imageBubble.dataset.ratio = savedRatio;
-        // 重新生成按钮事件：用保存的提示词直连生成，走和原图一致的快通道
-        imageBubble.querySelector('.regenerate-btn').onclick = async function() {
-            const btn = this;
-            btn.disabled = true;
-            btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中...';
-            try {
-                let finalSaved = savedPrompt;
-                if (localStorage.getItem('IMG_CONFIRM_PROMPT') !== '0') {
-                    const conf = await awaitPromptConfirm(savedPrompt);
-                    if (!conf.confirmed) return;
-                    finalSaved = (conf.text || '').trim() || savedPrompt;
-                }
-                const result = await generateImageWithSafety(finalSaved, getImageModel(), null, finalSaved, refImages, imageBubble.dataset.ratio || '1:1', getImageQuality());
-                const newImageUrl = URL.createObjectURL(result.blob);
-                trackChatBlobUrl(newImageUrl);
-                imageBubble.querySelector('img').src = newImageUrl;
-                imageBubble.querySelector('img').onclick = () => openImageLightbox(newImageUrl);
-                imageBubble.querySelector('a[download]').href = newImageUrl;
-            } catch (err) {
-                alert('重新生成失败，图片未更新（仍是原图）: ' + (err.message || err));
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> 重新生成';
-            }
-        };
-        imageDiv.appendChild(imageBubble);
+        imageDiv.appendChild(imgWrap);
         container.appendChild(imageDiv);
         smartScroll(container);
         isGeneratingChatImage = false;
