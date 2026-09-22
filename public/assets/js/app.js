@@ -2405,13 +2405,21 @@ async function generateCustomEmojis() {
         }
         
         try {
-            // 获取当前角色的外貌描述
+            // 获取当前角色的外貌描述和头像
             const role = getCurrentRole();
             const roleDesc = role?.desc || role?.description || '';
             const roleName = role?.name || '';
-            const prompt = `Q版表情包，${roleName}，${roleDesc}，做这个表情：${emoji.prompt}，白色背景，正方形，可爱chibi风格，头大身小，线条清晰`;
+            const roleAvatar = role?.avatar || '';  // 角色头像dataURL
             
-            const result = await generateImageWithSafety(prompt, getImageModel(), null, prompt, null, '1:1', '1K');
+            const prompt = `Q版表情包，这是一个女孩子，她叫${roleName}，外貌特征和服装和参考头像里的人完全一致，现在她做这个表情：${emoji.prompt}，白色背景，正方形，可爱chibi风格，头大身小，线条清晰，和参考头像是同一个人`;
+            
+            // 把头像dataURL转成Blob，作为参考图传进去
+            let avatarBlob = null;
+            if (roleAvatar && roleAvatar.startsWith('data:image')) {
+                avatarBlob = await (await fetch(roleAvatar)).blob();
+            }
+            
+            const result = await generateImageWithSafety(prompt, getImageModel(), null, prompt, avatarBlob, '1:1', '1K');
             
             // 转成dataURL存起来
             const dataUrl = await new Promise((resolve) => {
