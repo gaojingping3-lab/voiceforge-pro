@@ -2654,12 +2654,12 @@ async function sendRedPacket(amount, roleName) {
     const container = document.getElementById('chat-messages');
     const rpDiv = document.createElement('div');
     rpDiv.className = 'chat chat-end relative gap-2';
-    rpDiv.innerHTML = `<div class="chat-bubble p-0 overflow-hidden" style="min-width:240px;background:linear-gradient(180deg,#e64340,#d93838);">
+    rpDiv.innerHTML = `<div class="chat-bubble p-0 overflow-hidden" style="min-width:240px;background:#ff9900;">
         <div style="display:flex;align-items:center;padding:14px 16px;gap:12px;">
-            <div style="width:44px;height:44px;border-radius:6px;background:linear-gradient(180deg,#f7b733,#fc4a1a);display:flex;align-items:center;justify-content:center;color:white;font-size:24px;font-weight:bold;">¥</div>
-            <div>
-                <div style="font-size:15px;color:#fff;">恭喜发财，大吉大利</div>
-                <div style="font-size:12px;opacity:0.8;margin-top:4px;">微信红包</div>
+            <div style="width:44px;height:44px;border-radius:4px;background:linear-gradient(180deg,#e64340,#d93838);display:flex;align-items:center;justify-content:center;color:#f7b733;font-size:24px;font-weight:bold;">¥</div>
+            <div style="flex:1;">
+                <div style="font-size:18px;color:#fff;">恭喜发财，大吉大利</div>
+                <div style="font-size:12px;opacity:0.8;margin-top:8px;">微信红包</div>
             </div>
         </div>
     </div>`;
