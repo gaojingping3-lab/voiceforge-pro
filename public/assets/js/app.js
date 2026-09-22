@@ -6055,20 +6055,21 @@ function applyChatBg() {
     const roleId = role ? role.id : 'default';
     const bg = localStorage.getItem(`chatBg_${roleId}`) || 'default';
     const chatContainer = document.getElementById('chat-messages');
+    if (!chatContainer) return;
     
     if (bg === 'default') {
-        chatContainer.style.background = '#f8fafc'; // 原来的默认背景
+        chatContainer.style.cssText += ';background: #f8fafc !important';
     } else if (bg === 'pink') {
-        chatContainer.style.background = 'linear-gradient(135deg,#ffdde1,#ee9ca7)';
+        chatContainer.style.cssText += ';background: linear-gradient(135deg,#ffdde1,#ee9ca7) !important';
     } else if (bg === 'blue') {
-        chatContainer.style.background = 'linear-gradient(135deg,#a1c4fd,#c2e9fb)';
+        chatContainer.style.cssText += ';background: linear-gradient(135deg,#a1c4fd,#c2e9fb) !important';
     } else if (bg === 'sakura') {
-        chatContainer.style.background = 'linear-gradient(135deg,#fbc2eb,#a6c1ee)';
+        chatContainer.style.cssText += ';background: linear-gradient(135deg,#fbc2eb,#a6c1ee) !important';
     } else if (bg === 'dark') {
-        chatContainer.style.background = 'linear-gradient(135deg,#232526,#414345)';
+        chatContainer.style.cssText += ';background: linear-gradient(135deg,#232526,#414345) !important';
     } else {
         // 用户上传的图片
-        chatContainer.style.background = `url(${bg}) center/cover no-repeat`;
+        chatContainer.style.cssText += `;background: url(${bg}) center/cover no-repeat !important`;
     }
 }
 
