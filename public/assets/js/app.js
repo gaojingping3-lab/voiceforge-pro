@@ -2271,10 +2271,11 @@ function togglePlusMenu(e) {
     const menu = document.getElementById('plus-menu');
     if (!menu) return;
     if (menu.classList.contains('hidden')) {
-        // 动态定位：在+按钮上方弹出
+        // 动态定位：在+按钮上方弹出，靠右对齐
         const btn = e.currentTarget;
         const rect = btn.getBoundingClientRect();
-        menu.style.left = rect.left + 'px';
+        const menuWidth = 160; // w-40
+        menu.style.right = (window.innerWidth - rect.right) + 'px';
         menu.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
         menu.classList.remove('hidden');
     } else {
