@@ -1074,8 +1074,6 @@ function syncModalInputs() {
     if (relationAB) relationAB.value = localStorage.getItem('RELATION_A_B') || '';
     const relationAUser = document.getElementById('relation-a-user');
     if (relationAUser) relationAUser.value = localStorage.getItem('RELATION_A_USER') || '';
-    const relationBUser = document.getElementById('relation-b-user');
-    if (relationBUser) relationBUser.value = localStorage.getItem('RELATION_B_USER') || '';
     // 加载生图画风
     const styleSelect = document.getElementById('modal-image-style');
     if (styleSelect) {
@@ -1115,8 +1113,6 @@ function saveModalKeys() {
     localStorage.setItem('RELATION_A_B', relationAB);
     const relationAUser = document.getElementById('relation-a-user').value.trim();
     localStorage.setItem('RELATION_A_USER', relationAUser);
-    const relationBUser = document.getElementById('relation-b-user').value.trim();
-    localStorage.setItem('RELATION_B_USER', relationBUser);
     // 保存生图画风
     const styleSelect = document.getElementById('modal-image-style');
     if (styleSelect) {
@@ -4948,24 +4944,14 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
     if (dualRoleA && dualRoleB) {
         const relationAB = localStorage.getItem('RELATION_A_B') || '';
         const relationAUser = localStorage.getItem('RELATION_A_USER') || '';
-        const relationBUser = localStorage.getItem('RELATION_B_USER') || '';
         
-        if (relationAB || relationAUser || relationBUser) {
+        if (relationAB || relationAUser) {
             let relationPrompt = `\n\n【最高优先级：你的关系网（绝对不能搞反！）】\n`;
             relationPrompt += `这是最高优先级的规则，比任何其他设定都重要，你必须严格遵守：\n\n`;
             
             // 你和用户的关系
-            if (currentRole === dualRoleA && relationAUser) {
+            if (relationAUser) {
                 relationPrompt += `【你和用户的关系】${relationAUser}\n`;
-            } else if (currentRole === dualRoleB && relationBUser) {
-                relationPrompt += `【你和用户的关系】${relationBUser}\n`;
-            }
-            
-            // 另一个角色和用户的关系
-            if (currentRole === dualRoleA && relationBUser) {
-                relationPrompt += `【${dualRoleB.name}和用户的关系】${relationBUser}\n`;
-            } else if (currentRole === dualRoleB && relationAUser) {
-                relationPrompt += `【${dualRoleA.name}和用户的关系】${relationAUser}\n`;
             }
             
             // 你和另一个角色的关系
