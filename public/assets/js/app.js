@@ -4210,7 +4210,7 @@ function getAvatarData(name, isUser) {
 function createChatAvatar(name, isUser) {
     const avatarData = getAvatarData(name, isUser);
     const wrap = document.createElement('div');
-    wrap.className = 'chat-image avatar flex-shrink-0';
+    wrap.className = 'chat-image avatar flex-shrink-0 cursor-pointer';
     const inner = document.createElement('div');
     // 微信风格：圆角矩形，36px精致尺寸
     inner.className = 'w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center text-white text-xs font-bold shadow-sm';
@@ -4224,7 +4224,73 @@ function createChatAvatar(name, isUser) {
         inner.innerText = avatarData.char;
     }
     wrap.appendChild(inner);
+    
+    // 点击头像看相册
+    if (!isUser) {
+        wrap.onclick = () => openCharacterAlbum(name);
+    }
+    
     return wrap;
+}
+
+// 打开角色相册
+function openCharacterAlbum(roleName) {
+    // 从聊天记录里找这个角色发过的所有图片
+    const albumImages = chatHistory
+        .filter(msg => msg.type === 'image' && msg.role === 'assistant')
+        .map(msg => msg.content);
+    
+    // 弹窗
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4';
+    modal.onclick = () => modal.remove();
+    
+    const content = document.createElement('div');
+    content.className = 'bg-base-100 rounded-2xl p-4 max-w-lg w-full max-h-[80vh] overflow-y-auto';
+    content.onclick = (e) => e.stopPropagation();
+    
+    const title = document.createElement('div');
+    title.className = 'text-lg font-bold mb-3';
+    title.innerText = `${roleName}的相册`;
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'btn btn-sm btn-circle absolute right-4 top-4';
+    closeBtn.innerHTML = '✕';
+    closeBtn.onclick = () => modal.remove();
+    
+    const grid = document.createElement('div');
+    grid.className = 'grid grid-cols-3 gap-2';
+    
+    if (albumImages.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'text-center text-base-content/50 py-10 col-span-3';
+        empty.innerText = '还没有照片';
+        grid.appendChild(empty);
+    } else {
+        albumImages.forEach(src => {
+            const img = document.createElement('img');
+            img.src = src;
+            img.className = 'w-full h-32 object-cover rounded-lg cursor-pointer';
+            img.onclick = () => {
+                // 点击看大图
+                const bigImg = document.createElement('img');
+                bigImg.src = src;
+                bigImg.className = 'max-w-full max-h-full object-contain';
+                const bigModal = document.createElement('div');
+                bigModal.className = 'fixed inset-0 bg-black/90 z-60 flex items-center justify-center p-4';
+                bigModal.onclick = () => bigModal.remove();
+                bigModal.appendChild(bigImg);
+                document.body.appendChild(bigModal);
+            };
+            grid.appendChild(img);
+        });
+    }
+    
+    content.appendChild(title);
+    content.appendChild(closeBtn);
+    content.appendChild(grid);
+    modal.appendChild(content);
+    document.body.appendChild(modal);
 }
 
 // 上传头像处理
