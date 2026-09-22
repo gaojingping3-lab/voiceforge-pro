@@ -4914,11 +4914,11 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
                     // 当前角色自己说的话，作为assistant
                     formattedHistory.push({ role: 'assistant', content: content });
                 } else if (speakerName === otherRole.name) {
-                    // 对方角色说的话，作为system消息传入，不要让AI以为是用户说的
-                    formattedHistory.push({ role: 'system', content: `【${speakerName}说】${content}` });
+                    // 对方角色说的话，作为user消息传入，标记清楚
+                    formattedHistory.push({ role: 'user', content: `【${speakerName}说】${content}` });
                 } else {
                     // 其他情况，也标记清楚
-                    formattedHistory.push({ role: 'system', content: `【${speakerName}说】${content}` });
+                    formattedHistory.push({ role: 'user', content: `【${speakerName}说】${content}` });
                 }
             } else {
                 formattedHistory.push({ role: 'assistant', content: msg.content });
@@ -4938,7 +4938,7 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
 
     // 在最后也加一条角色提醒，AI最后看到的最有效
     const lastRoleNote = dualRoleA && dualRoleB
-        ? `【最后提醒】你现在是${currentRole.name}！绝对不要用${otherRole.name}的语气说话！严格按你的角色卡来！`
+        ? `【最后提醒】\n这个对话里有三个人：\n1. ${dualRoleA.name}（角色A）\n2. ${dualRoleB.name}（角色B）\n3. 用户（角色C）\n\n你现在是${currentRole.name}！绝对不要用${otherRole.name}的语气说话！严格按你的角色卡来！`
         : `【最后提醒】保持${currentRole.name}的性格和语气！`;
     formattedHistory.push({ role: "system", content: lastRoleNote });
 
