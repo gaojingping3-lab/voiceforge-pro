@@ -955,13 +955,18 @@ document.addEventListener('DOMContentLoaded', () => {
                             <i class="fa-solid fa-chevron-left text-lg"></i>
                         </button>
                         <span id="fullscreen-title" class="font-bold text-base truncate max-w-[60%]">聊天</span>
-                        <div class="flex items-center gap-1">
-                            <button class="btn btn-ghost btn-sm btn-circle" onclick="openArFromChat()" title="AR出屏">
-                                <i class="fa-solid fa-camera text-lg" style="color:#f43f5e"></i>
+                        <div class="flex items-center gap-1 relative">
+                            <button class="btn btn-ghost btn-sm btn-circle" onclick="toggleChatMoreMenu(event)" title="更多">
+                                <i class="fa-solid fa-ellipsis text-lg"></i>
                             </button>
-                            <button class="btn btn-ghost btn-sm btn-circle text-error" onclick="clearChat()">
-                                <i class="fa-solid fa-eraser text-lg"></i>
-                            </button>
+                            <div id="chat-more-menu" class="hidden absolute top-full right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 py-1 w-40 z-[1001]">
+                                <button class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100" onclick="openArFromChat(); closeChatMoreMenu();">
+                                    <i class="fa-solid fa-camera mr-2" style="color:#f43f5e"></i> AR出屏
+                                </button>
+                                <button class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-error" onclick="clearChat(); closeChatMoreMenu();">
+                                    <i class="fa-solid fa-eraser mr-2"></i> 清空聊天
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div id="chat-messages" class="bg-base-100/80 rounded-2xl p-4 flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 mb-3"></div>

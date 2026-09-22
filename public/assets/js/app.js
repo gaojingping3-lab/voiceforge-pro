@@ -2266,6 +2266,23 @@ async function loadRecentImageDataUrls(limit = 20) {
 }
 
 // ===== 微信式 + 号菜单 =====
+function toggleChatMoreMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('chat-more-menu');
+    if (!menu) return;
+    menu.classList.toggle('hidden');
+}
+function closeChatMoreMenu() {
+    document.getElementById('chat-more-menu')?.classList.add('hidden');
+}
+// 点空白处关闭聊天更多菜单
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('chat-more-menu');
+    if (menu && !menu.classList.contains('hidden') && !e.target.closest('#chat-more-menu') && !e.target.closest('button[onclick*="toggleChatMoreMenu"]')) {
+        menu.classList.add('hidden');
+    }
+});
+
 function togglePlusMenu(e) {
     if (e) e.stopPropagation();
     const menu = document.getElementById('plus-menu');
