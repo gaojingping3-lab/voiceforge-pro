@@ -2456,7 +2456,7 @@ async function loadCustomEmojis() {
                     const btn = document.createElement('button');
                     btn.className = 'emoji-item';
                     btn.innerHTML = `<img src="${emoji.dataUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
-                    btn.onclick = () => sendEmoji(`[表情:${key}]`);
+                    btn.onclick = () => sendEmoji(key);
                     panel.appendChild(btn);
                 }
             }
