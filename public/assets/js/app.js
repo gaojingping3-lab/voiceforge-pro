@@ -4273,15 +4273,19 @@ async function openCharacterAlbum(roleName) {
             const img = document.createElement('img');
             img.src = src;
             img.className = 'w-full h-32 object-cover rounded-lg cursor-pointer';
-            img.onclick = () => {
-                // 点击看大图
+            img.onclick = (e) => {
+                e.stopPropagation();
+                // 点击看大图，全屏显示
+                const bigModal = document.createElement('div');
+                bigModal.className = 'fixed inset-0 bg-black z-[100] flex items-center justify-center';
+                bigModal.style.cursor = 'zoom-out';
+                
                 const bigImg = document.createElement('img');
                 bigImg.src = src;
                 bigImg.className = 'max-w-full max-h-full object-contain';
-                const bigModal = document.createElement('div');
-                bigModal.className = 'fixed inset-0 bg-black/90 z-60 flex items-center justify-center p-4';
-                bigModal.onclick = () => bigModal.remove();
+                
                 bigModal.appendChild(bigImg);
+                bigModal.onclick = () => bigModal.remove();
                 document.body.appendChild(bigModal);
             };
             grid.appendChild(img);
