@@ -302,13 +302,12 @@
   /* 3. 聊天容器 - 消除白底圆角盒中盒 */
   html body.chat-fullscreen #chat-messages,
   body.chat-fullscreen:not(.theme-obsidian):not(.theme-dark) #chat-messages {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    padding: 16px !important;
-    margin: 0 !important;
-    flex: 1 !important;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 16px;
+    margin: 0;
+    flex: 1;
   }
   /* 4. 底部输入区左右和底部彻底贴边 */
   body.chat-fullscreen .flex.gap-2.items-end {
@@ -346,9 +345,8 @@
     box-shadow: 0 2px 10px rgba(0,0,0,0.08) !important;
   }
   body:not(.theme-obsidian):not(.theme-dark) #chat-messages {
-    background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-    box-shadow: inset 0 2px 8px rgba(0,0,0,0.04) !important;
+    border: 1px solid #e2e8f0;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.04);
   }
   body:not(.theme-obsidian):not(.theme-dark) .chat-bubble {
     box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
