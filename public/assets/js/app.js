@@ -2448,14 +2448,19 @@ async function generateCustomEmojis() {
         const store = tx.objectStore(CHAT_IMG_STORE);
         
         // 先清空旧的表情包
-        const oldReq = store.index('roleKey').openCursor(IDBKeyRange.only('custom_emoji'));
-        oldReq.onsuccess = (e) => {
-            const cursor = e.target.result;
-            if (cursor) {
-                cursor.delete();
-                cursor.continue();
-            }
-        };
+        await new Promise((resolve, reject) => {
+            const oldReq = store.index('roleKey').openCursor(IDBKeyRange.only('custom_emoji'));
+            oldReq.onsuccess = (e) => {
+                const cursor = e.target.result;
+                if (cursor) {
+                    cursor.delete();
+                    cursor.continue();
+                } else {
+                    resolve(); // 删完了
+                }
+            };
+            oldReq.onerror = reject;
+        });
         
         // 存新的表情包
         for (const [key, dataUrl] of Object.entries(results)) {
@@ -2467,6 +2472,12 @@ async function generateCustomEmojis() {
                 ratio: '1:1'
             });
         }
+        
+        // 等transaction完成
+        await new Promise((resolve, reject) => {
+            tx.oncomplete = resolve;
+            tx.onerror = reject;
+        });
         
         // 标记已生成
         localStorage.setItem('custom_emojis_generated', '1');
