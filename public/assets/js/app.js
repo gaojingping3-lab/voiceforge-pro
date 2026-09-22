@@ -2967,17 +2967,25 @@ function renderChatHistory() {
         }
         if (msg.ts) lastMsgTs = msg.ts;
         
-        // 红包卡片（右侧，红色封面）
+        // 转账卡片（右侧，微信样式）
         if (msg.type === 'redpacket') {
             const rpDiv = document.createElement('div');
             rpDiv.className = 'chat chat-end relative gap-2';
-            rpDiv.innerHTML = `<div class="chat-bubble p-0 overflow-hidden" style="background:linear-gradient(135deg,#e53e3e,#c53030);min-width:160px;border-radius:12px;">
-                <div style="padding:12px 16px;color:#fff;">
-                    <div style="font-size:28px;">🧧</div>
-                    <div style="font-size:13px;margin-top:4px;">恭喜发财，大吉大利</div>
-                    <div style="font-size:11px;opacity:0.8;margin-top:8px;">¥${msg.amount}</div>
-                </div>
-            </div>`;
+            rpDiv.innerHTML = `
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0;">
+                    <div class="chat-bubble p-0 overflow-hidden" style="min-width:220px;background:#ffd3b0 !important;">
+                        <div style="display:flex;align-items:center;padding:10px 14px 4px;gap:10px;">
+                            <div style="width:32px;height:32px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:16px;">✓</div>
+                            <div>
+                                <div style="font-size:17px;color:#fff;font-weight:bold;">¥${parseFloat(msg.amount).toFixed(2)}</div>
+                                <div style="font-size:12px;color:#fff;opacity:0.9;margin-top:0px;">请收款</div>
+                            </div>
+                        </div>
+                        <div style="padding:0 14px 8px;font-size:11px;color:#fff;opacity:0.8;">转账</div>
+                    </div>
+                </div>`;
+            const avatar = createChatAvatar('我', true);
+            rpDiv.appendChild(avatar);
             container.appendChild(rpDiv);
             continue;
         }
