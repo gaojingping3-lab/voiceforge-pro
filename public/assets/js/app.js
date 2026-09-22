@@ -2308,6 +2308,97 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// 生成专属表情包
+async function generateCustomEmojis() {
+    const btn = document.getElementById('generate-emoji-btn');
+    if (!btn) return;
+    
+    const emojis = [
+        { key: 'happy', prompt: '开心微笑，眼睛弯成月牙' },
+        { key: 'love', prompt: '比心，脸红红的' },
+        { key: 'wink', prompt: '眨眼wink，俏皮' },
+        { key: 'angry', prompt: '嘟嘴生气，鼓包子脸' },
+        { key: 'cry', prompt: '大哭，眼泪哗哗' },
+        { key: 'shy', prompt: '害羞，脸红到耳朵' },
+        { key: 'sleepy', prompt: '睡觉打哈欠' },
+        { key: 'surprised', prompt: '惊讶，眼睛瞪得圆圆的' },
+    ];
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> 生成中 0/8...';
+    
+    const results = {};
+    
+    for (let i = 0; i < emojis.length; i++) {
+        const emoji = emojis[i];
+        btn.innerHTML = `<span class="loading loading-spinner loading-xs"></span> 生成中 ${i+1}/8...`;
+        
+        try {
+            // 获取当前角色的外貌描述
+            const roleDesc = getCurrentRoleCard()?.appearance || getCurrentRoleCard()?.description || '';
+            const prompt = `Q版表情包，和参考图同一个人，${roleDesc}，做这个表情：${emoji.prompt}，白色背景，正方形，可爱chibi风格，头大身小，线条清晰`;
+            
+            const result = await generateImageWithSafety(prompt, getImageModel(), null, prompt, null, '1:1', '1K');
+            
+            // 转成dataURL存起来
+            const dataUrl = await new Promise((resolve) => {
+                const fr = new FileReader();
+                fr.onload = () => resolve(fr.result);
+                fr.onerror = () => resolve(null);
+                fr.readAsDataURL(result.blob);
+            });
+            
+            if (dataUrl) {
+                results[emoji.key] = dataUrl;
+            }
+        } catch (e) {
+            console.error('生成表情失败:', emoji.key, e);
+        }
+    }
+    
+    // 保存到localStorage
+    try {
+        localStorage.setItem('custom_emojis', JSON.stringify(results));
+        alert('专属表情包生成完成！共成功' + Object.keys(results).length + '/8个');
+    } catch (e) {
+        alert('表情包保存失败，可能是内存不够');
+    }
+    
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles mr-2"></i>重新生成专属表情包';
+    
+    // 重新加载表情面板
+    loadCustomEmojis();
+}
+
+// 加载专属表情包到面板
+function loadCustomEmojis() {
+    try {
+        const customEmojis = JSON.parse(localStorage.getItem('custom_emojis') || '{}');
+        const panel = document.querySelector('#emoji-panel .grid');
+        if (!panel) return;
+        
+        // 如果有自定义表情包，替换掉系统emoji
+        if (Object.keys(customEmojis).length > 0) {
+            panel.innerHTML = '';
+            for (const [key, src] of Object.entries(customEmojis)) {
+                const btn = document.createElement('button');
+                btn.className = 'emoji-item';
+                btn.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+                btn.onclick = () => sendEmoji(`[表情:${key}]`);
+                panel.appendChild(btn);
+            }
+        }
+    } catch (e) {
+        console.error('加载自定义表情失败:', e);
+    }
+}
+
+// 页面加载时自动加载自定义表情
+window.addEventListener('load', () => {
+    setTimeout(loadCustomEmojis, 1000);
+});
+
 function togglePlusMenu(e) {
     if (e) e.stopPropagation();
     const menu = document.getElementById('plus-menu');
