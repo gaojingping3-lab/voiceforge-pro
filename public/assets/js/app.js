@@ -4893,13 +4893,13 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
         messages.push({ role: 'system', content: `你正在和${otherRole.name}对话。请用第一人称回复，只说你自己（${currentRole.name}）的话，不要替对方说话。回复要简短自然，像真人聊天一样，不要太长。` });
     }
 
-    // 格式化对话历史：每条消息都标明发言人，让AI清楚区分三方，增加到20条上下文
+    // 格式化对话历史：每条消息都标明发言人，让AI清楚区分三方，改成10条上下文（太多容易混淆）
     // 视觉模型支持：双聊历史里的图片同样带给视觉模型
     const chatLlmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
     const visionEnabled = (chatLlmModel === 'deepseek-flash') || /vision/i.test(chatLlmModel);
-    const chatImageMap = visionEnabled ? await loadRecentImageDataUrls(20) : new Map();
+    const chatImageMap = visionEnabled ? await loadRecentImageDataUrls(10) : new Map();
     const formattedHistory = [];
-    for (const msg of chatHistory.slice(-20)) {
+    for (const msg of chatHistory.slice(-10)) {
         if (msg.type === 'image') {
             if (visionEnabled && chatImageMap.has(msg.ts)) {
                 const caption = (msg.role === 'user') ? '我发给你看一张照片：' : '这是你刚才给我生成的那张照片：';
@@ -4928,11 +4928,11 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
                     // 当前角色自己说的话，作为assistant
                     formattedHistory.push({ role: 'assistant', content: content });
                 } else if (speakerName === otherRole.name) {
-                    // 对方角色说的话，作为user消息传入，标记清楚
-                    formattedHistory.push({ role: 'user', content: `【角色${dualCurrentSpeaker === 'A' ? 'B' : 'A'}（${speakerName}）说】${content}` });
+                    // 对方角色说的话，作为system消息传入，不要让AI以为是用户说的
+                    formattedHistory.push({ role: 'system', content: `【${speakerName}说】${content}` });
                 } else {
                     // 其他情况，也标记清楚
-                    formattedHistory.push({ role: 'user', content: `【${speakerName}说】${content}` });
+                    formattedHistory.push({ role: 'system', content: `【${speakerName}说】${content}` });
                 }
             } else {
                 formattedHistory.push({ role: 'assistant', content: msg.content });
@@ -4949,6 +4949,12 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
     } else {
         formattedHistory.push({ role: "system", content: roleNote });
     }
+
+    // 在最后也加一条角色提醒，AI最后看到的最有效
+    const lastRoleNote = dualRoleA && dualRoleB
+        ? `【最后提醒】你现在是${currentRole.name}！绝对不要用${otherRole.name}的语气说话！严格按你的角色卡来！`
+        : `【最后提醒】保持${currentRole.name}的性格和语气！`;
+    formattedHistory.push({ role: "system", content: lastRoleNote });
 
     messages.push(...formattedHistory);
 
