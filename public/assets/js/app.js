@@ -2291,13 +2291,42 @@ function openEmojiPanel() {
 function closeEmojiPanel() {
     document.getElementById('emoji-panel')?.classList.add('hidden');
 }
-function sendEmoji(emoji) {
+async function sendEmoji(emojiKey) {
     closeEmojiPanel();
-    // 把表情作为消息发送
-    const input = document.getElementById('chat-input');
-    if (input) {
-        input.value = emoji;
-        sendChatMessage();
+    
+    try {
+        // 从IndexedDB读取表情图片
+        const db = await openImageDB();
+        const tx = db.transaction(CHAT_IMG_STORE, 'readonly');
+        const index = tx.objectStore(CHAT_IMG_STORE).index('roleKey');
+        const req = index.getAll('custom_emoji');
+        
+        req.onsuccess = async () => {
+            const emojis = req.result;
+            const emoji = emojis.find(e => e.prompt === 'emoji_' + emojiKey);
+            if (!emoji) {
+                alert('表情没找到，请先生成专属表情包');
+                return;
+            }
+            
+            // 进聊天记录（role=user，右侧气泡，类型是image）
+            const ts = Date.now();
+            chatHistory.push({ 
+                role: 'user', 
+                content: '', 
+                type: 'image', 
+                ts,
+                dataUrl: emoji.dataUrl  // 直接带dataUrl，不用再读IndexedDB
+            });
+            saveChatHistory();
+            renderChatHistory();
+            
+            // 触发AI回复
+            await sendChatMessage();
+        };
+    } catch (e) {
+        console.error('发表情失败:', e);
+        alert('发表情失败: ' + e.message);
     }
 }
 // 点空白处关闭表情面板
@@ -2860,15 +2889,22 @@ function renderChatHistory() {
                 // 用户发的照片：右侧，主色气泡，无头像
                 const imageBubble = document.createElement('div');
                 imageBubble.className = 'chat-bubble bg-primary text-primary-content p-1 max-w-[80%]';
-                imageBubble.innerHTML = '<div class="text-xs opacity-70 px-2 py-3">图片加载中…</div>';
+                // 如果msg里直接带了dataUrl（比如表情），直接显示
+                if (msg.dataUrl) {
+                    imageBubble.innerHTML = `<img src="${msg.dataUrl}" alt="用户发的表情" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />`;
+                } else {
+                    imageBubble.innerHTML = '<div class="text-xs opacity-70 px-2 py-3">图片加载中…</div>';
+                }
                 imageDiv.appendChild(imageBubble);
                 container.appendChild(imageDiv);
-                loadChatImageByTs(msg.ts).then(item => {
-                    if (item && imageBubble.isConnected) {
-                        let src = item.dataUrl || (item.blob ? URL.createObjectURL(item.blob) : '');
-                        if (src) imageBubble.innerHTML = `<img src="${src}" alt="用户发的照片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />`;
-                    }
-                });
+                if (!msg.dataUrl) {
+                    loadChatImageByTs(msg.ts).then(item => {
+                        if (item && imageBubble.isConnected) {
+                            let src = item.dataUrl || (item.blob ? URL.createObjectURL(item.blob) : '');
+                            if (src) imageBubble.innerHTML = `<img src="${src}" alt="用户发的照片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />`;
+                        }
+                    });
+                }
             } else {
                 imageDiv.appendChild(createChatAvatar(curRole ? curRole.name : 'AI', false));
                 const imageBubble = document.createElement('div');
