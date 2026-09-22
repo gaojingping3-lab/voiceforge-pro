@@ -1795,6 +1795,11 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
     const formattedHistory = [];
     for (const msg of chatHistory.slice(-20)) {
         if (msg.type === 'image') {
+            // 表情包消息：如果content里有表情说明，直接发过去，不用"（发了一张照片）"
+            if (msg.role === 'user' && msg.content && String(msg.content).includes('[发表情：')) {
+                formattedHistory.push({ role: 'user', content: `【你（用户）说】${msg.content}` });
+                continue;
+            }
             if (visionEnabled && chatImageMap.has(msg.ts)) {
                 // DeepSeek 视觉模型要求图必须在 user 消息里（assistant 带图会400），
                 // 所以把"AI刚生成的图"以 user 视角重新呈现：让 AI 看见自己给用户拍的照片
@@ -2347,7 +2352,7 @@ async function sendEmoji(emojiKey) {
             const ts = Date.now();
             const newMsg = { 
                 role: 'user', 
-                content: '', 
+                content: `[发表情：${emojiKey}]`,  // 这个content会发给AI，让它知道是什么表情
                 type: 'image', 
                 ts,
                 dataUrl: emoji.dataUrl  // 直接带dataUrl，不用再读IndexedDB
