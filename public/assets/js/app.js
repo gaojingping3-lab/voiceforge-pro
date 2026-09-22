@@ -2405,18 +2405,27 @@ async function generateCustomEmojis() {
         }
         
         try {
-            // 获取当前角色的外貌描述和头像
+            // 获取当前角色的外貌描述和头像（和聊天生图逻辑完全一样）
             const role = getCurrentRole();
-            const roleDesc = role?.desc || role?.description || '';
             const roleName = role?.name || '';
+            const roleDesc = role?.desc || '';
             const roleAvatar = role?.avatar || '';  // 角色头像dataURL
             
-            const prompt = `Q版表情包，这是一个女孩子，她叫${roleName}，外貌特征和服装和参考头像里的人完全一致，现在她做这个表情：${emoji.prompt}，白色背景，正方形，可爱chibi风格，头大身小，线条清晰，和参考头像是同一个人`;
+            // 从角色卡desc里提取外貌特征（和聊天生图一样的逻辑）
+            const appearance = extractAppearanceFromRoleCard(roleDesc) || roleDesc;
+            const gender = getRoleGender(roleDesc) || 'female';
+            const genderTag = gender === 'male' ? '1boy' : '1girl';
             
-            // 把头像dataURL转成Blob，作为参考图传进去
+            const prompt = `Q版chibi表情包，${genderTag}，${appearance}，她叫${roleName}，现在她做这个表情：${emoji.prompt}，白色背景，正方形，可爱风格，头大身小，线条清晰，和参考头像是同一个人，服装和外貌完全一致`;
+            
+            // 把头像dataURL转成Blob，作为参考图传进去（和聊天生图一样，只参考面部）
             let avatarBlob = null;
             if (roleAvatar && roleAvatar.startsWith('data:image')) {
-                avatarBlob = await (await fetch(roleAvatar)).blob();
+                // 先裁剪成脸部特写，和聊天生图一样
+                const cropped = await cropAvatarToFace(roleAvatar);
+                if (cropped) {
+                    avatarBlob = await (await fetch(cropped)).blob();
+                }
             }
             
             const result = await generateImageWithSafety(prompt, getImageModel(), null, prompt, avatarBlob, '1:1', '1K');
