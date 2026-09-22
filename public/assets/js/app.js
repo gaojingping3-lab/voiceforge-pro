@@ -2291,6 +2291,32 @@ function openEmojiPanel() {
 function closeEmojiPanel() {
     document.getElementById('emoji-panel')?.classList.add('hidden');
 }
+// 只追加一条用户图片消息，不重新渲染全部（防止跳顶）
+function appendUserImageMessage(msg) {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+    
+    // 时间戳
+    const lastMsg = chatHistory[chatHistory.length - 2];
+    if (lastMsg && lastMsg.ts && (msg.ts - lastMsg.ts > 5 * 60 * 1000)) {
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'text-center text-xs text-base-content/50 my-2';
+        timeDiv.innerText = formatChatTime(msg.ts);
+        container.appendChild(timeDiv);
+    }
+    
+    const imageDiv = document.createElement('div');
+    imageDiv.className = 'chat chat-end relative gap-2';
+    const imageBubble = document.createElement('div');
+    imageBubble.className = 'chat-bubble bg-primary text-primary-content p-1 max-w-[80%]';
+    imageBubble.innerHTML = `<img src="${msg.dataUrl}" alt="用户发的表情" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />`;
+    imageDiv.appendChild(imageBubble);
+    container.appendChild(imageDiv);
+    
+    // 滚到底部
+    container.scrollTop = container.scrollHeight;
+}
+
 async function sendEmoji(emojiKey) {
     closeEmojiPanel();
     
@@ -2311,15 +2337,18 @@ async function sendEmoji(emojiKey) {
             
             // 进聊天记录（role=user，右侧气泡，类型是image）
             const ts = Date.now();
-            chatHistory.push({ 
+            const newMsg = { 
                 role: 'user', 
                 content: '', 
                 type: 'image', 
                 ts,
                 dataUrl: emoji.dataUrl  // 直接带dataUrl，不用再读IndexedDB
-            });
+            };
+            chatHistory.push(newMsg);
             saveChatHistory();
-            renderChatHistory();
+            
+            // 只追加这条消息，不重新渲染全部，防止跳顶
+            appendUserImageMessage(newMsg);
             
             // 触发AI回复
             await sendChatMessage();
