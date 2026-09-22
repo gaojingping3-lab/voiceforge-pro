@@ -4949,14 +4949,21 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
             let relationPrompt = `\n\n【最高优先级：你的关系网（绝对不能搞反！）】\n`;
             relationPrompt += `这是最高优先级的规则，比任何其他设定都重要，你必须严格遵守：\n\n`;
             
-            // 你和用户的关系
+            // 你和用户的关系 - 分视角替换角色名
             if (relationAUser) {
-                relationPrompt += `【你和用户的关系】${relationAUser}\n`;
+                let userRelation = relationAUser;
+                // 把A替换成"你"，把B替换成对方
+                userRelation = userRelation.replaceAll(dualRoleA.name, '你');
+                userRelation = userRelation.replaceAll(dualRoleB.name, otherRole.name);
+                relationPrompt += `【你和用户的关系】${userRelation}\n`;
             }
             
-            // 你和另一个角色的关系
+            // 你和另一个角色的关系 - 分视角替换角色名
             if (relationAB) {
-                relationPrompt += `【你和${otherRole.name}的关系】${relationAB}\n`;
+                let abRelation = relationAB;
+                abRelation = abRelation.replaceAll(dualRoleA.name, '你');
+                abRelation = abRelation.replaceAll(dualRoleB.name, otherRole.name);
+                relationPrompt += `【你和${otherRole.name}的关系】${abRelation}\n`;
             }
             
             relationPrompt += `\n【你的行为准则】\n`;
