@@ -12,6 +12,8 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@3.9.0/dist/full.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- WeUI 微信风格UI -->
+    <link rel="stylesheet" href="https://res.wx.qq.com/open/libs/weui/2.5.0/weui.min.css">
     <style>
         .glass-panel {
             background: rgba(255, 255, 255, 0.8);
@@ -359,9 +361,13 @@
   }
   #chat-messages .chat-start {
     justify-content: flex-start !important;
+    gap: 10px !important;
+    margin-bottom: 16px !important;
   }
   #chat-messages .chat-end {
     justify-content: flex-end !important;
+    gap: 10px !important;
+    margin-bottom: 16px !important;
   }
   #chat-messages .chat-image {
     flex-shrink: 0 !important;
@@ -374,21 +380,60 @@
     margin: 0 !important;
     padding: 0 !important;
     line-height: 1 !important;
+    border-radius: 4px !important;
   }
   #chat-messages .chat-bubble {
-    max-width: calc(100% - 50px) !important;
+    max-width: 70% !important;
+    width: fit-content !important;
     word-break: break-word !important;
     margin: 0 !important;
     align-self: flex-start !important;
-    min-height: 36px !important;
-    padding-top: 8px !important;
-    padding-bottom: 8px !important;
+    min-height: 40px !important;
+    padding: 10px 14px !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: flex-start !important;
+    border-radius: 4px !important;
+    position: relative !important;
+    font-size: 16px !important;
+    line-height: 1.4 !important;
   }
-  #chat-messages .chat-bubble::before {
-    display: none !important;
+  /* 左边气泡（AI）：白色背景 */
+  #chat-messages .chat-start .chat-bubble {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  /* 右边气泡（用户）：微信绿 */
+  #chat-messages .chat-end .chat-bubble {
+    background: #95ec69 !important;
+    color: #000 !important;
+  }
+  /* 气泡尾巴 */
+  #chat-messages .chat-start .chat-bubble::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 12px;
+    width: 0;
+    height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-right: 6px solid #fff;
+  }
+  #chat-messages .chat-end .chat-bubble::before {
+    content: '';
+    position: absolute;
+    right: -6px;
+    top: 12px;
+    width: 0;
+    height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-left: 6px solid #95ec69;
+  }
+  /* 聊天页面背景改成微信灰 */
+  #chat-messages {
+    background: #ededed !important;
   }
 
   /* === 语音通话模式 === */
