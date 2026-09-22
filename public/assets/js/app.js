@@ -4273,7 +4273,21 @@ async function openCharacterAlbum(roleName) {
             grid.appendChild(placeholder);
             
             try {
-                const item = await loadChatImageByTs(msg.ts);
+                // 和聊天里一样的逻辑：先精确匹配，找不到就找最接近的
+                let item = await loadChatImageByTs(msg.ts);
+                if (!item) {
+                    // 兜底：找当前角色所有图片里最接近的
+                    const allImages = await loadRoleChatImages();
+                    if (allImages && allImages.length) {
+                        let best = null, bestDiff = Infinity;
+                        for (const it of allImages) {
+                            const d = Math.abs((it.ts || 0) - (msg.ts || 0));
+                            if (d < bestDiff) { bestDiff = d; best = it; }
+                        }
+                        item = best;
+                    }
+                }
+                
                 if (item && grid.isConnected) {
                     let src = item.dataUrl || (item.blob ? URL.createObjectURL(item.blob) : '');
                     if (src) {
@@ -4293,6 +4307,8 @@ async function openCharacterAlbum(roleName) {
                         };
                         grid.replaceChild(img, placeholder);
                     }
+                } else {
+                    placeholder.remove();
                 }
             } catch (e) {
                 placeholder.remove();
