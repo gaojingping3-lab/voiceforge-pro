@@ -4851,11 +4851,12 @@ ${isUserInterruption ? '⚠️ 现在有用户（角色C）在插话，请直接
         
         let relationPrompt = '';
         if (relationAB || relationAUser || relationBUser) {
-            relationPrompt = `\n\n【三个人的关系网】\n`;
-            if (relationAB) relationPrompt += `${dualRoleA.name}和${dualRoleB.name}：${relationAB}\n`;
-            if (relationAUser) relationPrompt += `${dualRoleA.name}和你（用户）：${relationAUser}\n`;
-            if (relationBUser) relationPrompt += `${dualRoleB.name}和你（用户）：${relationBUser}\n`;
-            relationPrompt += `\n【重要】请准确理解这些关系的方向！谁是支配方、谁是服从方，谁对谁怎么样，绝对不要搞反！说话时严格按照这些关系来体现。`;
+            relationPrompt = `\n\n【三个人的关系规则（绝对不能搞反！）】\n`;
+            relationPrompt += `以下是硬性规则，必须严格遵守，不能颠倒：\n`;
+            if (relationAB) relationPrompt += `1. ${dualRoleA.name} ↔ ${dualRoleB.name}：${relationAB}\n`;
+            if (relationAUser) relationPrompt += `2. ${dualRoleA.name} ↔ 你（用户）：${relationAUser}\n`;
+            if (relationBUser) relationPrompt += `3. ${dualRoleB.name} ↔ 你（用户）：${relationBUser}\n`;
+            relationPrompt += `\n【重要警告】支配和服从的方向绝对不能搞反！谁是s谁是m，谁支配谁服从，必须严格按照上面写的来，绝对不能互换身份！说话时必须体现这些关系，不能违反规则！`;
         }
         
         messages.push({ role: 'system', content: `【角色C（用户）的设定】
