@@ -4165,6 +4165,11 @@ async function sendChatMessage() {
         const singleImageMap = singleVisionEnabled ? await loadRecentImageDataUrls(20) : new Map();
         for (const msg of chatHistory) {
             if (msg.type === 'image') {
+                // 表情包消息：如果content里有表情说明，直接发过去
+                if (msg.role === 'user' && msg.content && String(msg.content).includes('[发表情：')) {
+                    messages.push({ role: 'user', content: msg.content });
+                    continue;
+                }
                 if (singleVisionEnabled && singleImageMap.has(msg.ts)) {
                     const caption = (msg.role === 'user') ? '我发给你看一张照片：' : '这是你刚才给我生成的那张照片：';
                     messages.push({
