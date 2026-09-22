@@ -2286,10 +2286,18 @@ document.addEventListener('click', (e) => {
 // 表情面板
 function openEmojiPanel() {
     closePlusMenu();
-    document.getElementById('emoji-panel')?.classList.remove('hidden');
+    const panel = document.getElementById('emoji-panel');
+    if (panel) {
+        panel.classList.remove('hidden');
+        panel.style.display = 'flex';
+    }
 }
 function closeEmojiPanel() {
-    document.getElementById('emoji-panel')?.classList.add('hidden');
+    const panel = document.getElementById('emoji-panel');
+    if (panel) {
+        panel.classList.add('hidden');
+        panel.style.display = 'none';
+    }
 }
 // 只追加一条用户图片消息，不重新渲染全部（防止跳顶）
 function appendUserImageMessage(msg) {
