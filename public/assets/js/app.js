@@ -6046,8 +6046,7 @@ function applyChatBg() {
     const chatContainer = document.getElementById('chat-messages');
     
     if (bg === 'default') {
-        chatContainer.style.background = '';
-        chatContainer.style.backgroundImage = '';
+        chatContainer.style.background = 'rgba(255,255,255,0.8)'; // 原来的默认背景
     } else if (bg === 'pink') {
         chatContainer.style.background = 'linear-gradient(135deg,#ffdde1,#ee9ca7)';
     } else if (bg === 'blue') {
