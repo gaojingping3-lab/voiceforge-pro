@@ -2633,7 +2633,17 @@ function renderChatHistory() {
     if (chatHistory.length === 0) {
         return; // 空聊天，不显示默认欢迎消息
     }
+    let lastMsgTs = 0;
     for (const msg of chatHistory) {
+        // 聊天时间戳：和上一条差超过5分钟就显示时间
+        if (msg.ts && lastMsgTs && (msg.ts - lastMsgTs > 5 * 60 * 1000)) {
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'text-center text-xs text-base-content/50 my-2';
+            timeDiv.innerText = formatChatTime(msg.ts);
+            container.appendChild(timeDiv);
+        }
+        if (msg.ts) lastMsgTs = msg.ts;
+        
         // 红包卡片（右侧，红色封面）
         if (msg.type === 'redpacket') {
             const rpDiv = document.createElement('div');
@@ -5221,6 +5231,23 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// 聊天时间格式化：今天显示HH:MM，昨天显示"昨天 HH:MM"，更早显示MM-DD
+function formatChatTime(ts) {
+    const d = new Date(ts);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday = d.toDateString() === yesterday.toDateString();
+    
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    
+    if (isToday) return `${hh}:${mm}`;
+    if (isYesterday) return `昨天 ${hh}:${mm}`;
+    return `${d.getMonth() + 1}月${d.getDate()}日 ${hh}:${mm}`;
 }
 
 // 台词上色：【】[]()*包裹的动作/心理描写保持原色，其他台词用橙色
