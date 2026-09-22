@@ -2283,6 +2283,31 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// 表情面板
+function openEmojiPanel() {
+    closePlusMenu();
+    document.getElementById('emoji-panel')?.classList.remove('hidden');
+}
+function closeEmojiPanel() {
+    document.getElementById('emoji-panel')?.classList.add('hidden');
+}
+function sendEmoji(emoji) {
+    closeEmojiPanel();
+    // 把表情作为消息发送
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = emoji;
+        sendChatMessage();
+    }
+}
+// 点空白处关闭表情面板
+document.addEventListener('click', (e) => {
+    const panel = document.getElementById('emoji-panel');
+    if (panel && !panel.classList.contains('hidden') && !e.target.closest('#emoji-panel') && !e.target.closest('button[onclick*="openEmojiPanel"]')) {
+        panel.classList.add('hidden');
+    }
+});
+
 function togglePlusMenu(e) {
     if (e) e.stopPropagation();
     const menu = document.getElementById('plus-menu');

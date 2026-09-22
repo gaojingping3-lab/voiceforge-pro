@@ -1674,6 +1674,8 @@ document.addEventListener('DOMContentLoaded', () => {
       #pat-toast .pat-main{font-weight:600;margin-bottom:4px;}
       .pat-tip{text-align:center;font-size:12px;color:#999;padding:6px 0;}
       #pat-toast .pat-reply{color:rgba(255,255,255,.85);font-size:13px;}
+      .emoji-item{font-size:28px;line-height:1;cursor:pointer;padding:8px;border-radius:8px;transition:background 0.15s;}
+      .emoji-item:hover{background:#f0f0f0;}
     </style>
 
     <!-- 微信式+号菜单（fixed定位，动态跟随+按钮） -->
@@ -1681,12 +1683,51 @@ document.addEventListener('DOMContentLoaded', () => {
         <button class="btn btn-ghost btn-sm w-full justify-start mb-1" onclick="document.getElementById('user-photo-input').click(); closePlusMenu()">
             <i class="fa-regular fa-image mr-2"></i>发照片
         </button>
+        <button class="btn btn-ghost btn-sm w-full justify-start mb-1" onclick="openEmojiPanel(); closePlusMenu()">
+            <i class="fa-regular fa-face-smile mr-2"></i>发表情
+        </button>
         <button class="btn btn-ghost btn-sm w-full justify-start mb-1" onclick="openRedPacket(); closePlusMenu()">
             <i class="fa-solid fa-envelope-circle-check mr-2 text-error"></i>发红包
         </button>
         <button class="btn btn-ghost btn-sm w-full justify-start" onclick="openGiftPanel(); closePlusMenu()">
             <i class="fa-solid fa-gift mr-2 text-pink-500"></i>送礼物
         </button>
+    </div>
+
+    <!-- 表情面板 -->
+    <div id="emoji-panel" class="hidden fixed z-[1001] bg-white border border-gray-200 rounded-t-2xl shadow-xl p-3" style="bottom:0;left:0;right:0;max-height:280px;overflow-y:auto;">
+        <div class="flex justify-between items-center mb-2">
+            <span class="text-sm font-bold text-gray-700">选个表情</span>
+            <button class="btn btn-ghost btn-sm btn-circle" onclick="closeEmojiPanel()">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="grid grid-cols-8 gap-2 text-3xl">
+            <button class="emoji-item" onclick="sendEmoji('😊')">😊</button>
+            <button class="emoji-item" onclick="sendEmoji('🥰')">🥰</button>
+            <button class="emoji-item" onclick="sendEmoji('😘')">😘</button>
+            <button class="emoji-item" onclick="sendEmoji('😍')">😍</button>
+            <button class="emoji-item" onclick="sendEmoji('🤗')">🤗</button>
+            <button class="emoji-item" onclick="sendEmoji('🥺')">🥺</button>
+            <button class="emoji-item" onclick="sendEmoji('😢')">😢</button>
+            <button class="emoji-item" onclick="sendEmoji('😭')">😭</button>
+            <button class="emoji-item" onclick="sendEmoji('😠')">😠</button>
+            <button class="emoji-item" onclick="sendEmoji('😡')">😡</button>
+            <button class="emoji-item" onclick="sendEmoji('🥱')">🥱</button>
+            <button class="emoji-item" onclick="sendEmoji('😴')">😴</button>
+            <button class="emoji-item" onclick="sendEmoji('😳')">😳</button>
+            <button class="emoji-item" onclick="sendEmoji('🤔')">🤔</button>
+            <button class="emoji-item" onclick="sendEmoji('😮')">😮</button>
+            <button class="emoji-item" onclick="sendEmoji('😎')">😎</button>
+            <button class="emoji-item" onclick="sendEmoji('👍')">👍</button>
+            <button class="emoji-item" onclick="sendEmoji('👎')">👎</button>
+            <button class="emoji-item" onclick="sendEmoji('❤️')">❤️</button>
+            <button class="emoji-item" onclick="sendEmoji('💔')">💔</button>
+            <button class="emoji-item" onclick="sendEmoji('🌹')">🌹</button>
+            <button class="emoji-item" onclick="sendEmoji('🎁')">🎁</button>
+            <button class="emoji-item" onclick="sendEmoji('🍰')">🍰</button>
+            <button class="emoji-item" onclick="sendEmoji('☕')">☕</button>
+        </div>
     </div>
 
     <script src="assets/js/app.js?v=20260922i"></script>
