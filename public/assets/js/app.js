@@ -6017,7 +6017,19 @@ function selectChatBg(bgKey) {
     const role = getCurrentRole();
     const roleId = role ? role.id : 'default';
     localStorage.setItem(`chatBg_${roleId}`, bgKey);
-    applyChatBg();
+    // 直接写死测试
+    const chatContainer = document.getElementById('chat-messages');
+    if (bgKey === 'pink') {
+        chatContainer.style.cssText += ';background: linear-gradient(135deg,#ffdde1,#ee9ca7) !important';
+    } else if (bgKey === 'blue') {
+        chatContainer.style.cssText += ';background: linear-gradient(135deg,#a1c4fd,#c2e9fb) !important';
+    } else if (bgKey === 'sakura') {
+        chatContainer.style.cssText += ';background: linear-gradient(135deg,#fbc2eb,#a6c1ee) !important';
+    } else if (bgKey === 'dark') {
+        chatContainer.style.cssText += ';background: linear-gradient(135deg,#232526,#414345) !important';
+    } else if (bgKey === 'default') {
+        chatContainer.style.cssText += ';background: #f8fafc !important';
+    }
     // 选完直接关闭弹窗
     document.querySelectorAll('.modal').forEach(m => m.close());
 }
