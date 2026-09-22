@@ -1373,11 +1373,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="form-control mb-4">
                     <label class="label py-1"><span class="label-text text-sm">关系网（双角色）</span></label>
                     <div class="space-y-2">
-                        <input type="text" id="relation-a-b" class="input input-bordered input-sm w-full" placeholder="角色A和角色B的关系，例：前任、兄妹、死对头" />
-                        <input type="text" id="relation-a-user" class="input input-bordered input-sm w-full" placeholder="角色A和你的关系，例：现任、朋友、恋人" />
-                        <input type="text" id="relation-b-user" class="input input-bordered input-sm w-full" placeholder="角色B和你的关系，例：暗恋你、前任、情敌" />
+                        <input type="text" id="relation-a-b" class="input input-bordered input-sm w-full" placeholder="例：B命令A，A服从B" />
+                        <input type="text" id="relation-a-user" class="input input-bordered input-sm w-full" placeholder="例：A命令我，我服从A" />
+                        <input type="text" id="relation-b-user" class="input input-bordered input-sm w-full" placeholder="例：不用填就留空" />
                     </div>
-                    <span class="text-xs text-base-content/50 mt-1">填写后双角色对话会知道三个人的关系，说话更自然</span>
+                    <span class="text-xs text-base-content/50 mt-1">填谁命令谁、谁服从谁，不要只填关键词</span>
                 </div>
                 <div class="form-control">
                     <label class="label py-1"><span class="label-text text-sm">AI 角色设定 (System Prompt)</span></label>
@@ -1644,6 +1644,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </button>
     </div>
 
-    <script src="assets/js/app.js?v=20260922g"></script>
+    <script src="assets/js/app.js?v=20260922h"></script>
 </body>
 </html>
