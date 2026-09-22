@@ -2340,8 +2340,10 @@ async function generateCustomEmojis() {
         
         try {
             // 获取当前角色的外貌描述
-            const roleDesc = getCurrentRoleCard()?.appearance || getCurrentRoleCard()?.description || '';
-            const prompt = `Q版表情包，和参考图同一个人，${roleDesc}，做这个表情：${emoji.prompt}，白色背景，正方形，可爱chibi风格，头大身小，线条清晰`;
+            const role = getCurrentRole();
+            const roleDesc = role?.desc || role?.description || '';
+            const roleName = role?.name || '';
+            const prompt = `Q版表情包，${roleName}，${roleDesc}，做这个表情：${emoji.prompt}，白色背景，正方形，可爱chibi风格，头大身小，线条清晰`;
             
             const result = await generateImageWithSafety(prompt, getImageModel(), null, prompt, null, '1:1', '1K');
             
