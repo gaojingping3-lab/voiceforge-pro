@@ -2418,17 +2418,7 @@ async function generateCustomEmojis() {
             
             const prompt = `Q版chibi表情包，${genderTag}，${appearance}，她叫${roleName}，现在她做这个表情：${emoji.prompt}，白色背景，正方形，可爱风格，头大身小，线条清晰，和参考头像是同一个人，服装和外貌完全一致`;
             
-            // 把头像dataURL转成Blob，作为参考图传进去
-            let avatarBlob = null;
-            if (roleAvatar && roleAvatar.startsWith('data:image')) {
-                try {
-                    avatarBlob = await (await fetch(roleAvatar)).blob();
-                } catch (e) {
-                    console.warn('头像转Blob失败，不用参考图了', e);
-                }
-            }
-            
-            const result = await generateImageWithSafety(prompt, getImageModel(), null, prompt, avatarBlob, '1:1', '1K');
+            const result = await generateImageWithSafety(prompt, getImageModel(), null, prompt, null, '1:1', '1K');
             
             // 转成dataURL存起来
             const dataUrl = await new Promise((resolve) => {
