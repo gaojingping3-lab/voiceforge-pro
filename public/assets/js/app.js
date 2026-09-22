@@ -2655,7 +2655,7 @@ async function sendRedPacket(amount, roleName) {
     const rpDiv = document.createElement('div');
     rpDiv.className = 'chat chat-end relative gap-2';
     rpDiv.innerHTML = `
-        <div class="chat-bubble p-0 overflow-hidden" style="min-width:260px;background:#ff9900;">
+        <div class="chat-bubble p-0 overflow-hidden" style="min-width:260px;background:#ff9900 !important;">
             <div style="display:flex;align-items:center;padding:16px 16px;gap:12px;">
                 <div style="width:40px;height:40px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:20px;">⇄</div>
                 <div>
@@ -2665,6 +2665,9 @@ async function sendRedPacket(amount, roleName) {
             </div>
         </div>
         <div style="font-size:12px;color:#666;margin-top:4px;text-align:right;padding-right:8px;">微信转账</div>`;
+    // 加上用户头像
+    const avatar = createChatAvatar('我', true);
+    rpDiv.appendChild(avatar);
     container.appendChild(rpDiv);
     scrollToBottom();
     await sendChatMessage();
