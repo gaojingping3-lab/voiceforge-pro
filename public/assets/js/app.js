@@ -4234,11 +4234,10 @@ function createChatAvatar(name, isUser) {
 }
 
 // 打开角色相册
-function openCharacterAlbum(roleName) {
+async function openCharacterAlbum(roleName) {
     // 从聊天记录里找这个角色发过的所有图片
-    const albumImages = chatHistory
-        .filter(msg => msg.type === 'image' && msg.role === 'assistant')
-        .map(msg => msg.content);
+    const imageMsgs = chatHistory
+        .filter(msg => msg.type === 'image' && msg.role === 'assistant');
     
     // 弹窗
     const modal = document.createElement('div');
@@ -4261,29 +4260,44 @@ function openCharacterAlbum(roleName) {
     const grid = document.createElement('div');
     grid.className = 'grid grid-cols-3 gap-2';
     
-    if (albumImages.length === 0) {
+    if (imageMsgs.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'text-center text-base-content/50 py-10 col-span-3';
         empty.innerText = '还没有照片';
         grid.appendChild(empty);
     } else {
-        albumImages.forEach(src => {
-            const img = document.createElement('img');
-            img.src = src;
-            img.className = 'w-full h-32 object-cover rounded-lg cursor-pointer';
-            img.onclick = () => {
-                // 点击看大图
-                const bigImg = document.createElement('img');
-                bigImg.src = src;
-                bigImg.className = 'max-w-full max-h-full object-contain';
-                const bigModal = document.createElement('div');
-                bigModal.className = 'fixed inset-0 bg-black/90 z-60 flex items-center justify-center p-4';
-                bigModal.onclick = () => bigModal.remove();
-                bigModal.appendChild(bigImg);
-                document.body.appendChild(bigModal);
-            };
-            grid.appendChild(img);
-        });
+        // 异步加载所有图片
+        for (const msg of imageMsgs) {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'w-full h-32 bg-base-200 rounded-lg animate-pulse';
+            grid.appendChild(placeholder);
+            
+            try {
+                const item = await loadChatImageByTs(msg.ts);
+                if (item && grid.isConnected) {
+                    let src = item.dataUrl || (item.blob ? URL.createObjectURL(item.blob) : '');
+                    if (src) {
+                        const img = document.createElement('img');
+                        img.src = src;
+                        img.className = 'w-full h-32 object-cover rounded-lg cursor-pointer';
+                        img.onclick = () => {
+                            // 点击看大图
+                            const bigImg = document.createElement('img');
+                            bigImg.src = src;
+                            bigImg.className = 'max-w-full max-h-full object-contain';
+                            const bigModal = document.createElement('div');
+                            bigModal.className = 'fixed inset-0 bg-black/90 z-60 flex items-center justify-center p-4';
+                            bigModal.onclick = () => bigModal.remove();
+                            bigModal.appendChild(bigImg);
+                            document.body.appendChild(bigModal);
+                        };
+                        grid.replaceChild(img, placeholder);
+                    }
+                }
+            } catch (e) {
+                placeholder.remove();
+            }
+        }
     }
     
     content.appendChild(title);
