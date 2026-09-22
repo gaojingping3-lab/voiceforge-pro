@@ -5228,6 +5228,11 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
     const formattedHistory = [];
     for (const msg of chatHistory.slice(-10)) {
         if (msg.type === 'image') {
+            // 表情包消息：如果content里有表情说明，直接发过去
+            if (msg.role === 'user' && msg.content && String(msg.content).includes('[发表情：')) {
+                formattedHistory.push({ role: 'user', content: `【角色C（用户）说】${msg.content}` });
+                continue;
+            }
             if (visionEnabled && chatImageMap.has(msg.ts)) {
                 const caption = (msg.role === 'user') ? '我发给你看一张照片：' : '这是你刚才给我生成的那张照片：';
                 formattedHistory.push({
