@@ -4944,19 +4944,39 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
 
     messages.push(...formattedHistory);
 
-    // 关系网放在最后，作为最高优先级规则，AI最后看到的最有效
+    // 关系网放在最后，作为最高优先级规则，分视角给当前角色看
     if (dualRoleA && dualRoleB) {
         const relationAB = localStorage.getItem('RELATION_A_B') || '';
         const relationAUser = localStorage.getItem('RELATION_A_USER') || '';
         const relationBUser = localStorage.getItem('RELATION_B_USER') || '';
         
         if (relationAB || relationAUser || relationBUser) {
-            let relationPrompt = `\n\n【最高优先级：三个人的关系规则（绝对不能搞反！）】\n`;
-            relationPrompt += `这是最高优先级的规则，比任何其他设定都重要，必须严格遵守，不能颠倒：\n`;
-            if (relationAB) relationPrompt += `1. ${dualRoleA.name} ↔ ${dualRoleB.name}：${relationAB}\n`;
-            if (relationAUser) relationPrompt += `2. ${dualRoleA.name} ↔ 你（用户）：${relationAUser}\n`;
-            if (relationBUser) relationPrompt += `3. ${dualRoleB.name} ↔ 你（用户）：${relationBUser}\n`;
-            relationPrompt += `\n【绝对不能违反】关系的方向绝对不能搞反！谁喜欢谁、谁讨厌谁、谁命令谁、谁服从谁、谁主动谁被动，必须严格按照上面写的来，绝对不能互换身份！即使其他设定有不同说法，也必须以这里的关系规则为准！`;
+            let relationPrompt = `\n\n【最高优先级：你的关系网（绝对不能搞反！）】\n`;
+            relationPrompt += `这是最高优先级的规则，比任何其他设定都重要，你必须严格遵守：\n\n`;
+            
+            // 你和用户的关系
+            if (currentRole === dualRoleA && relationAUser) {
+                relationPrompt += `【你和用户的关系】${relationAUser}\n`;
+            } else if (currentRole === dualRoleB && relationBUser) {
+                relationPrompt += `【你和用户的关系】${relationBUser}\n`;
+            }
+            
+            // 另一个角色和用户的关系
+            if (currentRole === dualRoleA && relationBUser) {
+                relationPrompt += `【${dualRoleB.name}和用户的关系】${relationBUser}\n`;
+            } else if (currentRole === dualRoleB && relationAUser) {
+                relationPrompt += `【${dualRoleA.name}和用户的关系】${relationAUser}\n`;
+            }
+            
+            // 你和另一个角色的关系
+            if (relationAB) {
+                relationPrompt += `【你和${otherRole.name}的关系】${relationAB}\n`;
+            }
+            
+            relationPrompt += `\n【你的行为准则】\n`;
+            relationPrompt += `- 你必须严格按照上面的关系来表现，绝对不能搞反\n`;
+            relationPrompt += `- 谁喜欢谁、谁讨厌谁、谁命令谁、谁服从谁，必须严格按上面写的来\n`;
+            relationPrompt += `- 即使其他设定有不同说法，也必须以这里的关系网为准！`;
             
             messages.push({ role: 'system', content: relationPrompt });
         }
