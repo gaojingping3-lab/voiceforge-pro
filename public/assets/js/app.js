@@ -2318,12 +2318,14 @@ function appendUserImageMessage(msg) {
         container.appendChild(timeDiv);
     }
     
+    // 表情包：不要气泡背景，直接显示图片，和微信一样
     const imageDiv = document.createElement('div');
     imageDiv.className = 'chat chat-end relative gap-2';
-    const imageBubble = document.createElement('div');
-    imageBubble.className = 'chat-bubble bg-primary text-primary-content p-1 max-w-[80%]';
-    imageBubble.innerHTML = `<img src="${msg.dataUrl}" alt="用户发的表情" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />`;
-    imageDiv.appendChild(imageBubble);
+    const img = document.createElement('img');
+    img.src = msg.dataUrl;
+    img.className = 'rounded-lg max-w-[60%] cursor-pointer';
+    img.onclick = () => openImageLightbox(img.src);
+    imageDiv.appendChild(img);
     container.appendChild(imageDiv);
     
     // 滚到底部
@@ -2990,24 +2992,35 @@ function renderChatHistory() {
             const imageDiv = document.createElement('div');
             imageDiv.className = isUserPhoto ? 'chat chat-end relative gap-2' : 'chat chat-start relative gap-2';
             if (isUserPhoto) {
-                // 用户发的照片：右侧，主色气泡，无头像
-                const imageBubble = document.createElement('div');
-                imageBubble.className = 'chat-bubble bg-primary text-primary-content p-1 max-w-[80%]';
-                // 如果msg里直接带了dataUrl（比如表情），直接显示
-                if (msg.dataUrl) {
-                    imageBubble.innerHTML = `<img src="${msg.dataUrl}" alt="用户发的表情" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />`;
+                // 如果是表情包，不要气泡背景，直接显示图片，和微信一样
+                const isEmoji = msg.content && String(msg.content).includes('[发表情：');
+                if (isEmoji) {
+                    const img = document.createElement('img');
+                    img.src = msg.dataUrl;
+                    img.className = 'rounded-lg max-w-[60%] cursor-pointer';
+                    img.onclick = () => openImageLightbox(img.src);
+                    imageDiv.appendChild(img);
+                    container.appendChild(imageDiv);
                 } else {
-                    imageBubble.innerHTML = '<div class="text-xs opacity-70 px-2 py-3">图片加载中…</div>';
-                }
-                imageDiv.appendChild(imageBubble);
-                container.appendChild(imageDiv);
-                if (!msg.dataUrl) {
-                    loadChatImageByTs(msg.ts).then(item => {
-                        if (item && imageBubble.isConnected) {
-                            let src = item.dataUrl || (item.blob ? URL.createObjectURL(item.blob) : '');
-                            if (src) imageBubble.innerHTML = `<img src="${src}" alt="用户发的照片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />`;
-                        }
-                    });
+                    // 用户发的照片：右侧，主色气泡，无头像
+                    const imageBubble = document.createElement('div');
+                    imageBubble.className = 'chat-bubble bg-primary text-primary-content p-1 max-w-[80%]';
+                    // 如果msg里直接带了dataUrl，直接显示
+                    if (msg.dataUrl) {
+                        imageBubble.innerHTML = `<img src="${msg.dataUrl}" alt="用户发的照片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />`;
+                    } else {
+                        imageBubble.innerHTML = '<div class="text-xs opacity-70 px-2 py-3">图片加载中…</div>';
+                    }
+                    imageDiv.appendChild(imageBubble);
+                    container.appendChild(imageDiv);
+                    if (!msg.dataUrl) {
+                        loadChatImageByTs(msg.ts).then(item => {
+                            if (item && imageBubble.isConnected) {
+                                let src = item.dataUrl || (item.blob ? URL.createObjectURL(item.blob) : '');
+                                if (src) imageBubble.innerHTML = `<img src="${src}" alt="用户发的照片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />`;
+                            }
+                        });
+                    }
                 }
             } else {
                 imageDiv.appendChild(createChatAvatar(curRole ? curRole.name : 'AI', false));
