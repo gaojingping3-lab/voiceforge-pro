@@ -3023,11 +3023,12 @@ function renderChatHistory() {
                     }
                 }
             } else {
+                // AI发的图片：不要气泡背景，直接显示图片，和微信一样
                 imageDiv.appendChild(createChatAvatar(curRole ? curRole.name : 'AI', false));
-                const imageBubble = document.createElement('div');
-                imageBubble.className = 'chat-bubble bg-base-200 text-base-content p-1 max-w-[80%]';
-                imageBubble.innerHTML = '<div class="text-xs opacity-60 px-2 py-3">图片加载中…</div>';
-                imageDiv.appendChild(imageBubble);
+                const imgWrap = document.createElement('div');
+                imgWrap.className = 'max-w-[80%]';
+                imgWrap.innerHTML = '<div class="text-xs opacity-60 px-2 py-3">图片加载中…</div>';
+                imageDiv.appendChild(imgWrap);
                 container.appendChild(imageDiv);
                 loadChatImageByTs(msg.ts).then(item => {
                     if (item) return item;
@@ -3042,11 +3043,14 @@ function renderChatHistory() {
                         return best;
                     });
                 }).then(item => {
-                    if (!item || !imageBubble.isConnected) {
-                        if (imageBubble && imageBubble.isConnected) imageBubble.innerHTML = '<div class="text-xs opacity-60 px-2 py-3">图片加载失败（本地数据缺失，可清空聊天后重新生成）</div>';
+                    if (!item || !imgWrap.isConnected) {
+                        if (imgWrap && imgWrap.isConnected) imgWrap.innerHTML = '<div class="text-xs opacity-60 px-2 py-3">图片加载失败（本地数据缺失，可清空聊天后重新生成）</div>';
                         return;
                     }
-                    renderChatImageBubble(imageBubble, item);
+                    let src = item.dataUrl || (item.blob ? URL.createObjectURL(item.blob) : '');
+                    if (src) {
+                        imgWrap.innerHTML = `<img src="${src}" alt="AI生成的图片" class="rounded-lg w-full cursor-pointer" onclick="openImageLightbox(this.src)" />`;
+                    }
                 });
             }
             continue;
