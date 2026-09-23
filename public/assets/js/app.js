@@ -3121,14 +3121,27 @@ function renderChatHistory() {
     container.scrollTop = container.scrollHeight;
     // 异步恢复本角色最近5张生图（IndexedDB，防卡顿）
     restoreChatImages();
-    // 等图片渲染完，再滚动一次到底部
+    // 自动监听聊天容器变化，有新内容就滚到底部（不打断用户往上翻）
     setTimeout(() => {
-        container.scrollTop = container.scrollHeight;
-    }, 500);
-    // 再等久一点，确保所有图片都加载完
-    setTimeout(() => {
-        container.scrollTop = container.scrollHeight;
-    }, 1000);
+        const scrollToBottomIfNearBottom = () => {
+            const threshold = 100; // 距离底部100px以内才自动滚
+            if (container.scrollHeight - container.scrollTop - container.clientHeight < threshold) {
+                container.scrollTop = container.scrollHeight;
+            }
+        };
+        // 监听容器变化
+        if (window._chatScrollObserver) window._chatScrollObserver.disconnect();
+        window._chatScrollObserver = new MutationObserver(scrollToBottomIfNearBottom);
+        window._chatScrollObserver.observe(container, { childList: true, subtree: true, attributes: true });
+        // 图片加载完也滚一次
+        container.querySelectorAll('img').forEach(img => {
+            if (!img.complete) img.onload = scrollToBottomIfNearBottom;
+        });
+        // 兜底再滚几次
+        setTimeout(scrollToBottomIfNearBottom, 300);
+        setTimeout(scrollToBottomIfNearBottom, 800);
+        setTimeout(scrollToBottomIfNearBottom, 1500);
+    }, 100);
 }
 
 // 停止所有音频播放（聊天音频 + TTS页面播放器）
