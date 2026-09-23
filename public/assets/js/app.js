@@ -4363,8 +4363,10 @@ async function sendChatMessage() {
             messages.push({ role: 'system', content: `【你和他的过去回忆】\n${existingSummary}\n\n以上是你和他从认识到现在的全部经历，你已经完全记得这些事，带着这些记忆继续和他正常聊天，不要提这是总结，不要说你不记得之前的事。` });
         }
 
-        // 只发最近的RECENT_KEEP条消息，加上图片处理
-        const recentMsgs = chatHistory.slice(-(RECENT_KEEP + 5)); // 多留5条缓冲
+        // 有记忆了才只发最近20条，没开始总结的时候全量发
+        const recentMsgs = existingSummary
+            ? chatHistory.slice(-(RECENT_KEEP + 5))
+            : chatHistory; // 没总结的时候全量发，不截断
         for (const msg of recentMsgs) {
             if (msg.type === 'image') {
                 // 表情包消息：如果content里有表情说明，直接发过去
