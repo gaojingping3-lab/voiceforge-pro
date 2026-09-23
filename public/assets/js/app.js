@@ -3123,6 +3123,8 @@ function renderChatHistory() {
     restoreChatImages();
     // 自动监听聊天容器变化，有新内容就滚到底部（不打断用户往上翻）
     setTimeout(() => {
+        // 刚进页面先强制滚到底部
+        container.scrollTop = container.scrollHeight;
         const scrollToBottomIfNearBottom = () => {
             const threshold = 100; // 距离底部100px以内才自动滚
             if (container.scrollHeight - container.scrollTop - container.clientHeight < threshold) {
