@@ -2343,11 +2343,13 @@ async function sendEmoji(emojiKey) {
     closeEmojiPanel();
     
     try {
-        // 从IndexedDB读取表情图片
+        // 从IndexedDB读取当前角色的表情图片
+        const role = getCurrentRole();
+        const curEmojiKey = 'custom_emoji_' + (role ? role.id : 'default');
         const db = await openImageDB();
         const tx = db.transaction(CHAT_IMG_STORE, 'readonly');
         const index = tx.objectStore(CHAT_IMG_STORE).index('roleKey');
-        const req = index.getAll('custom_emoji');
+        const req = index.getAll(curEmojiKey);
         
         req.onsuccess = async () => {
             const emojis = req.result;
@@ -2494,15 +2496,17 @@ async function generateCustomEmojis() {
         }
     }
     
-    // 保存到IndexedDB（不是localStorage，那个只有5MB）
+    // 保存到IndexedDB（不是localStorage，那个只有5MB），按角色分开存
+    const role = getCurrentRole();
+    const emojiKey = 'custom_emoji_' + (role ? role.id : 'default');
     try {
         const db = await openImageDB();
         const tx = db.transaction(CHAT_IMG_STORE, 'readwrite');
         const store = tx.objectStore(CHAT_IMG_STORE);
         
-        // 先清空旧的表情包
+        // 先清空当前角色旧的表情包
         await new Promise((resolve, reject) => {
-            const oldReq = store.index('roleKey').openCursor(IDBKeyRange.only('custom_emoji'));
+            const oldReq = store.index('roleKey').openCursor(IDBKeyRange.only(emojiKey));
             oldReq.onsuccess = (e) => {
                 const cursor = e.target.result;
                 if (cursor) {
@@ -2520,7 +2524,7 @@ async function generateCustomEmojis() {
             store.add({
                 dataUrl: dataUrl,
                 ts: Date.now(),
-                roleKey: 'custom_emoji',
+                roleKey: emojiKey,
                 prompt: 'emoji_' + key,
                 ratio: '1:1'
             });
@@ -2532,8 +2536,8 @@ async function generateCustomEmojis() {
             tx.onerror = reject;
         });
         
-        // 标记已生成
-        localStorage.setItem('custom_emojis_generated', '1');
+        // 标记当前角色已生成
+        localStorage.setItem('custom_emojis_generated_' + (role ? role.id : 'default'), '1');
         
         alert('专属表情包生成完成！共成功' + Object.keys(results).length + '/8个');
     } catch (e) {
@@ -2554,11 +2558,13 @@ async function loadCustomEmojis() {
         const panel = document.getElementById('emoji-grid');
         if (!panel) return;
         
-        // 从IndexedDB读取表情包
+        // 从IndexedDB读取当前角色的表情包
+        const role = getCurrentRole();
+        const curEmojiKey = 'custom_emoji_' + (role ? role.id : 'default');
         const db = await openImageDB();
         const tx = db.transaction(CHAT_IMG_STORE, 'readonly');
         const index = tx.objectStore(CHAT_IMG_STORE).index('roleKey');
-        const req = index.getAll('custom_emoji');
+        const req = index.getAll(curEmojiKey);
         
         req.onsuccess = async () => {
             const emojis = req.result;
@@ -4980,6 +4986,8 @@ function switchRole(id) {
         loadChatHistory();
         renderChatHistory();
         updateTotalTokensDisplay(); // 更新当前角色的token显示
+        closeEmojiPanel(); // 切角色时关掉表情包面板，避免串
+        loadCustomEmojis(); // 加载新角色自己的表情包
 
         // 如果新角色没有聊天记录，且有开场白，就显示开场白
         const role = getCurrentRole();
