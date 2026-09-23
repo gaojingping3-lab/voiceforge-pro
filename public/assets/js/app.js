@@ -1964,8 +1964,9 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
         saveChatHistory();
 
         if (tokens > 0) {
-            totalTokensUsed += tokens;
-            localStorage.setItem('TOTAL_TOKENS_USED', totalTokensUsed.toString());
+            const key = getTokenKey();
+            const cur = parseInt(localStorage.getItem(key) || '0');
+            localStorage.setItem(key, (cur + tokens).toString());
             updateTotalTokensDisplay();
         }
 
@@ -2132,13 +2133,19 @@ async function generateAndPlayAudio(text) {
 
 // 添加聊天气泡
 let chatHistory = []; // 对话历史记忆（永久保存，只有清空才删除）
-let totalTokensUsed = 0; // 总消耗tokens量
+// 获取当前角色的token统计key
+function getTokenKey() {
+    const role = getCurrentRole();
+    return 'TOTAL_TOKENS_' + (role.id || 'default');
+}
 
-// 更新总tokens显示
+// 更新总tokens显示（按角色单独统计）
 function updateTotalTokensDisplay() {
     const el = document.getElementById('total-tokens-display');
     if (el) {
-        el.innerText = `${totalTokensUsed} tokens`;
+        const key = getTokenKey();
+        const tokens = parseInt(localStorage.getItem(key) || '0');
+        el.innerText = `${tokens} tokens`;
     }
 }
 
@@ -2938,11 +2945,6 @@ function loadChatHistory() {
         } else {
             chatHistory = [];
         }
-    }
-    // 恢复总tokens
-    const savedTokens = localStorage.getItem('TOTAL_TOKENS_USED');
-    if (savedTokens) {
-        totalTokensUsed = parseInt(savedTokens, 10) || 0;
     }
     updateTotalTokensDisplay();
 }
@@ -4556,9 +4558,10 @@ async function sendChatMessage() {
             tokenRow.innerText = `${totalTokens} tokens`;
             // 插到chat div后面，作为独立的一行
             chatDiv.after(tokenRow);
-            // 累加总tokens
-            totalTokensUsed += totalTokens;
-            localStorage.setItem('TOTAL_TOKENS_USED', totalTokensUsed.toString());
+            // 累加总tokens（按角色）
+            const key = getTokenKey();
+            const cur = parseInt(localStorage.getItem(key) || '0');
+            localStorage.setItem(key, (cur + totalTokens).toString());
             updateTotalTokensDisplay();
         }
 
@@ -4976,6 +4979,7 @@ function switchRole(id) {
         // 加载新角色的聊天记录
         loadChatHistory();
         renderChatHistory();
+        updateTotalTokensDisplay(); // 更新当前角色的token显示
 
         // 如果新角色没有聊天记录，且有开场白，就显示开场白
         const role = getCurrentRole();
@@ -5674,10 +5678,11 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
         chatHistory.push({ role: 'assistant', content: `[${currentRole.name}] ${reply}` });
         saveChatHistory();
 
-        // 累加总tokens
+        // 累加总tokens（按角色）
         if (dualTokens > 0) {
-            totalTokensUsed += dualTokens;
-            localStorage.setItem('TOTAL_TOKENS_USED', totalTokensUsed.toString());
+            const key = getTokenKey();
+            const cur = parseInt(localStorage.getItem(key) || '0');
+            localStorage.setItem(key, (cur + dualTokens).toString());
             updateTotalTokensDisplay();
         }
 
@@ -6237,9 +6242,9 @@ function clearChat() {
     try { momentsDbClear(momentsKey()); } catch (e) { /* ignore */ }
     // 重置个性签名：清空后下次打开朋友圈重新随机生成一个
     try { localStorage.removeItem(momentsSigKey()); } catch (e) { /* ignore */ }
-    // 重置总tokens
-    totalTokensUsed = 0;
-    localStorage.removeItem('TOTAL_TOKENS_USED');
+    // 重置总tokens（清当前角色的统计）
+    const tokenKey = getTokenKey();
+    localStorage.removeItem(tokenKey);
     updateTotalTokensDisplay();
     stopAllAudio(); // 停止正在播放的语音
     sfxSuccess();
@@ -6337,8 +6342,10 @@ async function clearAllChatData() {
         // 4. 清除 IndexedDB 里的全部朋友圈图片
         await momentsDbClear(null); // null → 全库清空
         // 5. 重置统计与状态
-        totalTokensUsed = 0;
-        try { localStorage.removeItem('TOTAL_TOKENS_USED'); } catch(e){}
+        // 清所有角色的token统计
+        Object.keys(localStorage).forEach(k => {
+            if (k.startsWith('TOTAL_TOKENS_')) localStorage.removeItem(k);
+        });
         if (typeof updateTotalTokensDisplay === 'function') updateTotalTokensDisplay();
         if (typeof stopAllAudio === 'function') stopAllAudio();
         if (typeof sfxSuccess === 'function') sfxSuccess();
