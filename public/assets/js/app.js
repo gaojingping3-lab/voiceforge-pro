@@ -4687,7 +4687,7 @@ async function openCharacterAlbum(roleName) {
     
     // 弹窗
     const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4';
+    modal.className = 'fixed inset-0 bg-black/80 z-[1000] flex items-center justify-center p-4';
     modal.onclick = () => modal.remove();
     
     const content = document.createElement('div');
