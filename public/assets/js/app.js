@@ -3121,6 +3121,10 @@ function renderChatHistory() {
     container.scrollTop = container.scrollHeight;
     // 异步恢复本角色最近5张生图（IndexedDB，防卡顿）
     restoreChatImages();
+    // 等图片渲染完，再滚动一次到底部
+    setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+    }, 300);
 }
 
 // 停止所有音频播放（聊天音频 + TTS页面播放器）
