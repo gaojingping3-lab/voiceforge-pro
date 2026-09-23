@@ -4290,17 +4290,17 @@ async function sendChatMessage() {
         const singleVisionEnabled = (singleLlmModel === 'deepseek-flash') || /vision/i.test(singleLlmModel);
         const singleImageMap = singleVisionEnabled ? await loadRecentImageDataUrls(20) : new Map();
 
-        // === 自动总结省token：超过30条就把最早的10条总结成摘要 ===
+        // === 自动总结省token：超过100条才把最早的20条总结成摘要，平时全量发不花钱 ===
         const roleId = role.id || 'default';
         const summaryKey = 'chatSummary_' + roleId;
         let existingSummary = localStorage.getItem(summaryKey) || '';
         const textMsgs = chatHistory.filter(m => m.type !== 'image' && m.content && String(m.content).trim());
-        const RECENT_KEEP = 20; // 最近保留20条原文
-        const SUMMARY_TRIGGER = 30; // 超过30条触发总结
+        const RECENT_KEEP = 50; // 最近保留50条原文，平时全发
+        const SUMMARY_TRIGGER = 100; // 超过100条才触发总结，平时不额外花钱
         if (textMsgs.length > SUMMARY_TRIGGER) {
-            // 取最早的10条来总结
-            const oldMsgs = textMsgs.slice(0, 10);
-            textMsgs.splice(0, 10); // 从临时数组里删掉，后面只发最近的
+            // 取最早的20条来总结
+            const oldMsgs = textMsgs.slice(0, 20);
+            textMsgs.splice(0, 20); // 从临时数组里删掉，后面只发最近的
             const convo = oldMsgs.map(m => (m.role === 'user' ? '我' : role.name) + '：' + String(m.content).trim()).join('\n');
             // 调用AI总结
             try {
