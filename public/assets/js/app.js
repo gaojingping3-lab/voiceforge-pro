@@ -4290,17 +4290,19 @@ async function sendChatMessage() {
         const singleVisionEnabled = (singleLlmModel === 'deepseek-flash') || /vision/i.test(singleLlmModel);
         const singleImageMap = singleVisionEnabled ? await loadRecentImageDataUrls(20) : new Map();
 
-        // === 自动总结省token：超过100条把最早的对话压缩成500字详细记忆，之后只带最近20条 ===
+        // === 自动总结省token：每攒80条新对话，才总结一次成500字详细记忆，不重复跑 ===
         const roleId = role.id || 'default';
         const summaryKey = 'chatSummary_' + roleId;
+        const summaryIdxKey = 'chatSummaryIdx_' + roleId;
         let existingSummary = localStorage.getItem(summaryKey) || '';
+        let lastSummarizedIdx = parseInt(localStorage.getItem(summaryIdxKey) || '0');
         const textMsgs = chatHistory.filter(m => m.type !== 'image' && m.content && String(m.content).trim());
         const RECENT_KEEP = 20; // 总结后只带最近20条原文
-        const SUMMARY_TRIGGER = 100; // 超过100条触发总结
-        if (textMsgs.length > SUMMARY_TRIGGER) {
-            // 取最早的20条来总结
-            const oldMsgs = textMsgs.slice(0, 20);
-            textMsgs.splice(0, 20);
+        const SUMMARY_BATCH = 80; // 每攒80条新消息总结一次
+        // 只有当新攒的消息超过80条，才总结，否则直接跳过
+        if (textMsgs.length - lastSummarizedIdx >= SUMMARY_BATCH && textMsgs.length >= SUMMARY_BATCH) {
+            // 取上次总结点之后的80条新消息来总结
+            const oldMsgs = textMsgs.slice(lastSummarizedIdx, lastSummarizedIdx + SUMMARY_BATCH);
             const convo = oldMsgs.map(m => (m.role === 'user' ? '我' : role.name) + '：' + String(m.content).trim()).join('\n');
             // 调用AI写详细前情
             try {
@@ -4315,7 +4317,7 @@ async function sendChatMessage() {
                         model: llmModel,
                         stream: false,
                         messages: [
-                            { role: 'system', content: `请把下面你和对方的对话，写成一段500字左右的第一人称详细前情回忆，你就是${role.name}本人。要包含：1.你们现在的关系和亲近程度；2.这期间发生的最重要的3-5件事；3.你对他现在的感觉和态度；4.你们之间的约定、小暗号、小习惯；5.你的性格特点在这段对话里的表现。写得像你自己在回忆，不要第三人称，不要说"这是总结"，直接输出回忆内容，不要客套。` },
+                            { role: 'system', content: `请把下面你和对方新发生的对话，写成一段300字左右的第一人称回忆补充，你就是${role.name}本人。只写这期间新发生的事、你对他的感觉变化、你们之间的新约定，不要重复之前已经说过的事。写得像你自己在回忆，不要第三人称，不要说"这是总结"，直接输出。` },
                             { role: 'user', content: convo }
                         ]
                     })
@@ -4345,8 +4347,11 @@ async function sendChatMessage() {
                                 existingSummary = (data2.choices?.[0]?.message?.content || existingSummary).trim();
                             }
                         }
+                        // 记录这次总结到第几条了
+                        lastSummarizedIdx = lastSummarizedIdx + SUMMARY_BATCH;
                         localStorage.setItem(summaryKey, existingSummary);
-                        console.log('自动总结完成，当前记忆长度：', existingSummary.length);
+                        localStorage.setItem(summaryIdxKey, String(lastSummarizedIdx));
+                        console.log('自动总结完成，当前记忆长度：', existingSummary.length, '，已总结到第', lastSummarizedIdx, '条');
                     }
                 }
             } catch (e) {
@@ -6208,6 +6213,7 @@ function clearChat() {
     // 清空自动总结的摘要
     const roleId = getCurrentRole()?.id || 'default';
     localStorage.removeItem('chatSummary_' + roleId);
+    localStorage.removeItem('chatSummaryIdx_' + roleId);
     clearRoleChatImages(); // 联动清空当前角色保存在IndexedDB里的生图
     // 联动清空当前角色的朋友圈动态（localStorage元数据 + IndexedDB图片）
     try { localStorage.removeItem(momentsKey()); } catch (e) { /* ignore */ }
