@@ -4261,7 +4261,78 @@ async function sendChatMessage() {
         const singleLlmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
         const singleVisionEnabled = (singleLlmModel === 'deepseek-flash') || /vision/i.test(singleLlmModel);
         const singleImageMap = singleVisionEnabled ? await loadRecentImageDataUrls(20) : new Map();
-        for (const msg of chatHistory) {
+
+        // === 自动总结省token：超过30条就把最早的10条总结成摘要 ===
+        const roleId = role.id || 'default';
+        const summaryKey = 'chatSummary_' + roleId;
+        let existingSummary = localStorage.getItem(summaryKey) || '';
+        const textMsgs = chatHistory.filter(m => m.type !== 'image' && m.content && String(m.content).trim());
+        const RECENT_KEEP = 20; // 最近保留20条原文
+        const SUMMARY_TRIGGER = 30; // 超过30条触发总结
+        if (textMsgs.length > SUMMARY_TRIGGER) {
+            // 取最早的10条来总结
+            const oldMsgs = textMsgs.slice(0, 10);
+            textMsgs.splice(0, 10); // 从临时数组里删掉，后面只发最近的
+            const convo = oldMsgs.map(m => (m.role === 'user' ? '我' : role.name) + '：' + String(m.content).trim()).join('\n');
+            // 调用AI总结
+            try {
+                const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+                const llmKey = localStorage.getItem('LLM_KEY') || '';
+                const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
+                    body: JSON.stringify({
+                        baseUrl: llmUrl,
+                        model: llmModel,
+                        stream: false,
+                        messages: [
+                            { role: 'system', content: '请把下面的对话总结成100字以内的前情提要，保留关键事件、关系进展和重要约定，用第三人称，直接输出摘要，不要客套。' },
+                            { role: 'user', content: convo }
+                        ]
+                    })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const newSummary = (data.choices?.[0]?.message?.content || '').trim();
+                    if (newSummary) {
+                        existingSummary = existingSummary ? existingSummary + ' ' + newSummary : newSummary;
+                        // 摘要太长就再压缩一次
+                        if (existingSummary.length > 500) {
+                            const res2 = await fetch('/api/chat', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
+                                body: JSON.stringify({
+                                    baseUrl: llmUrl,
+                                    model: llmModel,
+                                    stream: false,
+                                    messages: [
+                                        { role: 'system', content: '请把这段长摘要压缩成150字以内，保留所有关键信息。' },
+                                        { role: 'user', content: existingSummary }
+                                    ]
+                                })
+                            });
+                            if (res2.ok) {
+                                const data2 = await res2.json();
+                                existingSummary = (data2.choices?.[0]?.message?.content || existingSummary).trim();
+                            }
+                        }
+                        localStorage.setItem(summaryKey, existingSummary);
+                        console.log('自动总结完成，当前摘要长度：', existingSummary.length);
+                    }
+                }
+            } catch (e) {
+                console.warn('自动总结失败，继续用完整历史：', e);
+            }
+        }
+        // 把摘要加到messages最前面
+        if (existingSummary) {
+            messages.push({ role: 'system', content: '【前情提要（之前发生的事）】\n' + existingSummary });
+        }
+
+        // 只发最近的RECENT_KEEP条消息，加上图片处理
+        const recentMsgs = chatHistory.slice(-(RECENT_KEEP + 5)); // 多留5条缓冲
+        for (const msg of recentMsgs) {
             if (msg.type === 'image') {
                 // 表情包消息：如果content里有表情说明，直接发过去
                 if (msg.role === 'user' && msg.content && String(msg.content).includes('[发表情：')) {
@@ -6106,6 +6177,9 @@ function clearChat() {
     chatHistory = []; // 清空对话记忆
     localStorage.removeItem(getChatStorageKey()); // 清除当前角色的本地永久记忆
     localStorage.removeItem('PERM_CHAT_HISTORY'); // 清除旧版全局记录，防止刷新后自动恢复
+    // 清空自动总结的摘要
+    const roleId = getCurrentRole()?.id || 'default';
+    localStorage.removeItem('chatSummary_' + roleId);
     clearRoleChatImages(); // 联动清空当前角色保存在IndexedDB里的生图
     // 联动清空当前角色的朋友圈动态（localStorage元数据 + IndexedDB图片）
     try { localStorage.removeItem(momentsKey()); } catch (e) { /* ignore */ }
