@@ -4290,19 +4290,19 @@ async function sendChatMessage() {
         const singleVisionEnabled = (singleLlmModel === 'deepseek-flash') || /vision/i.test(singleLlmModel);
         const singleImageMap = singleVisionEnabled ? await loadRecentImageDataUrls(20) : new Map();
 
-        // === 自动总结省token：超过100条才把最早的20条总结成摘要，平时全量发不花钱 ===
+        // === 自动总结省token：超过100条把最早的对话压缩成500字详细记忆，之后只带最近20条 ===
         const roleId = role.id || 'default';
         const summaryKey = 'chatSummary_' + roleId;
         let existingSummary = localStorage.getItem(summaryKey) || '';
         const textMsgs = chatHistory.filter(m => m.type !== 'image' && m.content && String(m.content).trim());
-        const RECENT_KEEP = 50; // 最近保留50条原文，平时全发
-        const SUMMARY_TRIGGER = 100; // 超过100条才触发总结，平时不额外花钱
+        const RECENT_KEEP = 20; // 总结后只带最近20条原文
+        const SUMMARY_TRIGGER = 100; // 超过100条触发总结
         if (textMsgs.length > SUMMARY_TRIGGER) {
             // 取最早的20条来总结
             const oldMsgs = textMsgs.slice(0, 20);
-            textMsgs.splice(0, 20); // 从临时数组里删掉，后面只发最近的
+            textMsgs.splice(0, 20);
             const convo = oldMsgs.map(m => (m.role === 'user' ? '我' : role.name) + '：' + String(m.content).trim()).join('\n');
-            // 调用AI总结
+            // 调用AI写详细前情
             try {
                 const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
                 const llmKey = localStorage.getItem('LLM_KEY') || '';
@@ -4315,7 +4315,7 @@ async function sendChatMessage() {
                         model: llmModel,
                         stream: false,
                         messages: [
-                            { role: 'system', content: '请把下面的对话总结成100字以内的前情提要，保留关键事件、关系进展和重要约定，用第三人称，直接输出摘要，不要客套。' },
+                            { role: 'system', content: `请把下面你和对方的对话，写成一段500字左右的第一人称详细前情回忆，你就是${role.name}本人。要包含：1.你们现在的关系和亲近程度；2.这期间发生的最重要的3-5件事；3.你对他现在的感觉和态度；4.你们之间的约定、小暗号、小习惯；5.你的性格特点在这段对话里的表现。写得像你自己在回忆，不要第三人称，不要说"这是总结"，直接输出回忆内容，不要客套。` },
                             { role: 'user', content: convo }
                         ]
                     })
@@ -4324,9 +4324,9 @@ async function sendChatMessage() {
                     const data = await res.json();
                     const newSummary = (data.choices?.[0]?.message?.content || '').trim();
                     if (newSummary) {
-                        existingSummary = existingSummary ? existingSummary + ' ' + newSummary : newSummary;
-                        // 摘要太长就再压缩一次
-                        if (existingSummary.length > 500) {
+                        existingSummary = existingSummary ? existingSummary + '\n后来：' + newSummary : newSummary;
+                        // 记忆太长就压到500字以内，保留所有关键信息
+                        if (existingSummary.length > 600) {
                             const res2 = await fetch('/api/chat', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
@@ -4335,7 +4335,7 @@ async function sendChatMessage() {
                                     model: llmModel,
                                     stream: false,
                                     messages: [
-                                        { role: 'system', content: '请把这段长摘要压缩成150字以内，保留所有关键信息。' },
+                                        { role: 'system', content: '请把这段长回忆压缩成500字以内，保留所有关键事件、关系、约定和性格细节，用第一人称，不要客套。' },
                                         { role: 'user', content: existingSummary }
                                     ]
                                 })
@@ -4346,16 +4346,16 @@ async function sendChatMessage() {
                             }
                         }
                         localStorage.setItem(summaryKey, existingSummary);
-                        console.log('自动总结完成，当前摘要长度：', existingSummary.length);
+                        console.log('自动总结完成，当前记忆长度：', existingSummary.length);
                     }
                 }
             } catch (e) {
                 console.warn('自动总结失败，继续用完整历史：', e);
             }
         }
-        // 把摘要加到messages最前面
+        // 把记忆加到system里，告诉AI这就是它的全部过去
         if (existingSummary) {
-            messages.push({ role: 'system', content: '【前情提要（之前发生的事）】\n' + existingSummary });
+            messages.push({ role: 'system', content: `【你和他的过去回忆】\n${existingSummary}\n\n以上是你和他从认识到现在的全部经历，你已经完全记得这些事，带着这些记忆继续和他正常聊天，不要提这是总结，不要说你不记得之前的事。` });
         }
 
         // 只发最近的RECENT_KEEP条消息，加上图片处理
