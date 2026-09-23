@@ -2568,8 +2568,9 @@ async function loadCustomEmojis() {
         
         req.onsuccess = async () => {
             const emojis = req.result;
+            // 先清空面板，不管有没有表情
+            panel.innerHTML = '';
             if (emojis.length > 0) {
-                panel.innerHTML = '';
                 for (const emoji of emojis) {
                     const key = emoji.prompt.replace('emoji_', '');
                     const btn = document.createElement('button');
@@ -2578,6 +2579,9 @@ async function loadCustomEmojis() {
                     btn.onclick = () => sendEmoji(key);
                     panel.appendChild(btn);
                 }
+            } else {
+                // 没表情包就提示生成
+                panel.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#999;padding:30px 0;font-size:14px;">还没生成专属表情包<br>点右上角魔法棒去生成</div>';
             }
         };
     } catch (e) {
