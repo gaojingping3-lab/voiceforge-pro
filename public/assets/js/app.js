@@ -4290,7 +4290,17 @@ async function sendChatMessage() {
         const singleVisionEnabled = (singleLlmModel === 'deepseek-flash') || /vision/i.test(singleLlmModel);
         const singleImageMap = singleVisionEnabled ? await loadRecentImageDataUrls(20) : new Map();
 
-        // === 自动总结省token：每攒80条新对话，才总结一次成500字详细记忆，不重复跑 ===
+        // === 自动总结省token：按估算总token数触发，到10万token才总结一次，短消息多聊会儿 ===
+        // 简单估算token：中文1.3字=1token，其他4字符=1token
+        function estimateTokens(str) {
+            if (!str) return 0;
+            let cn = 0, en = 0;
+            for (const c of str) {
+                if (/[\u4e00-\u9fa5]/.test(c)) cn++;
+                else en++;
+            }
+            return Math.round(cn / 1.3 + en / 4);
+        }
         const roleId = role.id || 'default';
         const summaryKey = 'chatSummary_' + roleId;
         const summaryIdxKey = 'chatSummaryIdx_' + roleId;
@@ -4298,11 +4308,17 @@ async function sendChatMessage() {
         let lastSummarizedIdx = parseInt(localStorage.getItem(summaryIdxKey) || '0');
         const textMsgs = chatHistory.filter(m => m.type !== 'image' && m.content && String(m.content).trim());
         const RECENT_KEEP = 20; // 总结后只带最近20条原文
-        const SUMMARY_BATCH = 80; // 每攒80条新消息总结一次
-        // 只有当新攒的消息超过80条，才总结，否则直接跳过
-        if (textMsgs.length - lastSummarizedIdx >= SUMMARY_BATCH && textMsgs.length >= SUMMARY_BATCH) {
-            // 取上次总结点之后的80条新消息来总结
-            const oldMsgs = textMsgs.slice(lastSummarizedIdx, lastSummarizedIdx + SUMMARY_BATCH);
+        const TOKEN_LIMIT = 100000; // 到10万token触发总结（模型上下文12.8万，留2.8万缓冲）
+        // 算一下从上次总结点到现在，总共有多少token
+        let oldPartTokens = 0;
+        for (let i = lastSummarizedIdx; i < textMsgs.length - RECENT_KEEP; i++) {
+            oldPartTokens += estimateTokens(String(textMsgs[i].content));
+        }
+        // 旧部分+现有摘要的token超过10万，就总结
+        if (oldPartTokens + estimateTokens(existingSummary) > TOKEN_LIMIT && textMsgs.length > RECENT_KEEP + 20) {
+            // 取上次总结点到倒数第20条之前的所有消息来总结
+            const endIdx = textMsgs.length - RECENT_KEEP;
+            const oldMsgs = textMsgs.slice(lastSummarizedIdx, endIdx);
             const convo = oldMsgs.map(m => (m.role === 'user' ? '我' : role.name) + '：' + String(m.content).trim()).join('\n');
             // 调用AI写详细前情
             try {
@@ -4348,10 +4364,10 @@ async function sendChatMessage() {
                             }
                         }
                         // 记录这次总结到第几条了
-                        lastSummarizedIdx = lastSummarizedIdx + SUMMARY_BATCH;
+                        lastSummarizedIdx = endIdx;
                         localStorage.setItem(summaryKey, existingSummary);
                         localStorage.setItem(summaryIdxKey, String(lastSummarizedIdx));
-                        console.log('自动总结完成，当前记忆长度：', existingSummary.length, '，已总结到第', lastSummarizedIdx, '条');
+                        console.log('自动总结完成，当前记忆长度：', existingSummary.length, '，已总结到第', lastSummarizedIdx, '条，约', estimateTokens(existingSummary), 'token');
                     }
                 }
             } catch (e) {
