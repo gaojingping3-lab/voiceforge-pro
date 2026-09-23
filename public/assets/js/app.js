@@ -9310,11 +9310,11 @@ async function submitMomentComment() {
         if (!llmKey) throw new Error('未配置LLM Key');
         const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
         const recentChat = (typeof chatHistory !== 'undefined' ? chatHistory : []).slice(-5);
-        const recentChatText = recentChat.map(cm => (cm.role === 'user' ? '我' : role.name) + ': ' + String(cm.content || '').slice(0, 100)).join('\n');
-        const replyPrompt = '你的朋友圈动态：「' + String(m.text).slice(0, 80) + '」\n' +
-            '我刚才评论：「' + text + '」\n' +
-            '【你们最近的聊天状态（必须贴合这个语气和氛围回复）】\n' + (recentChatText || '（刚发完这条动态）') + '\n' +
-            '【重要】评论你的人就是我——那个和你最亲近的人，你完全知道是我，不是外人。即使你对外人高冷，对我也不是客套。请用你平时和我聊天一模一样的语气回我，口语化，10~30字，可以傲娇、吐槽、调侃或温柔，不要端着。不要引号，不要解释。';
+        const recentChatText = recentChat.map(cm => (cm.role === 'user' ? '【我（用户）】' : '【你】') + ': ' + String(cm.content || '').slice(0, 100)).join('\n');
+        const replyPrompt = '【你】发了一条朋友圈：「' + String(m.text).slice(0, 80) + '」\n' +
+            '【我（用户）】在下面评论了：「' + text + '」\n' +
+            '【你们最近的聊天记录（你就是【你】，不是【我】！用你平时和我聊天的语气回我）】\n' + (recentChatText || '（刚发完这条动态）') + '\n' +
+            '【身份提醒】你就是' + role.name + '，在回复【我】的评论，不是替我说话。你是被我评论的那个人，用你平时聊天的语气回我，口语化，10~30字，可以傲娇、吐槽、调侃或温柔。不要引号，不要解释。';
         const messages = [
             { role: 'system', content: '你是角色「' + role.name + '」。私人虚构陪伴空间，完全沉浸角色，不要AI腔。' },
         ];
@@ -9469,7 +9469,7 @@ async function postNewMoment(autoOpts) {
         const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
         if (!llmKey) throw new Error('没有配置 LLM Key');
         const recent = (typeof chatHistory !== 'undefined' ? chatHistory : []).slice(-8);
-        const recentText = recent.map(m => (m.role === 'user' ? '我' : role.name) + ': ' + String(m.content || '').slice(0, 150)).join('\n');
+        const recentText = recent.map(m => (m.role === 'user' ? '【我（用户）】' : '【你】') + ': ' + String(m.content || '').slice(0, 150)).join('\n');
         // 历史文案（去重用）：文案必须完全根据最近聊天记录来写，且不能和发过的重复
         const existingMoments = (() => { try { return loadMoments().map(m => String(m.text || '').trim()); } catch (e) { return []; } })();
         const existingBlock = existingMoments.length
