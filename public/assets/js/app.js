@@ -8974,20 +8974,22 @@ function openMomentsDB() {
 async function momentsDbSave(id, dataURL, roleKey) {
     try {
         const db = await openMomentsDB();
-        return new Promise((resolve) => {
+        const fullId = roleKey + '_' + id;
+        return Promise((resolve) => {
             const tx = db.transaction(MOMENTS_STORE, 'readwrite');
-            tx.objectStore(MOMENTS_STORE).put({ id, dataURL, roleKey, ts: Date.now() });
+            tx.objectStore(MOMENTS_STORE).put({ id: fullId, dataURL, roleKey, ts: Date.now() });
             tx.oncomplete = () => resolve(true);
             tx.onerror = () => resolve(false);
         });
     } catch (e) { console.warn('[MomentsDB] 保存失败:', e.message); return false; }
 }
-async function momentsDbGet(id) {
+async function momentsDbGet(id, roleKey) {
     try {
         const db = await openMomentsDB();
+        const fullId = roleKey + '_' + id;
         return new Promise((resolve) => {
             const tx = db.transaction(MOMENTS_STORE, 'readonly');
-            const req = tx.objectStore(MOMENTS_STORE).get(id);
+            const req = tx.objectStore(MOMENTS_STORE).get(fullId);
             req.onsuccess = () => resolve(req.result ? req.result.dataURL : null);
             req.onerror = () => resolve(null);
         });
@@ -9104,7 +9106,7 @@ async function openMoments() {
     // 背景图：有缓存直接显示；没有缓存后台生成（不阻塞打开，生成好自动换上）
     const coverImg = document.getElementById('moments-cover-img');
     if (coverImg) {
-        const cachedCover = await momentsDbGet('cover_' + role.id);
+        const cachedCover = await momentsDbGet('cover_' + role.id, momentsKey());
         if (cachedCover) {
             coverImg.src = cachedCover;
             coverImg.style.display = 'block';
@@ -9239,7 +9241,7 @@ function renderMoments() {
         if (m.image && m.image.indexOf('idx:') === 0) {
             const mid = parseInt(m.image.slice(4), 10);
             if (!isNaN(mid)) {
-                momentsDbGet(mid).then(src => {
+                momentsDbGet(mid, momentsKey()).then(src => {
                     if (src) {
                         const img = feed.querySelector('img.moment-img[data-mid="' + m.id + '"]');
                         if (img) img.src = src;
