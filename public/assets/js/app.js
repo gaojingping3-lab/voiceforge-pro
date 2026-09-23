@@ -3124,7 +3124,11 @@ function renderChatHistory() {
     // 等图片渲染完，再滚动一次到底部
     setTimeout(() => {
         container.scrollTop = container.scrollHeight;
-    }, 300);
+    }, 500);
+    // 再等久一点，确保所有图片都加载完
+    setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+    }, 1000);
 }
 
 // 停止所有音频播放（聊天音频 + TTS页面播放器）
