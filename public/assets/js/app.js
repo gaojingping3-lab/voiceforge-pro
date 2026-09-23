@@ -4308,14 +4308,11 @@ async function sendChatMessage() {
         let lastSummarizedIdx = parseInt(localStorage.getItem(summaryIdxKey) || '0');
         const textMsgs = chatHistory.filter(m => m.type !== 'image' && m.content && String(m.content).trim());
         const RECENT_KEEP = 20; // 总结后只带最近20条原文
-        const TOKEN_LIMIT = 100000; // 到10万token触发总结（模型上下文12.8万，留2.8万缓冲）
-        // 算一下从上次总结点到现在，总共有多少token
-        let oldPartTokens = 0;
-        for (let i = lastSummarizedIdx; i < textMsgs.length - RECENT_KEEP; i++) {
-            oldPartTokens += estimateTokens(String(textMsgs[i].content));
-        }
-        // 旧部分+现有摘要的token超过10万，就总结
-        if (oldPartTokens + estimateTokens(existingSummary) > TOKEN_LIMIT && textMsgs.length > RECENT_KEEP + 20) {
+        const TRIGGER_MSG_COUNT = 120; // 未总结的消息超过120条就总结，避免估算不准堆太多
+        // 算一下从上次总结点到现在，新攒了多少条消息
+        const newMsgCount = textMsgs.length - lastSummarizedIdx;
+        // 新消息数超过120条，就总结
+        if (newMsgCount >= TRIGGER_MSG_COUNT && textMsgs.length > RECENT_KEEP + 20) {
             // 取上次总结点到倒数第20条之前的所有消息来总结
             const endIdx = textMsgs.length - RECENT_KEEP;
             const oldMsgs = textMsgs.slice(lastSummarizedIdx, endIdx);
