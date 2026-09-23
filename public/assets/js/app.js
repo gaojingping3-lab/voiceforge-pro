@@ -3123,26 +3123,39 @@ function renderChatHistory() {
     restoreChatImages();
     // 自动监听聊天容器变化，有新内容就滚到底部（不打断用户往上翻）
     setTimeout(() => {
-        // 刚进页面先强制滚到底部
-        container.scrollTop = container.scrollHeight;
-        const scrollToBottomIfNearBottom = () => {
-            const threshold = 100; // 距离底部100px以内才自动滚
-            if (container.scrollHeight - container.scrollTop - container.clientHeight < threshold) {
-                container.scrollTop = container.scrollHeight;
-            }
+        // 刚进页面连续强制滚到底部，直到所有图片加载完
+        const forceScroll = () => {
+            container.scrollTop = container.scrollHeight;
         };
-        // 监听容器变化
-        if (window._chatScrollObserver) window._chatScrollObserver.disconnect();
-        window._chatScrollObserver = new MutationObserver(scrollToBottomIfNearBottom);
-        window._chatScrollObserver.observe(container, { childList: true, subtree: true, attributes: true });
-        // 图片加载完也滚一次
-        container.querySelectorAll('img').forEach(img => {
-            if (!img.complete) img.onload = scrollToBottomIfNearBottom;
+        forceScroll();
+        const imgObserver = new MutationObserver(() => {
+            forceScroll();
+            // 图片加载完也滚
+            container.querySelectorAll('img:not([data-loaded])').forEach(img => {
+                img.dataset.loaded = '1';
+                img.onload = forceScroll;
+            });
         });
-        // 兜底再滚几次
-        setTimeout(scrollToBottomIfNearBottom, 300);
-        setTimeout(scrollToBottomIfNearBottom, 800);
-        setTimeout(scrollToBottomIfNearBottom, 1500);
+        imgObserver.observe(container, { childList: true, subtree: true });
+        // 2秒后停止强制滚动，改成智能监听
+        setTimeout(() => {
+            imgObserver.disconnect();
+            forceScroll();
+            const scrollToBottomIfNearBottom = () => {
+                const threshold = 100; // 距离底部100px以内才自动滚
+                if (container.scrollHeight - container.scrollTop - container.clientHeight < threshold) {
+                    container.scrollTop = container.scrollHeight;
+                }
+            };
+            // 监听容器变化
+            if (window._chatScrollObserver) window._chatScrollObserver.disconnect();
+            window._chatScrollObserver = new MutationObserver(scrollToBottomIfNearBottom);
+            window._chatScrollObserver.observe(container, { childList: true, subtree: true, attributes: true });
+        }, 2000);
+        // 兜底
+        setTimeout(forceScroll, 500);
+        setTimeout(forceScroll, 1000);
+        setTimeout(forceScroll, 1500);
     }, 100);
 }
 
