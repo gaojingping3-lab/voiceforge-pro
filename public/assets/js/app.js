@@ -4075,6 +4075,71 @@ function handleCallOverlayClick() {
 }
 
 // 发送聊天消息
+// 时间天气联动：自动获取当前时间和天气，生成给AI的上下文
+let cachedWeather = null;
+let weatherCacheTime = 0;
+async function buildTimeWeatherPrompt() {
+    try {
+        const now = new Date();
+        const hour = now.getHours();
+        const minute = now.getMinutes();
+        // 判断时间段
+        let timeDesc = '';
+        if (hour >= 5 && hour < 9) timeDesc = `现在是早上${hour}点${minute}分，刚起床没多久`;
+        else if (hour >= 9 && hour < 12) timeDesc = `现在是上午${hour}点${minute}分`;
+        else if (hour >= 12 && hour < 14) timeDesc = `现在是中午${hour}点${minute}分，该吃午饭了`;
+        else if (hour >= 14 && hour < 18) timeDesc = `现在是下午${hour}点${minute}分`;
+        else if (hour >= 18 && hour < 22) timeDesc = `现在是晚上${hour}点${minute}分，天黑了`;
+        else if (hour >= 22 && hour < 24) timeDesc = `现在是晚上${hour}点${minute}分，很晚了，该准备睡觉了`;
+        else timeDesc = `现在是凌晨${hour}点${minute}分，夜深人静，周围很安静`;
+
+        // 拿天气，缓存10分钟
+        let weatherDesc = '';
+        if (cachedWeather && Date.now() - weatherCacheTime < 10 * 60 * 1000) {
+            weatherDesc = cachedWeather;
+        } else {
+            try {
+                // 先拿位置
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 });
+                });
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                // 调用免费Open-Meteo API
+                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const temp = Math.round(data.current.temperature_2m);
+                    const code = data.current.weather_code;
+                    // 天气代码转描述
+                    let weather = '';
+                    if (code === 0) weather = '天气晴朗，阳光很好';
+                    else if (code <= 3) weather = '多云，有点阴';
+                    else if (code <= 67) weather = '正在下雨，外面潮潮的';
+                    else if (code <= 77) weather = '正在下雪，外面白白的';
+                    else if (code <= 82) weather = '在下小雨，不大';
+                    else if (code <= 86) weather = '下大雪';
+                    else weather = '天气不太好';
+                    weatherDesc = `外面${weather}，现在气温${temp}度`;
+                    cachedWeather = weatherDesc;
+                    weatherCacheTime = Date.now();
+                }
+            } catch (e) {
+                // 用户拒绝定位或者失败，就只返回时间
+                weatherDesc = '';
+            }
+        }
+
+        // 组合成给AI的提示
+        let prompt = `【当前真实环境】${timeDesc}`;
+        if (weatherDesc) prompt += `，${weatherDesc}`;
+        prompt += `。请你自然地在对话里结合现在的时间和天气，比如深夜就表现得困一点，下雨就提一下天气，不要生硬地说"现在几点"，要像真的生活在这个时刻一样。`;
+        return prompt;
+    } catch (e) {
+        return '';
+    }
+}
+
 async function sendChatMessage() {
     await initTTSAudio(); // 激活 iOS 音频会话，保持自动播放权限
     const input = document.getElementById('chat-input');
@@ -4261,6 +4326,11 @@ async function sendChatMessage() {
         const memoPrompt = formatMemoPrompt(getCurrentRoleId());
         if (memoPrompt) {
             messages.push({ role: 'system', content: memoPrompt });
+        }
+        // 时间天气联动：自动把当前时间和天气加进设定
+        const timeWeatherPrompt = await buildTimeWeatherPrompt();
+        if (timeWeatherPrompt) {
+            messages.push({ role: 'system', content: timeWeatherPrompt });
         }
         // 情绪感知已关闭（减少system prompt，提升回复速度）
         // const emotion = detectEmotion(text);
