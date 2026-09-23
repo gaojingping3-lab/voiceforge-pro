@@ -2581,7 +2581,7 @@ async function loadCustomEmojis() {
                 }
             } else {
                 // 没表情包就提示生成
-                panel.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#999;padding:30px 0;font-size:14px;">还没生成专属表情包<br>点右上角魔法棒去生成</div>';
+                panel.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#999;padding:30px 0;font-size:14px;">还没生成专属表情包<br>去设置里点"生成专属表情包"即可</div>';
             }
         };
     } catch (e) {
