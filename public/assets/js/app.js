@@ -3277,16 +3277,11 @@ function appendChatMessage(text, type) {
         bubble.innerHTML = escapeHtml(text);
     }
 
-    // 长按消息弹出菜单：复制、撤回（仅自己发的消息）
-    let pressTimer = null;
-    bubble.addEventListener('touchstart', (e) => {
-        pressTimer = setTimeout(() => {
-            if (navigator.vibrate) navigator.vibrate(10);
-            showMsgActionMenu(bubble, isUser, div);
-        }, 500);
+    // 双击消息弹出菜单：复制、撤回（仅自己发的消息）
+    bubble.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        showMsgActionMenu(bubble, isUser, div);
     });
-    bubble.addEventListener('touchend', () => clearTimeout(pressTimer));
-    bubble.addEventListener('touchmove', () => clearTimeout(pressTimer));
     bubble.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         showMsgActionMenu(bubble, isUser, div);
