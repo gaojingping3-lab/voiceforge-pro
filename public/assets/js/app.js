@@ -302,6 +302,31 @@ function showMsgContextMenu(msgEl, x, y) {
     const menu = document.createElement('div');
     menu.className = 'msg-context-menu';
 
+    // 复制（所有消息都显示）
+    const copyBtn = document.createElement('button');
+    copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i> 复制';
+    copyBtn.onclick = () => {
+        navigator.clipboard.writeText(text).then(() => sfxSend());
+        menu.remove();
+    };
+    menu.appendChild(copyBtn);
+
+    // 撤回（仅用户消息显示，等于删除刚发的自己的消息）
+    if (isUser) {
+        const recallBtn = document.createElement('button');
+        recallBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> 撤回';
+        recallBtn.onclick = () => {
+            const idx = Array.from(document.querySelectorAll('#chat-messages .chat')).indexOf(msgEl);
+            if (idx >= 0 && chatHistory[idx]) {
+                chatHistory.splice(idx, 1);
+                saveChatHistory();
+                renderChatHistory();
+            }
+            menu.remove();
+        };
+        menu.appendChild(recallBtn);
+    }
+
     // 重新生成（仅AI消息）
     if (!isUser) {
         const regenBtn = document.createElement('button');
@@ -3277,14 +3302,10 @@ function appendChatMessage(text, type) {
         bubble.innerHTML = escapeHtml(text);
     }
 
-    // 双击消息弹出菜单：复制、撤回（仅自己发的消息）
+    // 双击消息弹出和原来完全一致的上下文菜单
     bubble.addEventListener('dblclick', (e) => {
         e.preventDefault();
-        showMsgActionMenu(bubble, isUser, div);
-    });
-    bubble.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        showMsgActionMenu(bubble, isUser, div);
+        showMsgContextMenu(div, e.clientX, e.clientY);
     });
 
     // 微信风正确顺序：
@@ -3312,53 +3333,6 @@ function appendChatMessage(text, type) {
     container.appendChild(div);
     smartScroll(container);
     return bubble;
-}
-
-// 双击消息弹出操作菜单，和现有"重新生成/删除"菜单样式完全一致
-function showMsgActionMenu(bubble, isUser, div) {
-    const old = document.getElementById('msg-action-menu');
-    if (old) old.remove();
-    const rect = bubble.getBoundingClientRect();
-    const menu = document.createElement('div');
-    menu.id = 'msg-action-menu';
-    // 白色圆角菜单，和现有重新生成菜单一致
-    menu.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left + rect.width/2 - 60}px;z-index:60;background:white;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.15);padding:8px 0;min-width:120px;`;
-    // 复制选项
-    const copyItem = document.createElement('div');
-    copyItem.style.cssText = `display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;color:#333;font-size:15px;`;
-    copyItem.innerHTML = '<i class="fa-regular fa-copy" style="font-size:16px;"></i>复制';
-    copyItem.onclick = () => {
-        const text = bubble.innerText;
-        navigator.clipboard.writeText(text).then(() => sfxSend());
-        menu.remove();
-    };
-    menu.appendChild(copyItem);
-    // 撤回选项（仅用户消息显示）
-    if (isUser) {
-        const recallItem = document.createElement('div');
-        recallItem.style.cssText = `display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;color:#ef4444;font-size:15px;`;
-        recallItem.innerHTML = '<i class="fa-solid fa-rotate-left" style="font-size:16px;"></i>撤回';
-        recallItem.onclick = () => {
-            chatHistory.pop();
-            saveChatHistory();
-            div.remove();
-            menu.remove();
-        };
-        menu.appendChild(recallItem);
-    }
-    document.body.appendChild(menu);
-    // 点外面关闭
-    setTimeout(() => {
-        const closeOnClick = (e) => {
-            if (!menu.contains(e.target)) {
-                menu.remove();
-                document.removeEventListener('touchstart', closeOnClick);
-                document.removeEventListener('click', closeOnClick);
-            }
-        };
-        document.addEventListener('touchstart', closeOnClick);
-        document.addEventListener('click', closeOnClick);
-    }, 10);
 }
 
 // 自动朗读开关
