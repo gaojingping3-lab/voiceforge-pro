@@ -3314,43 +3314,40 @@ function appendChatMessage(text, type) {
     return bubble;
 }
 
-// 双击消息弹出操作菜单（和微信+号面板里的红包/礼物按钮同尺寸）
+// 双击消息弹出操作菜单，和现有"重新生成/删除"菜单样式完全一致
 function showMsgActionMenu(bubble, isUser, div) {
-    // 先关掉旧菜单
     const old = document.getElementById('msg-action-menu');
     if (old) old.remove();
     const rect = bubble.getBoundingClientRect();
     const menu = document.createElement('div');
     menu.id = 'msg-action-menu';
-    // 按钮尺寸和+号面板里的红包/礼物按钮一致：64x64
-    menu.style.cssText = `position:fixed;top:${rect.top - 70}px;left:${rect.left + rect.width/2 - 64}px;z-index:60;display:flex;gap:12px;`;
-    // 复制按钮
-    const copyBtn = document.createElement('div');
-    copyBtn.style.cssText = `width:64px;height:64px;background:rgba(255,255,255,0.95);border-radius:12px;display:flex;align-items:center;justify-content:center;color:#333;font-size:24px;box-shadow:0 2px 8px rgba(0,0,0,0.1);`;
-    copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i>';
-    copyBtn.onclick = () => {
+    // 白色圆角菜单，和现有重新生成菜单一致
+    menu.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left + rect.width/2 - 60}px;z-index:60;background:white;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.15);padding:8px 0;min-width:120px;`;
+    // 复制选项
+    const copyItem = document.createElement('div');
+    copyItem.style.cssText = `display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;color:#333;font-size:15px;`;
+    copyItem.innerHTML = '<i class="fa-regular fa-copy" style="font-size:16px;"></i>复制';
+    copyItem.onclick = () => {
         const text = bubble.innerText;
-        navigator.clipboard.writeText(text).then(() => {
-            sfxSend();
-        });
+        navigator.clipboard.writeText(text).then(() => sfxSend());
         menu.remove();
     };
-    menu.appendChild(copyBtn);
-    // 撤回按钮（仅用户消息显示）
+    menu.appendChild(copyItem);
+    // 撤回选项（仅用户消息显示）
     if (isUser) {
-        const recallBtn = document.createElement('div');
-        recallBtn.style.cssText = `width:64px;height:64px;background:rgba(255,255,255,0.95);border-radius:12px;display:flex;align-items:center;justify-content:center;color:#ef4444;font-size:24px;box-shadow:0 2px 8px rgba(0,0,0,0.1);`;
-        recallBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i>';
-        recallBtn.onclick = () => {
+        const recallItem = document.createElement('div');
+        recallItem.style.cssText = `display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;color:#ef4444;font-size:15px;`;
+        recallItem.innerHTML = '<i class="fa-solid fa-rotate-left" style="font-size:16px;"></i>撤回';
+        recallItem.onclick = () => {
             chatHistory.pop();
             saveChatHistory();
             div.remove();
             menu.remove();
         };
-        menu.appendChild(recallBtn);
+        menu.appendChild(recallItem);
     }
     document.body.appendChild(menu);
-    // 点菜单外面就关掉
+    // 点外面关闭
     setTimeout(() => {
         const closeOnClick = (e) => {
             if (!menu.contains(e.target)) {
