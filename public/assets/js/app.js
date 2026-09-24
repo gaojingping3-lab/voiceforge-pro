@@ -2172,7 +2172,7 @@ const CHAT_IMG_RESTORE = 5;
 function openImageDB() {
     return new Promise((resolve, reject) => {
         if (!window.indexedDB) { reject(new Error('浏览器不支持IndexedDB')); return; }
-        const req = indexedDB.open(CHAT_IMG_DB, 1);
+        const req = indexedDB.open(CHAT_IMG_DB, 2); // 版本升到2，加角色表
         req.onupgradeneeded = () => {
             const db = req.result;
             if (!db.objectStoreNames.contains(CHAT_IMG_STORE)) {
@@ -2180,10 +2180,64 @@ function openImageDB() {
                 store.createIndex('ts', 'ts');
                 store.createIndex('roleKey', 'roleKey');
             }
+            if (!db.objectStoreNames.contains('ROLE_STORE')) {
+                db.createObjectStore('ROLE_STORE', { keyPath: 'id' });
+            }
         };
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error || new Error('打开图片库失败'));
     });
+}
+
+// 角色列表内存缓存，页面加载时从IndexedDB读入
+let roleListCache = null;
+
+// 初始化角色列表：从IndexedDB读，没有就从localStorage迁移
+async function initRoleListFromIDB() {
+    try {
+        const db = await openImageDB();
+        return new Promise((resolve) => {
+            const tx = db.transaction('ROLE_STORE', 'readonly');
+            const req = tx.objectStore('ROLE_STORE').get('ROLE_LIST');
+            req.onsuccess = async () => {
+                if (req.result && req.result.list) {
+                    roleListCache = req.result.list;
+                    resolve(roleListCache);
+                } else {
+                    // IndexedDB里没有，从localStorage读旧数据
+                    const oldSaved = localStorage.getItem('ROLE_LIST');
+                    let list = null;
+                    if (oldSaved) {
+                        try { list = JSON.parse(oldSaved); } catch(e) {}
+                    }
+                    if (!list) {
+                        const oldName = localStorage.getItem('ROLE_CARD_NAME') || DEFAULT_ROLE_NAME;
+                        const oldDesc = localStorage.getItem('ROLE_CARD_DESC') || DEFAULT_ROLE_DESC;
+                        list = [{ id: Date.now(), name: oldName, desc: oldDesc, opening: '' }];
+                    }
+                    roleListCache = list;
+                    // 自动写入IndexedDB，完成迁移
+                    try {
+                        const db2 = await openImageDB();
+                        await new Promise((res) => {
+                            const tx2 = db2.transaction('ROLE_STORE', 'readwrite');
+                            tx2.objectStore('ROLE_STORE').put({ id: 'ROLE_LIST', list: list });
+                            tx2.oncomplete = res;
+                        });
+                    } catch(e) {}
+                    resolve(list);
+                }
+            };
+            req.onerror = () => resolve(null);
+        });
+    } catch(e) {
+        // 兜底：读localStorage
+        const oldSaved = localStorage.getItem('ROLE_LIST');
+        if (oldSaved) {
+            try { roleListCache = JSON.parse(oldSaved); return roleListCache; } catch(e) {}
+        }
+        return null;
+    }
 }
 
 async function saveChatImage(blob, savedPrompt, ts, ratio) {
@@ -2590,7 +2644,9 @@ async function loadCustomEmojis() {
 }
 
 // 页面加载时自动加载自定义表情
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+    // 先从IndexedDB加载角色列表，自动迁移旧数据
+    await initRoleListFromIDB();
     setTimeout(loadCustomEmojis, 1000);
 });
 
@@ -4612,30 +4668,33 @@ const DEFAULT_ROLE_DESC = '你是乐。这是一个纯粹的私人虚构陪伴�
 
 // 获取角色列表，没有则初始化默认角色
 function getRoleList() {
+    if (roleListCache) return roleListCache;
+    // 兜底：如果缓存还没加载完，读localStorage
     const saved = localStorage.getItem('ROLE_LIST');
     if (saved) {
-        try {
-            return JSON.parse(saved);
-        } catch (e) {
-            // 解析失败，迁移旧数据
-        }
+        try { return JSON.parse(saved); } catch (e) {}
     }
-    // 迁移旧数据或初始化
     const oldName = localStorage.getItem('ROLE_CARD_NAME') || DEFAULT_ROLE_NAME;
     const oldDesc = localStorage.getItem('ROLE_CARD_DESC') || DEFAULT_ROLE_DESC;
-    const list = [{ id: Date.now(), name: oldName, desc: oldDesc, opening: '' }];
-    localStorage.setItem('ROLE_LIST', JSON.stringify(list));
-    localStorage.setItem('CURRENT_ROLE_ID', list[0].id);
-    return list;
+    return [{ id: Date.now(), name: oldName, desc: oldDesc, opening: '' }];
 }
 
 function saveRoleList(list) {
+    roleListCache = list;
+    // 同步写localStorage当备份
     try {
         localStorage.setItem('ROLE_LIST', JSON.stringify(list));
     } catch (e) {
-        alert('保存失败：本地存储空间不足（角色卡或头像过大）。\n\n建议：精简角色卡内容，或重新上传小尺寸头像。');
-        console.error('[RoleList] 保存失败:', e);
+        console.warn('[RoleList] localStorage备份失败:', e.message);
     }
+    // 异步写IndexedDB
+    openImageDB().then(db => {
+        const tx = db.transaction('ROLE_STORE', 'readwrite');
+        tx.objectStore('ROLE_STORE').put({ id: 'ROLE_LIST', list: list });
+    }).catch(e => {
+        console.error('[RoleList] IndexedDB保存失败:', e);
+        alert('保存失败：本地存储空间不足。建议精简角色卡内容，或删除不用的旧角色。');
+    });
 }
 
 function getCurrentRoleId() {
