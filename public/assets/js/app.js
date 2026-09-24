@@ -5885,7 +5885,7 @@ function formatChatText(text) {
     let html = '';
     lines.forEach((line, idx) => {
         if (line.trimStart().startsWith('💭')) {
-            html += `<div style="color:#999;font-size:0.85em;margin:0;padding:0;font-style:italic;line-height:1.2;">${escapeHtml(line)}</div>`;
+            html += `<span style="color:#999;font-size:0.85em;font-style:italic;display:block;line-height:1.2;margin:0 0 2px 0;">${escapeHtml(line)}</span>`;
         } else {
             const parts = line.split(/(【[^】]*】|\[[^\]]*\]|（[^）]*）|\([^)]*\)|\*[^*]*\*)/g);
             const processed = parts.map(part => {
@@ -5895,7 +5895,7 @@ function formatChatText(text) {
                 }
                 return `<span style="color:${DIALOG_COLOR}">${escapeHtml(part)}</span>`;
             }).join('');
-            if (idx > 0 && !lines[idx-1].trimStart().startsWith('💭')) {
+            if (idx > 0) {
                 html += '<br>';
             }
             html += processed;
