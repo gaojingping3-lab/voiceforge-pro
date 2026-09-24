@@ -3314,19 +3314,19 @@ function appendChatMessage(text, type) {
     return bubble;
 }
 
-// 长按消息弹出操作菜单
+// 双击消息弹出操作菜单（和微信+号面板里的红包/礼物按钮同尺寸）
 function showMsgActionMenu(bubble, isUser, div) {
     // 先关掉旧菜单
     const old = document.getElementById('msg-action-menu');
     if (old) old.remove();
+    const rect = bubble.getBoundingClientRect();
     const menu = document.createElement('div');
     menu.id = 'msg-action-menu';
-    menu.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/30';
-    const menuBox = document.createElement('div');
-    menuBox.className = 'bg-base-100 rounded-xl shadow-2xl w-48 overflow-hidden';
+    // 按钮尺寸和+号面板里的红包/礼物按钮一致：64x64
+    menu.style.cssText = `position:fixed;top:${rect.top - 70}px;left:${rect.left + rect.width/2 - 64}px;z-index:60;display:flex;gap:12px;`;
     // 复制按钮
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'w-full py-3 text-center hover:bg-base-200 border-b border-base-200';
+    const copyBtn = document.createElement('div');
+    copyBtn.style.cssText = `width:64px;height:64px;background:rgba(0,0,0,0.85);border-radius:12px;display:flex;align-items:center;justify-content:center;color:white;font-size:13px;`;
     copyBtn.innerText = '复制';
     copyBtn.onclick = () => {
         const text = bubble.innerText;
@@ -3335,26 +3335,33 @@ function showMsgActionMenu(bubble, isUser, div) {
         });
         menu.remove();
     };
-    menuBox.appendChild(copyBtn);
+    menu.appendChild(copyBtn);
     // 撤回按钮（仅用户消息显示）
     if (isUser) {
-        const recallBtn = document.createElement('button');
-        recallBtn.className = 'w-full py-3 text-center text-red-500 hover:bg-base-200';
+        const recallBtn = document.createElement('div');
+        recallBtn.style.cssText = `width:64px;height:64px;background:rgba(220,38,38,0.9);border-radius:12px;display:flex;align-items:center;justify-content:center;color:white;font-size:13px;`;
         recallBtn.innerText = '撤回';
         recallBtn.onclick = () => {
-            // 从聊天历史里删掉最后一条用户消息
             chatHistory.pop();
             saveChatHistory();
             div.remove();
             menu.remove();
         };
-        menuBox.appendChild(recallBtn);
+        menu.appendChild(recallBtn);
     }
-    menu.appendChild(menuBox);
-    menu.onclick = (e) => {
-        if (e.target === menu) menu.remove();
-    };
     document.body.appendChild(menu);
+    // 点菜单外面就关掉
+    setTimeout(() => {
+        const closeOnClick = (e) => {
+            if (!menu.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener('touchstart', closeOnClick);
+                document.removeEventListener('click', closeOnClick);
+            }
+        };
+        document.addEventListener('touchstart', closeOnClick);
+        document.addEventListener('click', closeOnClick);
+    }, 10);
 }
 
 // 自动朗读开关
