@@ -3026,14 +3026,17 @@ function renderChatHistory() {
     }
     let lastMsgTs = 0;
     for (const msg of chatHistory) {
-        // 聊天时间戳：和上一条差超过5分钟就显示时间
-        if (msg.ts && lastMsgTs && (msg.ts - lastMsgTs > 5 * 60 * 1000)) {
+        // 微信风时间戳：和上一条差超过30分钟就显示时间
+        if (msg.ts && lastMsgTs && (msg.ts - lastMsgTs > 30 * 60 * 1000)) {
             const timeDiv = document.createElement('div');
             timeDiv.className = 'text-center text-xs text-base-content/50 my-2';
             timeDiv.innerText = formatChatTime(msg.ts);
             container.appendChild(timeDiv);
         }
-        if (msg.ts) lastMsgTs = msg.ts;
+        if (msg.ts) {
+            lastMsgTs = msg.ts;
+            container._lastMsgTime = msg.ts;
+        }
         
         // 转账卡片（右侧，微信样式）
         if (msg.type === 'redpacket') {
@@ -3246,6 +3249,19 @@ function stopAllAudio() {
 
 function appendChatMessage(text, type) {
     const container = document.getElementById('chat-messages');
+    const now = new Date();
+    // 微信风时间戳分组：和上一条消息间隔超过30分钟就显示时间
+    const lastTime = container._lastMsgTime || 0;
+    if (now.getTime() - lastTime > 30 * 60 * 1000) {
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'text-center text-xs text-gray-400 my-2';
+        const hh = now.getHours().toString().padStart(2, '0');
+        const mm = now.getMinutes().toString().padStart(2, '0');
+        timeDiv.innerText = `${hh}:${mm}`;
+        container.appendChild(timeDiv);
+    }
+    container._lastMsgTime = now.getTime();
+
     const div = document.createElement('div');
     div.className = `chat chat-${type === 'user' ? 'end' : 'start'} relative msg-enter gap-2`;
     const isUser = type === 'user';
@@ -3260,6 +3276,21 @@ function appendChatMessage(text, type) {
     } else {
         bubble.innerHTML = escapeHtml(text);
     }
+
+    // 长按消息弹出菜单：复制、撤回（仅自己发的消息）
+    let pressTimer = null;
+    bubble.addEventListener('touchstart', (e) => {
+        pressTimer = setTimeout(() => {
+            if (navigator.vibrate) navigator.vibrate(10);
+            showMsgActionMenu(bubble, isUser, div);
+        }, 500);
+    });
+    bubble.addEventListener('touchend', () => clearTimeout(pressTimer));
+    bubble.addEventListener('touchmove', () => clearTimeout(pressTimer));
+    bubble.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showMsgActionMenu(bubble, isUser, div);
+    });
 
     // 微信风正确顺序：
     // chat-start(AI左): 头像在前，气泡在后
@@ -3286,6 +3317,49 @@ function appendChatMessage(text, type) {
     container.appendChild(div);
     smartScroll(container);
     return bubble;
+}
+
+// 长按消息弹出操作菜单
+function showMsgActionMenu(bubble, isUser, div) {
+    // 先关掉旧菜单
+    const old = document.getElementById('msg-action-menu');
+    if (old) old.remove();
+    const menu = document.createElement('div');
+    menu.id = 'msg-action-menu';
+    menu.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/30';
+    const menuBox = document.createElement('div');
+    menuBox.className = 'bg-base-100 rounded-xl shadow-2xl w-48 overflow-hidden';
+    // 复制按钮
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'w-full py-3 text-center hover:bg-base-200 border-b border-base-200';
+    copyBtn.innerText = '复制';
+    copyBtn.onclick = () => {
+        const text = bubble.innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            sfxSend();
+        });
+        menu.remove();
+    };
+    menuBox.appendChild(copyBtn);
+    // 撤回按钮（仅用户消息显示）
+    if (isUser) {
+        const recallBtn = document.createElement('button');
+        recallBtn.className = 'w-full py-3 text-center text-red-500 hover:bg-base-200';
+        recallBtn.innerText = '撤回';
+        recallBtn.onclick = () => {
+            // 从聊天历史里删掉最后一条用户消息
+            chatHistory.pop();
+            saveChatHistory();
+            div.remove();
+            menu.remove();
+        };
+        menuBox.appendChild(recallBtn);
+    }
+    menu.appendChild(menuBox);
+    menu.onclick = (e) => {
+        if (e.target === menu) menu.remove();
+    };
+    document.body.appendChild(menu);
 }
 
 // 自动朗读开关
