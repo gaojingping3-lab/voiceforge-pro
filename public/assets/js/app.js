@@ -5882,25 +5882,26 @@ function formatChatText(text) {
     if (!text) return '';
     // 处理💭开头的心里话，渲染成灰色小字
     const lines = text.split('\n');
-    const processedLines = lines.map(line => {
+    let html = '';
+    lines.forEach((line, idx) => {
         if (line.trimStart().startsWith('💭')) {
-            return `<div style="color:#999;font-size:0.85em;margin-top:2px;font-style:italic;line-height:1.3;">${escapeHtml(line)}</div>`;
-        }
-        // 按括号分割，括号内的保持原色，括号外的台词上色
-        // 同时支持中英文括号：【】[]（）()**
-        const parts = line.split(/(【[^】]*】|\[[^\]]*\]|（[^）]*）|\([^)]*\)|\*[^*]*\*)/g);
-        const processed = parts.map(part => {
-            if (!part) return '';
-            // 括号包裹的内容（动作/心理描写）保持原色
-            if (/^【.*】$|^\[.*\]$|^（.*）$|^\(.*\)$|^\*.*\*$/.test(part)) {
-                return escapeHtml(part);
+            html += `<div style="color:#999;font-size:0.85em;margin:0;padding:0;font-style:italic;line-height:1.2;">${escapeHtml(line)}</div>`;
+        } else {
+            const parts = line.split(/(【[^】]*】|\[[^\]]*\]|（[^）]*）|\([^)]*\)|\*[^*]*\*)/g);
+            const processed = parts.map(part => {
+                if (!part) return '';
+                if (/^【.*】$|^\[.*\]$|^（.*）$|^\(.*\)$|^\*.*\*$/.test(part)) {
+                    return escapeHtml(part);
+                }
+                return `<span style="color:${DIALOG_COLOR}">${escapeHtml(part)}</span>`;
+            }).join('');
+            if (idx > 0 && !lines[idx-1].trimStart().startsWith('💭')) {
+                html += '<br>';
             }
-            // 台词部分上色
-            return `<span style="color:${DIALOG_COLOR}">${escapeHtml(part)}</span>`;
-        }).join('');
-        return processed;
+            html += processed;
+        }
     });
-    return processedLines.join('<br>');
+    return html;
 }
 
 // 心里话模式开关
