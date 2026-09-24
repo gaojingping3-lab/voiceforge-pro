@@ -511,6 +511,9 @@ document.addEventListener('DOMContentLoaded', () => {
             <button class="theme-dot-btn" data-theme-class="theme-amber" onclick="switchPremiumTheme('theme-amber')" title="琥珀"><div class="theme-dot dot-amber"></div></button>
         </div>
         <div class="flex-none gap-2">
+            <button class="btn btn-ghost btn-circle" id="inner-voice-btn" onclick="toggleInnerVoice()" title="心里话模式">
+                <i class="fa-regular fa-heart text-lg"></i>
+            </button>
             <button class="btn btn-ghost btn-circle" onclick="help_modal.showModal()" title="使用说明">
                 <i class="fa-solid fa-circle-question text-lg"></i>
             </button>
@@ -1723,6 +1726,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260924mergemenu"></script>
+    <script src="assets/js/app.js?v=20260924innervoice"></script>
 </body>
 </html>

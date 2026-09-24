@@ -4393,6 +4393,10 @@ async function sendChatMessage() {
         if (memoPrompt) {
             messages.push({ role: 'system', content: memoPrompt });
         }
+        // 心里话模式开启时：要求AI先写一句没说出口的内心活动
+        if (innerVoiceEnabled) {
+            messages.push({ role: 'system', content: '【心里话模式开启】每次回复的时候，先单独起一行，以💭开头，写你此刻真实的内心活动（嘴上不好意思说出口的、嘴硬背后的真实想法、偷偷的小心思），然后再写你说出来的台词和动作。注意：💭那行是心里话，不要说出来，要短，符合你的人设，比如嘴硬的时候嘴上说不在意，💭后面写其实我超在意。' });
+        }
         // 情绪感知已关闭（减少system prompt，提升回复速度）
         // const emotion = detectEmotion(text);
         // if (emotion !== 'neutral' && EMOTION_PROMPTS[emotion]) {
@@ -5876,18 +5880,48 @@ function formatChatTime(ts) {
 const DIALOG_COLOR = '#fb923c';
 function formatChatText(text) {
     if (!text) return '';
-    // 按括号分割，括号内的保持原色，括号外的台词上色
-    // 同时支持中英文括号：【】[]（）()**
-    const parts = text.split(/(【[^】]*】|\[[^\]]*\]|（[^）]*）|\([^)]*\)|\*[^*]*\*)/g);
-    return parts.map(part => {
-        if (!part) return '';
-        // 括号包裹的内容（动作/心理描写）保持原色
-        if (/^【.*】$|^\[.*\]$|^（.*）$|^\(.*\)$|^\*.*\*$/.test(part)) {
-            return escapeHtml(part);
+    // 处理💭开头的心里话，渲染成灰色小字
+    const lines = text.split('\n');
+    const processedLines = lines.map(line => {
+        if (line.trimStart().startsWith('💭')) {
+            return `<div style="color:#999;font-size:0.85em;margin-top:4px;font-style:italic;">${escapeHtml(line)}</div>`;
         }
-        // 台词部分上色
-        return `<span style="color:${DIALOG_COLOR}">${escapeHtml(part)}</span>`;
-    }).join('');
+        // 按括号分割，括号内的保持原色，括号外的台词上色
+        // 同时支持中英文括号：【】[]（）()**
+        const parts = line.split(/(【[^】]*】|\[[^\]]*\]|（[^）]*）|\([^)]*\)|\*[^*]*\*)/g);
+        const processed = parts.map(part => {
+            if (!part) return '';
+            // 括号包裹的内容（动作/心理描写）保持原色
+            if (/^【.*】$|^\[.*\]$|^（.*）$|^\(.*\)$|^\*.*\*$/.test(part)) {
+                return escapeHtml(part);
+            }
+            // 台词部分上色
+            return `<span style="color:${DIALOG_COLOR}">${escapeHtml(part)}</span>`;
+        }).join('');
+        return processed;
+    });
+    return processedLines.join('<br>');
+}
+
+// 心里话模式开关
+let innerVoiceEnabled = localStorage.getItem('INNER_VOICE') === 'true';
+function toggleInnerVoice() {
+    innerVoiceEnabled = !innerVoiceEnabled;
+    localStorage.setItem('INNER_VOICE', innerVoiceEnabled);
+    const btn = document.getElementById('inner-voice-btn');
+    if (innerVoiceEnabled) {
+        btn.innerHTML = '<i class="fa-solid fa-heart text-lg text-red-500"></i>';
+        alert('心里话模式已开启：你现在能看到她嘴上说的和心里想的不一样了');
+    } else {
+        btn.innerHTML = '<i class="fa-regular fa-heart text-lg"></i>';
+    }
+}
+// 页面加载时初始化按钮状态
+if (innerVoiceEnabled) {
+    window.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('inner-voice-btn');
+        if (btn) btn.innerHTML = '<i class="fa-solid fa-heart text-lg text-red-500"></i>';
+    });
 }
 
 function editRoleCard() {
