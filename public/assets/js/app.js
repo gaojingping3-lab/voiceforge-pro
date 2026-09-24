@@ -5884,7 +5884,7 @@ function formatChatText(text) {
     const lines = text.split('\n');
     const processedLines = lines.map(line => {
         if (line.trimStart().startsWith('💭')) {
-            return `<div style="color:#999;font-size:0.85em;margin-top:4px;font-style:italic;">${escapeHtml(line)}</div>`;
+            return `<div style="color:#999;font-size:0.85em;margin-top:2px;font-style:italic;line-height:1.3;">${escapeHtml(line)}</div>`;
         }
         // 按括号分割，括号内的保持原色，括号外的台词上色
         // 同时支持中英文括号：【】[]（）()**
