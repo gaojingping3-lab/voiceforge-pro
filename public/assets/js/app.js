@@ -3326,8 +3326,8 @@ function showMsgActionMenu(bubble, isUser, div) {
     menu.style.cssText = `position:fixed;top:${rect.top - 70}px;left:${rect.left + rect.width/2 - 64}px;z-index:60;display:flex;gap:12px;`;
     // 复制按钮
     const copyBtn = document.createElement('div');
-    copyBtn.style.cssText = `width:64px;height:64px;background:rgba(0,0,0,0.85);border-radius:12px;display:flex;align-items:center;justify-content:center;color:white;font-size:13px;`;
-    copyBtn.innerText = '复制';
+    copyBtn.style.cssText = `width:64px;height:64px;background:rgba(255,255,255,0.95);border-radius:12px;display:flex;align-items:center;justify-content:center;color:#333;font-size:24px;box-shadow:0 2px 8px rgba(0,0,0,0.1);`;
+    copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i>';
     copyBtn.onclick = () => {
         const text = bubble.innerText;
         navigator.clipboard.writeText(text).then(() => {
@@ -3339,8 +3339,8 @@ function showMsgActionMenu(bubble, isUser, div) {
     // 撤回按钮（仅用户消息显示）
     if (isUser) {
         const recallBtn = document.createElement('div');
-        recallBtn.style.cssText = `width:64px;height:64px;background:rgba(220,38,38,0.9);border-radius:12px;display:flex;align-items:center;justify-content:center;color:white;font-size:13px;`;
-        recallBtn.innerText = '撤回';
+        recallBtn.style.cssText = `width:64px;height:64px;background:rgba(255,255,255,0.95);border-radius:12px;display:flex;align-items:center;justify-content:center;color:#ef4444;font-size:24px;box-shadow:0 2px 8px rgba(0,0,0,0.1);`;
+        recallBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i>';
         recallBtn.onclick = () => {
             chatHistory.pop();
             saveChatHistory();
