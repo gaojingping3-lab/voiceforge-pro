@@ -4312,6 +4312,7 @@ async function sendChatMessage() {
     const loadingDiv = document.createElement('div');
     loadingDiv.className = 'chat chat-start relative msg-enter gap-2';
     const role = getCurrentRole();
+    const requestRoleId = role.id; // 记录本次请求发起时的角色ID，切角色后避免回复串台
     loadingDiv.appendChild(createChatAvatar(role ? role.name : 'AI', false));
     const loadingBubble = document.createElement('div');
     loadingBubble.className = 'chat-bubble bg-base-200 text-base-content relative pr-8';
@@ -4639,6 +4640,12 @@ async function sendChatMessage() {
             playBtn.title = '播放语音';
             playBtn.onclick = () => playChatMessage(loadingBubble);
             chatDiv.appendChild(playBtn);
+        }
+
+        // 如果用户已经切到别的角色，这个回复属于旧角色，不要串到新角色的聊天记录里
+        if (getCurrentRoleId() !== requestRoleId) {
+            if (loadingDiv && loadingDiv.parentNode) loadingDiv.remove();
+            return;
         }
 
         // 把AI回复加入永久记忆
