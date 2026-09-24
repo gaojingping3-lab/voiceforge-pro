@@ -4375,8 +4375,8 @@ async function sendChatMessage() {
         let existingSummary = localStorage.getItem(summaryKey) || '';
         let lastSummarizedIdx = parseInt(localStorage.getItem(summaryIdxKey) || '0');
         const textMsgs = chatHistory.filter(m => m.type !== 'image' && m.content && String(m.content).trim());
-        const RECENT_KEEP = 20; // 总结后只带最近20条原文
-        const TRIGGER_MSG_COUNT = 120; // 未总结的消息超过120条就总结，避免估算不准堆太多
+        const RECENT_KEEP = 50; // 总结后保留最近50条原文，减少失忆感
+        const TRIGGER_MSG_COUNT = 200; // 聊满200条新消息才总结一次，减少断层
         // 算一下从上次总结点到现在，新攒了多少条消息
         const newMsgCount = textMsgs.length - lastSummarizedIdx;
         // 新消息数超过120条，就总结
@@ -4398,7 +4398,7 @@ async function sendChatMessage() {
                         model: llmModel,
                         stream: false,
                         messages: [
-                            { role: 'system', content: `请把下面你和对方新发生的对话，写成一段300字左右的第一人称回忆补充，你就是${role.name}本人。只写这期间新发生的事、你对他的感觉变化、你们之间的新约定，不要重复之前已经说过的事。写得像你自己在回忆，不要第三人称，不要说"这是总结"，直接输出。` },
+                            { role: 'system', content: `请把下面你和对方新发生的对话，写成一段800字左右的第一人称回忆，你就是${role.name}本人，用"我"的视角写。必须保留：你们聊到的具体事件、他说过的喜好和小细节、你们之间的专属梗和小约定、你对他的情绪变化（开心/别扭/感动）。不要流水账，不要重复之前的记忆，不要第三人称叙述，直接输出回忆内容，不要加"这是总结"这类话。` },
                             { role: 'user', content: convo }
                         ]
                     })
@@ -4408,8 +4408,8 @@ async function sendChatMessage() {
                     const newSummary = (data.choices?.[0]?.message?.content || '').trim();
                     if (newSummary) {
                         existingSummary = existingSummary ? existingSummary + '\n后来：' + newSummary : newSummary;
-                        // 记忆太长就压到500字以内，保留所有关键信息
-                        if (existingSummary.length > 600) {
+                        // 记忆太长就压到1200字以内，保留所有关键细节
+                        if (existingSummary.length > 1300) {
                             const res2 = await fetch('/api/chat', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
@@ -4418,7 +4418,7 @@ async function sendChatMessage() {
                                     model: llmModel,
                                     stream: false,
                                     messages: [
-                                        { role: 'system', content: '请把这段长回忆压缩成500字以内，保留所有关键事件、关系、约定和性格细节，用第一人称，不要客套。' },
+                                        { role: 'system', content: '请把这段长回忆压缩到1200字以内，必须保留所有关键事件、他的喜好、你们的专属梗和约定、你的情绪变化，用第一人称写，不要客套，不要删掉重要细节。' },
                                         { role: 'user', content: existingSummary }
                                     ]
                                 })
