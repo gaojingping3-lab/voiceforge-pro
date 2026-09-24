@@ -4681,11 +4681,11 @@ function getRoleList() {
 
 function saveRoleList(list) {
     roleListCache = list;
-    // 同步写localStorage当备份
+    // 同步写localStorage当备份，写失败静默忽略（主数据在IndexedDB里）
     try {
         localStorage.setItem('ROLE_LIST', JSON.stringify(list));
     } catch (e) {
-        console.warn('[RoleList] localStorage备份失败:', e.message);
+        console.warn('[RoleList] localStorage备份写满，已跳过:', e.message);
     }
     // 异步写IndexedDB
     openImageDB().then(db => {
