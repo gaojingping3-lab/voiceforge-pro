@@ -5880,6 +5880,13 @@ function formatChatTime(ts) {
 const DIALOG_COLOR = '#fb923c';
 function formatChatText(text) {
     if (!text) return '';
+    // 心里话模式：先把全角括号（）格式的心里话统一"翻译"成💭格式，后续逻辑完全不变
+    if (innerVoiceEnabled) {
+        // 情况1：💭单独一行，下一行是（心里话）→ 合并成 💭心里话
+        text = text.replace(/💭[ \t]*\r?\n（([^）]*)）/g, '💭$1');
+        // 情况2：行首单独的（心里话）→ 💭心里话（只匹配行首，不碰动作描述里的括号）
+        text = text.replace(/(^|\n)（([^）]*)）/g, '$1💭$2');
+    }
     // 按括号分割，括号内的保持原色，括号外的台词上色
     // 同时支持中英文括号：【】[]（）()**
     const parts = text.split(/(【[^】]*】|\[[^\]]*\]|（[^）]*）|\([^)]*\)|\*[^*]*\*)/g);
