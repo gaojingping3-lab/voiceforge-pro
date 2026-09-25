@@ -5886,6 +5886,8 @@ function formatChatTime(ts) {
 const DIALOG_COLOR = '#fb923c';
 function formatChatText(text) {
     if (!text) return '';
+    // 净化：删除对显示无意义、却会干扰心里话识别的零宽字符（保留ZWJ组合符和FE0F变体符，不破坏❤️等emoji）
+    text = text.replace(/[​‌⁠﻿᠎]/g, '');
     // 心里话模式：先把全角括号（）格式的心里话统一"翻译"成💭格式，后续逻辑完全不变
     if (innerVoiceEnabled) {
         // 情况1：💭单独一行，下一行是（心里话）→ 合并成 💭心里话
