@@ -7596,8 +7596,15 @@ const IMAGE_STYLES = {
     anime: { name: '动漫二次元', prefix: 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality, simple clean background, no extra objects' },
     japanese_anime: { name: '日系动漫插画', prefix: 'anime style, semi-realistic, cel shading, clean lineart, vibrant colors, soft natural lighting, cinematic composition, high quality, masterpiece, studio anime key visual, simple clean background, no extra objects' }
 };
-// 合并后的画质+防崩锁（原来FIXED_IMAGE_STYLE和ANATOMY_LOCK重复的 anatomically correct / five fingers / natural posture 已去重）
-const CORE_QUALITY_LOCK = 'masterpiece, high quality, detailed, photorealistic, candid photo, shot on Canon EOS R5, 50mm f/1.8, soft natural lighting, authentic skin texture, anatomically correct limbs, correct hands and feet, natural posture';
+// 画质+防崩锁：按画风拆分，避免动漫和写实词冲突
+const QUALITY_LOCKS = {
+    photorealistic: 'masterpiece, high quality, detailed, photorealistic, candid photo, shot on Canon EOS R5, 50mm f/1.8, soft natural lighting, authentic skin texture, anatomically correct limbs, correct hands and feet, natural posture',
+    anime: 'masterpiece, best quality, high quality, detailed, anime key visual, vibrant colors, clean lineart, detailed eyes, anatomically correct, correct hands and feet, natural posture',
+    japanese_anime: 'masterpiece, best quality, high quality, detailed, studio anime key visual, cinematic composition, clean lineart, detailed eyes, anatomically correct, correct hands and feet, natural posture'
+};
+function getQualityLock(styleKey) {
+    return QUALITY_LOCKS[styleKey] || QUALITY_LOCKS.photorealistic;
+}
 
 function getImageStyle() {
     const s = localStorage.getItem('IMAGE_STYLE') || 'photorealistic';
@@ -7610,14 +7617,16 @@ function getImageStyle() {
 }
 
 function getFixedStyleByMode() {
-    const style = IMAGE_STYLES[getImageStyle()] || IMAGE_STYLES.photorealistic;
-    return style.prefix + ', ' + CORE_QUALITY_LOCK;
+    const styleKey = getImageStyle();
+    const style = IMAGE_STYLES[styleKey] || IMAGE_STYLES.photorealistic;
+    return style.prefix + ', ' + getQualityLock(styleKey);
 }
 
 // 获取指定角色的生图画风前缀：角色卡有imageStyle就用角色卡的，否则用全局
 function getFixedStyleForRole(role) {
     if (role && role.imageStyle && IMAGE_STYLES[role.imageStyle]) {
-        return IMAGE_STYLES[role.imageStyle].prefix + ', ' + CORE_QUALITY_LOCK;
+        const styleKey = role.imageStyle;
+        return IMAGE_STYLES[styleKey].prefix + ', ' + getQualityLock(styleKey);
     }
     return getFixedStyleByMode();
 }
@@ -7728,6 +7737,38 @@ function extractClothingFromRoleCard(roleDesc) {
         }
     }
     return hits.join(', ');
+}
+
+// ===== 提取纯视觉描述（外貌+服装），过滤性格/口头禅/开场白等非视觉内容 =====
+function extractVisualDescFromRoleCard(roleDesc) {
+    if (!roleDesc) return '';
+    // 1. 优先用【外貌】标记
+    const appearance = extractAppearanceFromRoleCard(roleDesc);
+    // 2. 提取服装
+    const clothing = extractClothingFromRoleCard(roleDesc);
+    // 3. 如果有外貌标记，用外貌+服装
+    if (appearance) {
+        return clothing ? appearance + '，' + clothing : appearance;
+    }
+    // 4. 没有标记时，按行过滤，只保留视觉相关行
+    const lines = roleDesc.split('\n');
+    const visualLines = [];
+    const visualKeywords = /头发|发色|发型|眼睛|瞳色|皮肤|身材|身高|体型|脸|五官|穿着|服装|衣服|裙子|上衣|裤子|鞋|配饰|首饰|项链|耳环|尾巴|耳朵|兽耳|翅膀|外貌|外观|长相|外形|肤色/;
+    const nonVisualKeywords = /性格|口头禅|开场白|身份|背景|故事|经历|喜欢|讨厌|习惯|说话风格|语气|职业|年龄|名字/;
+    for (const line of lines) {
+        const t = line.trim().replace(/^[·\-\*•\d.、\s]+/, '').replace(/^【[^】]+】\s*/, '');
+        if (!t) continue;
+        if (nonVisualKeywords.test(t) && !visualKeywords.test(t)) continue;
+        if (visualKeywords.test(t)) {
+            visualLines.push(t);
+        }
+    }
+    if (visualLines.length) {
+        const result = visualLines.join('，');
+        return clothing && !result.includes(clothing) ? result + '，' + clothing : result;
+    }
+    // 5. 实在提取不到，返回空（调用方自己决定降级）
+    return '';
 }
 
 // 剧情明确在换衣服/脱衣服时，豁免服装硬锁
@@ -7941,7 +7982,10 @@ async function extractActionSummaryZH(conversationText, userInput, isDualMode) {
         });
         if (!resp.ok) return '';
         const data = await resp.json();
-        const t = (data.choices?.[0]?.message?.content || '').trim();
+        let t = (data.choices?.[0]?.message?.content || '').trim();
+        // 后处理：清洗掉引号里的台词内容（LLM偶尔不听话会把对话带出来）
+        t = t.replace(/「[^」]*」/g, '').replace(/『[^』]*』/g, '').replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '').replace(/“[^”]*”/g, '').replace(/‘[^’]*’/g, '');
+        t = t.replace(/[，。！？、\s]*[，。！？]$/, '').trim();
         return t.length > 2 ? t : '';
     } catch (e) {
         console.warn('[中文提炼] 失败，降级用聊天原文:', e);
@@ -8061,7 +8105,7 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
 4. 【破除隐喻】对话中的文学隐喻（如"灼热呼吸""温度攀升""压迫感"）不得直接使用，必须翻译成具体视觉动作（face to face、extremely close up、intense eye contact、pinning to wall、leaning close）
 5. 【动作最高约束】严格按对话原文提取两人各自的动作、表情、姿态，核心动作（站/坐/走/跑/拥抱/牵手/亲吻/抚摸/看/微笑等）不许改变、替换、省略或加戏，只能补充姿势细节、手部位置、谁靠向谁
 6. 【人物起手式】必须使用 ${dualTag}，性别已由系统确定，禁止更改；画面必须同时包含两个人物，不能只画一个
-7. 不要添加风格词（系统已有固定写实前缀）
+7. 不要添加风格词（系统已有固定画风前缀）
 8. 除两个固定身份块外，动作/构图/场景/光线部分合计控制在180-280个英文单词，按结构精炼有序，不要堆砌无关形容词
 9. 【动作冲突清洗】每个角色只能有一个连贯动作，严禁同时出现互斥姿态；同一个词不要重复出现超过一次；全部输出纯英文，禁止出现中文字符或中文标点
 ${viewRule}`;
@@ -8587,8 +8631,8 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
             if (actionDesc) console.log('[中文提炼] 画面描述:', actionDesc.slice(0, 100));
             const stylePrefix = getFixedStyleForRole(role);
             if (isDualMode && roleA && roleB) {
-                const appA = extractAppearanceFromRoleCard(roleA.desc) || roleA.desc;
-                const appB = extractAppearanceFromRoleCard(roleB.desc) || roleB.desc;
+                const appA = extractVisualDescFromRoleCard(roleA.desc) || extractAppearanceFromRoleCard(roleA.desc) || '';
+                const appB = extractVisualDescFromRoleCard(roleB.desc) || extractAppearanceFromRoleCard(roleB.desc) || '';
                 const chatText = recentMessages.map(m => m.role === 'user' ? `我: ${m.content}` : m.content).join('；');
                 // 按A/B角色卡性别确定人数标签，不再固定2girls（一男一女会被画成两个女孩）
                 const ga = getRoleGender(roleA.desc), gb = getRoleGender(roleB.desc);
@@ -8598,15 +8642,15 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
                     else if (ga === 'male' && gb === 'male') dualTag = '2boys';
                     else dualTag = '1girl, 1boy';
                 }
-                rolePrompt = `${stylePrefix}, ${roleA.name}（${appA}）和${roleB.name}（${appB}），画面中有两个人，${dualTag}, exactly 2 people, only two characters, ${actionDesc || chatText}`;
+                rolePrompt = `${stylePrefix}, ${roleA.name}（${appA}）和${roleB.name}（${appB}），${dualTag}, ${actionDesc || chatText}`;
             } else {
                 const cur = getCurrentRole();
-                const app = cur ? (extractAppearanceFromRoleCard(cur.desc) || cur.desc) : '';
+                const app = cur ? (extractVisualDescFromRoleCard(cur.desc) || extractAppearanceFromRoleCard(cur.desc) || '') : '';
                 const chatText = recentMessages.map(m => `${m.role === 'user' ? '我' : cur?.name || 'AI'}: ${m.content}`).join('；');
                 // 按角色卡性别确定人数标签，不再固定1girl（男角色会画成女孩）
                 const curGender = cur ? getRoleGender(cur.desc) : '';
                 const soloTag = curGender === 'female' ? '1girl' : (curGender === 'male' ? '1boy' : 'single character');
-                rolePrompt = cur ? `${stylePrefix}, ${cur.name}，${app}，画面中只有一个人，solo, ${soloTag}, only one person, no other people, single character, ${actionDesc || chatText}` : `${stylePrefix}, ${actionDesc || chatText}`;
+                rolePrompt = cur ? `${stylePrefix}, ${cur.name}，${app}，${soloTag}, ${actionDesc || chatText}` : `${stylePrefix}, ${actionDesc || chatText}`;
             }
             if (userInput) rolePrompt += `，${userInput}`;
         } else {
@@ -8632,7 +8676,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
             const clothing = extractClothingFromRoleCard(curForClothing ? curForClothing.desc : '');
             const changing = isChangingClothingScene((userInput || '') + ' ' + (conversationText || ''));
             if (clothing && !changing) {
-                rolePrompt = `wearing exact outfit from character description (must not change): ${clothing}, ` + rolePrompt;
+                rolePrompt = `服装固定不变：${clothing}，` + rolePrompt;
                 console.log('[服装硬锁] 已钉入:', clothing.slice(0, 80));
             }
         }
