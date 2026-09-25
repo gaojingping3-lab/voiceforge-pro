@@ -707,6 +707,7 @@ const ttsQueueManager = {
                 if (lines.length > 1) text = lines.slice(1).join('\n').trim();
             }
             const speakText = text
+                .replace(/💭[^\n]*/g, '')
                 .replace(/【[^】]*】/g, '').replace(/\[[^\]]*\]/g, '')
                 .replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '')
                 .replace(/\*[^*]*\*/g, '').trim();
