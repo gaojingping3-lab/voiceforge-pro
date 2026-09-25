@@ -699,9 +699,14 @@ const ttsQueueManager = {
             if (this.taskToken !== currentToken) return;
 
             const bubble = task.bubble;
+            // 克隆气泡用于提取文本：先在DOM层面移除心里话（灰色小字span），不依赖具体图标字符
+            const speakClone = bubble.cloneNode(true);
+            speakClone.querySelectorAll('span').forEach(el => {
+                if (/font-size:\s*0\.85em/.test(el.getAttribute('style') || '')) el.remove();
+            });
             // 提取朗读文本
-            let text = bubble.innerText.replace(/\n?\d+\s*tokens\s*$/, '').trim();
-            const hasNameSpan = bubble.querySelector('.text-xs.font-bold');
+            let text = (speakClone.innerText || speakClone.textContent).replace(/\n?\d+\s*tokens\s*$/, '').trim();
+            const hasNameSpan = speakClone.querySelector('.text-xs.font-bold');
             if (hasNameSpan) {
                 const lines = text.split('\n');
                 if (lines.length > 1) text = lines.slice(1).join('\n').trim();
