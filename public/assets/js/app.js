@@ -7596,11 +7596,11 @@ const IMAGE_STYLES = {
     anime: { name: '动漫二次元', prefix: 'anime style, cel shading, 2D illustration, vibrant colors, anime key visual, clean lineart, studio quality, simple clean background, no extra objects' },
     japanese_anime: { name: '日系动漫插画', prefix: 'anime style, semi-realistic, cel shading, clean lineart, vibrant colors, soft natural lighting, cinematic composition, high quality, masterpiece, studio anime key visual, simple clean background, no extra objects' }
 };
-// 画质+防崩锁：按画风拆分，避免动漫和写实词冲突
+// 画质+防崩锁：按画风拆分，只保留纯画质/防崩词（画风词由IMAGE_STYLES.prefix负责，避免重复）
 const QUALITY_LOCKS = {
-    photorealistic: 'masterpiece, high quality, detailed, photorealistic, candid photo, shot on Canon EOS R5, 50mm f/1.8, soft natural lighting, authentic skin texture, anatomically correct limbs, correct hands and feet, natural posture',
-    anime: 'masterpiece, best quality, high quality, detailed, anime key visual, vibrant colors, clean lineart, detailed eyes, anatomically correct, correct hands and feet, natural posture',
-    japanese_anime: 'masterpiece, best quality, high quality, detailed, studio anime key visual, cinematic composition, clean lineart, detailed eyes, anatomically correct, correct hands and feet, natural posture'
+    photorealistic: 'masterpiece, high quality, detailed, anatomically correct limbs, correct hands and feet, natural posture',
+    anime: 'masterpiece, best quality, high quality, detailed, detailed eyes, anatomically correct, correct hands and feet, natural posture',
+    japanese_anime: 'masterpiece, best quality, high quality, detailed, detailed eyes, anatomically correct, correct hands and feet, natural posture'
 };
 function getQualityLock(styleKey) {
     return QUALITY_LOCKS[styleKey] || QUALITY_LOCKS.photorealistic;
@@ -7724,68 +7724,88 @@ function extractAppearanceFromRoleCard(roleDesc) {
     return '';
 }
 
-// ===== 服装硬锁：从角色卡里抠出"服装/穿着/衣服"相关行 =====
+// ===== 服装硬锁：从角色卡里抠出"服装/穿着/衣服"相关内容（按句子粒度过滤，避免性格描述混入）=====
 function extractClothingFromRoleCard(roleDesc) {
     if (!roleDesc) return '';
+    // 性格/动作/台词关键词，命中的句子直接丢弃
+    const nonClothingKeywords = /喜欢|习惯|性格|口头禅|开场白|说话|语气|走路|动作|表情|说|道|问|答|笑|哭|生气|害羞|偷偷|假装|被发现|扯着|衣角|线头|性格|傲娇|温柔|暴躁|腹黑|开朗|内向|冷漠|调皮|可爱|性感|妩媚|高冷|呆萌/;
+    // 服装关键词
+    const clothingKeywords = /服装|穿着|衣服|穿搭|上身|下身|上半身|下半身|裙子|上衣|下装|外套|内衣|光脚|赤裸|没穿|裸|鞋|袜|裤|裙|袍|衫|衣|帽|饰|项链|耳环|手镯|戒指|发饰|蝴蝶结|蕾丝|围裙|女仆装|连衣裙|T恤|衬衫|毛衣|外套|风衣|卫衣|吊带|抹胸|比基尼|泳装|和服|汉服|西装|制服|校服|丝袜|连裤袜|高跟鞋|平底鞋|靴子|运动鞋|手套|围巾|领带|腰带/;
     const lines = roleDesc.split('\n');
     const hits = [];
-    // 性格/动作/台词关键词，命中就跳过（这些不是服装描述）
-    const nonClothingKeywords = /喜欢|习惯|性格|口头禅|开场白|说话|语气|走路|动作|表情|说|道|问|答|笑|哭|生气|害羞/;
     for (const line of lines) {
         let t = line.trim();
         if (!t) continue;
         // 去掉行首的【标签】
         t = t.replace(/^【[^】]+】\s*/, '').replace(/^[·\-\*•\d.、\s]+/, '');
         if (!t) continue;
-        // 必须包含服装关键词
-        if (!/服装|穿着|衣服|穿搭|上身|下身|上半身|下半身|裙子|上衣|下装|外套|内衣|光脚|赤裸|没穿|裸|鞋|袜|裤|裙|袍|衫|衣|帽|饰|项链|耳环|手镯|戒指|发饰|蝴蝶结|蕾丝|围裙|女仆装/.test(t)) continue;
-        // 包含性格/动作/台词关键词的跳过
-        if (nonClothingKeywords.test(t) && !/服装|穿着|衣服|穿搭|裙子|上衣|下装|外套|鞋|袜|裤|裙|袍|衫|衣|帽/.test(t.split(/[，。！？]/)[0])) continue;
-        // 去掉引号里的台词
-        t = t.replace(/「[^」]*」/g, '').replace(/『[^』]*』/g, '').replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '').replace(/“[^”]*”/g, '').replace(/‘[^’]*’/g, '');
-        t = t.replace(/[，。！？、\s]+$/, '').trim();
-        if (t && t.length > 1) hits.push(t);
+        // 按句子分割，逐句判断
+        const sentences = t.split(/[，。！？；;\n]/);
+        for (const s of sentences) {
+            const sentence = s.trim();
+            if (!sentence || sentence.length < 2) continue;
+            // 去掉引号里的台词
+            const cleaned = sentence.replace(/「[^」]*」/g, '').replace(/『[^』]*』/g, '').replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '').replace(/“[^”]*”/g, '').replace(/‘[^’]*’/g, '').trim();
+            if (!cleaned || cleaned.length < 2) continue;
+            // 必须包含服装关键词
+            if (!clothingKeywords.test(cleaned)) continue;
+            // 不能包含性格/动作/台词关键词
+            if (nonClothingKeywords.test(cleaned)) continue;
+            hits.push(cleaned);
+        }
     }
-    return hits.join('，');
+    // 去重
+    const unique = [...new Set(hits)];
+    return unique.join('，');
 }
 
 // ===== 提取纯视觉描述（外貌，不含服装，服装由硬锁单独加），过滤性格/口头禅/开场白等非视觉内容 =====
 function extractVisualDescFromRoleCard(roleDesc) {
     if (!roleDesc) return '';
-    // 清洗函数：去掉标签、引号台词、性格动作词
-    const clean = (text) => {
-        let t = text.replace(/^【[^】]+】\s*/gm, '').replace(/^[·\-\*•\d.、\s]+/gm, '');
+    // 性格/动作/台词关键词，命中的句子直接丢弃
+    const nonVisualKeywords = /性格|口头禅|开场白|身份|背景|故事|经历|喜欢|讨厌|习惯|说话风格|语气|职业|年龄|名字|傲娇|温柔|暴躁|腹黑|开朗|内向|害羞|冷漠|调皮|可爱|性感|妩媚|高冷|呆萌|活泼|文静|成熟|幼稚|聪明|愚蠢|善良|邪恶|正义|勇敢|胆小|自信|自卑|乐观|悲观|幽默|严肃|热情|冷淡|说|道|问|答|笑|哭|生气|偷偷|假装|走路|动作|表情/;
+    // 外貌关键词
+    const appearanceKeywords = /头发|发色|发型|眼睛|瞳色|皮肤|身材|身高|体型|脸|五官|肤色|尾巴|耳朵|兽耳|翅膀|角|外貌|外观|长相|外形|呆毛|睫毛|眉毛|鼻子|嘴唇|肤色|虎牙|酒窝|雀斑|疤痕|纹身|肌肉|胸|腰|腿|手臂|脖颈|锁骨|肩膀/;
+    // 服装关键词（外貌里要排除，服装由硬锁单独加）
+    const clothingKeywords = /服装|穿着|衣服|穿搭|裙子|上衣|下装|外套|鞋|袜|裤|裙|袍|衫|衣|帽|围裙|女仆装|连衣裙|T恤|衬衫|毛衣|卫衣|吊带|抹胸|比基尼|泳装|和服|汉服|西装|制服|校服|丝袜|连裤袜|高跟鞋|平底鞋|靴子|运动鞋|手套|围巾|领带|腰带|项链|耳环|手镯|戒指|发饰|蝴蝶结|蕾丝/;
+
+    const cleanSentence = (s) => {
+        let t = s.trim().replace(/^【[^】]+】\s*/, '').replace(/^[·\-\*•\d.、\s]+/, '');
         t = t.replace(/「[^」]*」/g, '').replace(/『[^』]*』/g, '').replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '').replace(/“[^”]*”/g, '').replace(/‘[^’]*’/g, '');
-        return t;
+        return t.replace(/[，。！？、\s]+$/, '').trim();
     };
+
     // 1. 优先用【外貌】标记
     const appearance = extractAppearanceFromRoleCard(roleDesc);
     if (appearance) {
-        let cleaned = clean(appearance);
-        // 去掉服装相关句子（服装由硬锁单独加，避免重复）
-        cleaned = cleaned.split(/[。！？\n]/).filter(s => !/服装|穿着|衣服|穿搭|裙子|上衣|下装|外套|鞋|袜|裤|裙|袍|衫|衣|帽|围裙|女仆装/.test(s)).join('，');
-        cleaned = cleaned.replace(/[，。！？、\s]+$/, '').trim();
-        return cleaned;
+        const sentences = appearance.split(/[，。！？；;\n]/);
+        const kept = [];
+        for (const s of sentences) {
+            const cleaned = cleanSentence(s);
+            if (!cleaned || cleaned.length < 2) continue;
+            if (nonVisualKeywords.test(cleaned) && !appearanceKeywords.test(cleaned)) continue;
+            if (clothingKeywords.test(cleaned) && !appearanceKeywords.test(cleaned)) continue;
+            kept.push(cleaned);
+        }
+        if (kept.length) return kept.join('，');
     }
-    // 2. 没有标记时，按行过滤，只保留外貌相关行（不含服装）
+    // 2. 没有标记时，按句子过滤，只保留外貌相关句子
     const lines = roleDesc.split('\n');
     const visualLines = [];
-    const appearanceKeywords = /头发|发色|发型|眼睛|瞳色|皮肤|身材|身高|体型|脸|五官|肤色|尾巴|耳朵|兽耳|翅膀|角|外貌|外观|长相|外形|呆毛|肤色|睫毛|眉毛|鼻子|嘴唇/;
-    const nonVisualKeywords = /性格|口头禅|开场白|身份|背景|故事|经历|喜欢|讨厌|习惯|说话风格|语气|职业|年龄|名字|服装|穿着|衣服|穿搭|裙子|上衣|下装|外套|鞋|袜|裤|裙|袍|衫|衣|帽/;
     for (const line of lines) {
-        let t = line.trim().replace(/^[·\-\*•\d.、\s]+/, '').replace(/^【[^】]+】\s*/, '');
-        if (!t) continue;
-        // 去掉引号台词
-        t = t.replace(/「[^」]*」/g, '').replace(/『[^』]*』/g, '').replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '').replace(/“[^”]*”/g, '').replace(/‘[^’]*’/g, '');
-        t = t.replace(/[，。！？、\s]+$/, '').trim();
-        if (!t || t.length < 2) continue;
-        if (nonVisualKeywords.test(t) && !appearanceKeywords.test(t)) continue;
-        if (appearanceKeywords.test(t)) {
-            visualLines.push(t);
+        const sentences = line.split(/[，。！？；;\n]/);
+        for (const s of sentences) {
+            const cleaned = cleanSentence(s);
+            if (!cleaned || cleaned.length < 2) continue;
+            if (nonVisualKeywords.test(cleaned) && !appearanceKeywords.test(cleaned)) continue;
+            if (clothingKeywords.test(cleaned) && !appearanceKeywords.test(cleaned)) continue;
+            if (appearanceKeywords.test(cleaned)) {
+                visualLines.push(cleaned);
+            }
         }
     }
     if (visualLines.length) {
-        return visualLines.join('，');
+        return [...new Set(visualLines)].join('，');
     }
     return '';
 }
