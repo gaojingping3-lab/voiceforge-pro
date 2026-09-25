@@ -5892,9 +5892,14 @@ function formatChatText(text) {
         // 台词部分上色
         return `<span style="color:${DIALOG_COLOR}">${escapeHtml(part)}</span>`;
     }).join('');
-    // 心里话模式：把💭开头的那一行变成灰色小字，不影响任何原有间距
+    // 心里话模式：把💭开头的行 和 全角括号（）包裹的心里话 变成灰色小字，不影响任何原有间距
     if (innerVoiceEnabled) {
+        // 匹配💭开头的内容
         result = result.replace(/💭[^<]*/g, m => `<span style="color:#999;font-size:0.85em;font-style:italic;">${m}</span><br>`);
+        // 匹配行首的全角括号心里话（单独成行的，避免误匹配动作描述里的括号）
+        result = result.replace(/(^|\n)(（[^）\n]*）)/g, (m, newline, thought) =>
+            `${newline}<span style="color:#999;font-size:0.85em;font-style:italic;">${thought}</span><br>`
+        );
     }
     return result;
 }
