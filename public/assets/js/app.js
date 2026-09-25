@@ -7728,9 +7728,11 @@ function extractAppearanceFromRoleCard(roleDesc) {
 function extractClothingFromRoleCard(roleDesc) {
     if (!roleDesc) return '';
     // 性格/动作/台词关键词，命中的句子直接丢弃
-    const nonClothingKeywords = /喜欢|习惯|性格|口头禅|开场白|说话|语气|走路|动作|表情|说|道|问|答|笑|哭|生气|害羞|偷偷|假装|被发现|扯着|衣角|线头|性格|傲娇|温柔|暴躁|腹黑|开朗|内向|冷漠|调皮|可爱|性感|妩媚|高冷|呆萌/;
-    // 服装关键词
-    const clothingKeywords = /服装|穿着|衣服|穿搭|上身|下身|上半身|下半身|裙子|上衣|下装|外套|内衣|光脚|赤裸|没穿|裸|鞋|袜|裤|裙|袍|衫|衣|帽|饰|项链|耳环|手镯|戒指|发饰|蝴蝶结|蕾丝|围裙|女仆装|连衣裙|T恤|衬衫|毛衣|外套|风衣|卫衣|吊带|抹胸|比基尼|泳装|和服|汉服|西装|制服|校服|丝袜|连裤袜|高跟鞋|平底鞋|靴子|运动鞋|手套|围巾|领带|腰带/;
+    const nonClothingKeywords = /喜欢|习惯|性格|口头禅|开场白|说话|语气|走路|动作|表情|说|道|问|答|笑|哭|生气|害羞|偷偷|假装|被发现|扯着|衣角|线头|性格|傲娇|温柔|暴躁|腹黑|开朗|内向|冷漠|调皮|可爱|性感|妩媚|高冷|呆萌|静电|拍起|拍的|拍了|拍照|镜头|看你|看着你|望着你|盯着你/;
+    // 人称代词：纯服装描述不会有人称代词，有你/我/他/她大概率是对话或性格
+    const pronounKeywords = /你|我|他|她|它|咱们|大家|别人|对方/;
+    // 明确的服装名词（有这些才算真正的服装描述）
+    const solidClothingKeywords = /连衣裙|裙子|上衣|下装|外套|内衣|鞋|袜|裤|袍|衫|衣|帽|围裙|女仆装|T恤|衬衫|毛衣|卫衣|吊带|抹胸|比基尼|泳装|和服|汉服|西装|制服|校服|丝袜|连裤袜|高跟鞋|平底鞋|靴子|运动鞋|手套|围巾|领带|腰带|蕾丝|蝴蝶结|发箍|发饰|项链|耳环|手镯|戒指/;
     const lines = roleDesc.split('\n');
     const hits = [];
     for (const line of lines) {
@@ -7747,8 +7749,10 @@ function extractClothingFromRoleCard(roleDesc) {
             // 去掉引号里的台词
             const cleaned = sentence.replace(/「[^」]*」/g, '').replace(/『[^』]*』/g, '').replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '').replace(/“[^”]*”/g, '').replace(/‘[^’]*’/g, '').trim();
             if (!cleaned || cleaned.length < 2) continue;
-            // 必须包含服装关键词
-            if (!clothingKeywords.test(cleaned)) continue;
+            // 必须包含明确的服装名词
+            if (!solidClothingKeywords.test(cleaned)) continue;
+            // 有人称代词的直接跳过（大概率是对话/性格）
+            if (pronounKeywords.test(cleaned)) continue;
             // 不能包含性格/动作/台词关键词
             if (nonClothingKeywords.test(cleaned)) continue;
             hits.push(cleaned);
@@ -7772,7 +7776,10 @@ function extractVisualDescFromRoleCard(roleDesc) {
     const cleanSentence = (s) => {
         let t = s.trim().replace(/^【[^】]+】\s*/, '').replace(/^[·\-\*•\d.、\s]+/, '');
         t = t.replace(/「[^」]*」/g, '').replace(/『[^』]*』/g, '').replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '').replace(/“[^”]*”/g, '').replace(/‘[^’]*’/g, '');
-        return t.replace(/[，。！？、\s]+$/, '').trim();
+        // 把性格形容词从句子里删掉（不整句跳过，保留后面的外貌词）
+        t = t.replace(/小?傲娇|温柔|暴躁|腹黑|开朗|内向|害羞|冷漠|调皮|可爱|性感|妩媚|高冷|呆萌|活泼|文静|成熟|幼稚|聪明|愚蠢|善良|邪恶|正义|勇敢|胆小|自信|自卑|乐观|悲观|幽默|严肃|热情|冷淡|傲娇|元气|丧|佛系|卷|躺平|社恐|社牛|病娇|女王|萝莉|御姐|正太|大叔/g, '');
+        t = t.replace(/[，。！？、\s]+$/, '').replace(/^[，。！？、\s]+/, '').trim();
+        return t;
     };
 
     // 1. 优先用【外貌】标记
@@ -8006,13 +8013,14 @@ async function extractActionSummaryZH(conversationText, userInput, isDualMode) {
         const llmKey = localStorage.getItem('LLM_KEY') || '';
         const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
         const singleRule = isDualMode ? '' : '当前是单人模式，画面中绝对只有一个角色，严禁出现第二个人、对方、他人、旁边的人、观众等任何其他人物，也不能出现"环抱对方""靠在某人肩头"等暗示他人的描述。';
+        const staticRule = '生图是静态画面，只描述一个瞬间的动作和姿势，严禁出现"随后""然后""接着""之后""接下来""先...再..."等时间序列或多动作描述。';
         const resp = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmKey}` },
             body: JSON.stringify({
                 baseUrl: llmUrl, model: llmModel,
                 messages: [
-                    { role: 'system', content: '你是生图画面提炼师。从聊天记录中提炼生成图片所需的画面描述：只提取人物的动作、姿势、所处场景、表情、镜头景别（全身/半身/特写/背面等）和正在发生的事。用简洁中文输出，一两句话即可。严禁复述聊天原文、严禁输出对话内容、严禁语气词和内心独白。' + singleRule },
+                    { role: 'system', content: '你是生图画面提炼师。从聊天记录中提炼生成图片所需的画面描述：只提取人物的动作、姿势、所处场景、表情、镜头景别（全身/半身/特写/背面等）和正在发生的事。用简洁中文输出，一两句话即可。严禁复述聊天原文、严禁输出对话内容、严禁语气词和内心独白。' + singleRule + staticRule },
                     { role: 'user', content: `聊天记录：\n${conversationText}\n\n${userInput ? '用户拍摄要求：' + userInput : ''}\n请提炼画面描述。` }
                 ],
                 temperature: 0.3,
@@ -8030,6 +8038,9 @@ async function extractActionSummaryZH(conversationText, userInput, isDualMode) {
             t = t.replace(/对方|他人|旁边的人|观众|另一个人|某人|别人/g, '');
             t = t.replace(/环抱.{0,4}胳膊|靠在.{0,4}肩头|依偎在.{0,4}身边/g, '');
         }
+        // 静态画面：去掉时间序列词，只保留第一个动作（分号/句号后的多动作截断）
+        t = t.replace(/随后|然后|接着|之后|接下来|不一会儿|过了一会|片刻后|紧接着/g, '');
+        t = t.split(/[；;。]/)[0]; // 只保留第一个动作片段
         t = t.replace(/[，。！？、\s]*[，。！？]$/, '').trim();
         return t.length > 2 ? t : '';
     } catch (e) {
