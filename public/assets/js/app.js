@@ -7729,45 +7729,64 @@ function extractClothingFromRoleCard(roleDesc) {
     if (!roleDesc) return '';
     const lines = roleDesc.split('\n');
     const hits = [];
+    // 性格/动作/台词关键词，命中就跳过（这些不是服装描述）
+    const nonClothingKeywords = /喜欢|习惯|性格|口头禅|开场白|说话|语气|走路|动作|表情|说|道|问|答|笑|哭|生气|害羞/;
     for (const line of lines) {
-        const t = line.trim();
+        let t = line.trim();
         if (!t) continue;
-        if (/服装|穿着|衣服|穿搭|上身|下身|上半身|下半身|裙子|上衣|下装|外套|内衣|光脚|赤裸|没穿|裸/.test(t)) {
-            hits.push(t.replace(/^[·\-\*•\d.、\s]+/, ''));
-        }
+        // 去掉行首的【标签】
+        t = t.replace(/^【[^】]+】\s*/, '').replace(/^[·\-\*•\d.、\s]+/, '');
+        if (!t) continue;
+        // 必须包含服装关键词
+        if (!/服装|穿着|衣服|穿搭|上身|下身|上半身|下半身|裙子|上衣|下装|外套|内衣|光脚|赤裸|没穿|裸|鞋|袜|裤|裙|袍|衫|衣|帽|饰|项链|耳环|手镯|戒指|发饰|蝴蝶结|蕾丝|围裙|女仆装/.test(t)) continue;
+        // 包含性格/动作/台词关键词的跳过
+        if (nonClothingKeywords.test(t) && !/服装|穿着|衣服|穿搭|裙子|上衣|下装|外套|鞋|袜|裤|裙|袍|衫|衣|帽/.test(t.split(/[，。！？]/)[0])) continue;
+        // 去掉引号里的台词
+        t = t.replace(/「[^」]*」/g, '').replace(/『[^』]*』/g, '').replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '').replace(/“[^”]*”/g, '').replace(/‘[^’]*’/g, '');
+        t = t.replace(/[，。！？、\s]+$/, '').trim();
+        if (t && t.length > 1) hits.push(t);
     }
-    return hits.join(', ');
+    return hits.join('，');
 }
 
-// ===== 提取纯视觉描述（外貌+服装），过滤性格/口头禅/开场白等非视觉内容 =====
+// ===== 提取纯视觉描述（外貌，不含服装，服装由硬锁单独加），过滤性格/口头禅/开场白等非视觉内容 =====
 function extractVisualDescFromRoleCard(roleDesc) {
     if (!roleDesc) return '';
+    // 清洗函数：去掉标签、引号台词、性格动作词
+    const clean = (text) => {
+        let t = text.replace(/^【[^】]+】\s*/gm, '').replace(/^[·\-\*•\d.、\s]+/gm, '');
+        t = t.replace(/「[^」]*」/g, '').replace(/『[^』]*』/g, '').replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '').replace(/“[^”]*”/g, '').replace(/‘[^’]*’/g, '');
+        return t;
+    };
     // 1. 优先用【外貌】标记
     const appearance = extractAppearanceFromRoleCard(roleDesc);
-    // 2. 提取服装
-    const clothing = extractClothingFromRoleCard(roleDesc);
-    // 3. 如果有外貌标记，用外貌+服装
     if (appearance) {
-        return clothing ? appearance + '，' + clothing : appearance;
+        let cleaned = clean(appearance);
+        // 去掉服装相关句子（服装由硬锁单独加，避免重复）
+        cleaned = cleaned.split(/[。！？\n]/).filter(s => !/服装|穿着|衣服|穿搭|裙子|上衣|下装|外套|鞋|袜|裤|裙|袍|衫|衣|帽|围裙|女仆装/.test(s)).join('，');
+        cleaned = cleaned.replace(/[，。！？、\s]+$/, '').trim();
+        return cleaned;
     }
-    // 4. 没有标记时，按行过滤，只保留视觉相关行
+    // 2. 没有标记时，按行过滤，只保留外貌相关行（不含服装）
     const lines = roleDesc.split('\n');
     const visualLines = [];
-    const visualKeywords = /头发|发色|发型|眼睛|瞳色|皮肤|身材|身高|体型|脸|五官|穿着|服装|衣服|裙子|上衣|裤子|鞋|配饰|首饰|项链|耳环|尾巴|耳朵|兽耳|翅膀|外貌|外观|长相|外形|肤色/;
-    const nonVisualKeywords = /性格|口头禅|开场白|身份|背景|故事|经历|喜欢|讨厌|习惯|说话风格|语气|职业|年龄|名字/;
+    const appearanceKeywords = /头发|发色|发型|眼睛|瞳色|皮肤|身材|身高|体型|脸|五官|肤色|尾巴|耳朵|兽耳|翅膀|角|外貌|外观|长相|外形|呆毛|肤色|睫毛|眉毛|鼻子|嘴唇/;
+    const nonVisualKeywords = /性格|口头禅|开场白|身份|背景|故事|经历|喜欢|讨厌|习惯|说话风格|语气|职业|年龄|名字|服装|穿着|衣服|穿搭|裙子|上衣|下装|外套|鞋|袜|裤|裙|袍|衫|衣|帽/;
     for (const line of lines) {
-        const t = line.trim().replace(/^[·\-\*•\d.、\s]+/, '').replace(/^【[^】]+】\s*/, '');
+        let t = line.trim().replace(/^[·\-\*•\d.、\s]+/, '').replace(/^【[^】]+】\s*/, '');
         if (!t) continue;
-        if (nonVisualKeywords.test(t) && !visualKeywords.test(t)) continue;
-        if (visualKeywords.test(t)) {
+        // 去掉引号台词
+        t = t.replace(/「[^」]*」/g, '').replace(/『[^』]*』/g, '').replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '').replace(/“[^”]*”/g, '').replace(/‘[^’]*’/g, '');
+        t = t.replace(/[，。！？、\s]+$/, '').trim();
+        if (!t || t.length < 2) continue;
+        if (nonVisualKeywords.test(t) && !appearanceKeywords.test(t)) continue;
+        if (appearanceKeywords.test(t)) {
             visualLines.push(t);
         }
     }
     if (visualLines.length) {
-        const result = visualLines.join('，');
-        return clothing && !result.includes(clothing) ? result + '，' + clothing : result;
+        return visualLines.join('，');
     }
-    // 5. 实在提取不到，返回空（调用方自己决定降级）
     return '';
 }
 
@@ -7966,13 +7985,14 @@ async function extractActionSummaryZH(conversationText, userInput, isDualMode) {
         const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
         const llmKey = localStorage.getItem('LLM_KEY') || '';
         const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+        const singleRule = isDualMode ? '' : '当前是单人模式，画面中绝对只有一个角色，严禁出现第二个人、对方、他人、旁边的人、观众等任何其他人物，也不能出现"环抱对方""靠在某人肩头"等暗示他人的描述。';
         const resp = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmKey}` },
             body: JSON.stringify({
                 baseUrl: llmUrl, model: llmModel,
                 messages: [
-                    { role: 'system', content: '你是生图画面提炼师。从聊天记录中提炼生成图片所需的画面描述：只提取人物的动作、姿势、所处场景、表情、镜头景别（全身/半身/特写/背面等）和正在发生的事。用简洁中文输出，一两句话即可。严禁复述聊天原文、严禁输出对话内容、严禁语气词和内心独白。' },
+                    { role: 'system', content: '你是生图画面提炼师。从聊天记录中提炼生成图片所需的画面描述：只提取人物的动作、姿势、所处场景、表情、镜头景别（全身/半身/特写/背面等）和正在发生的事。用简洁中文输出，一两句话即可。严禁复述聊天原文、严禁输出对话内容、严禁语气词和内心独白。' + singleRule },
                     { role: 'user', content: `聊天记录：\n${conversationText}\n\n${userInput ? '用户拍摄要求：' + userInput : ''}\n请提炼画面描述。` }
                 ],
                 temperature: 0.3,
@@ -7985,6 +8005,11 @@ async function extractActionSummaryZH(conversationText, userInput, isDualMode) {
         let t = (data.choices?.[0]?.message?.content || '').trim();
         // 后处理：清洗掉引号里的台词内容（LLM偶尔不听话会把对话带出来）
         t = t.replace(/「[^」]*」/g, '').replace(/『[^』]*』/g, '').replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '').replace(/“[^”]*”/g, '').replace(/‘[^’]*’/g, '');
+        // 单人模式：清洗暗示第二个人的词
+        if (!isDualMode) {
+            t = t.replace(/对方|他人|旁边的人|观众|另一个人|某人|别人/g, '');
+            t = t.replace(/环抱.{0,4}胳膊|靠在.{0,4}肩头|依偎在.{0,4}身边/g, '');
+        }
         t = t.replace(/[，。！？、\s]*[，。！？]$/, '').trim();
         return t.length > 2 ? t : '';
     } catch (e) {
@@ -8630,10 +8655,12 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
             const actionDesc = await extractActionSummaryZH(conversationText, userInput, isDualMode);
             if (actionDesc) console.log('[中文提炼] 画面描述:', actionDesc.slice(0, 100));
             const stylePrefix = getFixedStyleForRole(role);
+            // 降级优先级：actionDesc > userInput > 清洗后的chatText（绝不直接用聊天原文）
+            const cleanChatText = recentMessages.map(m => m.content.replace(/「[^」]*」/g, '').replace(/“[^”]*”/g, '').replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '')).join('，').slice(0, 100);
+            const sceneDesc = actionDesc || userInput || cleanChatText;
             if (isDualMode && roleA && roleB) {
                 const appA = extractVisualDescFromRoleCard(roleA.desc) || extractAppearanceFromRoleCard(roleA.desc) || '';
                 const appB = extractVisualDescFromRoleCard(roleB.desc) || extractAppearanceFromRoleCard(roleB.desc) || '';
-                const chatText = recentMessages.map(m => m.role === 'user' ? `我: ${m.content}` : m.content).join('；');
                 // 按A/B角色卡性别确定人数标签，不再固定2girls（一男一女会被画成两个女孩）
                 const ga = getRoleGender(roleA.desc), gb = getRoleGender(roleB.desc);
                 let dualTag = 'two characters';
@@ -8642,17 +8669,17 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
                     else if (ga === 'male' && gb === 'male') dualTag = '2boys';
                     else dualTag = '1girl, 1boy';
                 }
-                rolePrompt = `${stylePrefix}, ${roleA.name}（${appA}）和${roleB.name}（${appB}），${dualTag}, ${actionDesc || chatText}`;
+                rolePrompt = `${stylePrefix}, ${roleA.name}（${appA}）和${roleB.name}（${appB}），${dualTag}, ${sceneDesc}`;
             } else {
                 const cur = getCurrentRole();
                 const app = cur ? (extractVisualDescFromRoleCard(cur.desc) || extractAppearanceFromRoleCard(cur.desc) || '') : '';
-                const chatText = recentMessages.map(m => `${m.role === 'user' ? '我' : cur?.name || 'AI'}: ${m.content}`).join('；');
                 // 按角色卡性别确定人数标签，不再固定1girl（男角色会画成女孩）
                 const curGender = cur ? getRoleGender(cur.desc) : '';
                 const soloTag = curGender === 'female' ? '1girl' : (curGender === 'male' ? '1boy' : 'single character');
-                rolePrompt = cur ? `${stylePrefix}, ${cur.name}，${app}，${soloTag}, ${actionDesc || chatText}` : `${stylePrefix}, ${actionDesc || chatText}`;
+                rolePrompt = cur ? `${stylePrefix}, ${cur.name}，${app}，${soloTag}, ${sceneDesc}` : `${stylePrefix}, ${sceneDesc}`;
             }
-            if (userInput) rolePrompt += `，${userInput}`;
+            // userInput如果已经包含在sceneDesc里就不重复加
+            if (userInput && !actionDesc && sceneDesc !== userInput) rolePrompt += `，${userInput}`;
         } else {
             // 英文优化模式：先取身份块（带缓存），再用角色AI把中文聊天翻译成英文生图提示词
             loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">角色AI正在整理画面描述...</span></div>';
