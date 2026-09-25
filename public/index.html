@@ -924,6 +924,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <label class="label py-1 mt-3"><span class="label-text text-sm">快捷开场白（切换角色后自动填入）</span></label>
                         <input type="text" id="role-opening-input" class="input input-bordered input-sm w-full" placeholder="例如：你来了，我等你很久了..." />
+                        <label class="label py-1 mt-3"><span class="label-text text-sm">生图画风（聊天生图时优先使用，不填则跟随全局设置）</span></label>
+                        <select id="role-image-style-input" class="select select-bordered select-sm w-full">
+                            <option value="global">跟随全局设置</option>
+                            <option value="photorealistic">写实照片</option>
+                            <option value="anime">动漫二次元</option>
+                            <option value="japanese_anime">日系动漫插画</option>
+                        </select>
 
                         <!-- 角色记忆便签（手动录入） -->
                         <div class="mt-4">
@@ -1723,6 +1730,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260925deltitle"></script>
+    <script src="assets/js/app.js?v=20260925rolestyle"></script>
 </body>
 </html>

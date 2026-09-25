@@ -5925,6 +5925,8 @@ function editRoleCard() {
     document.getElementById('role-name-input').value = role.name;
     document.getElementById('role-desc-input').value = role.desc;
     document.getElementById('role-opening-input').value = role.opening || '';
+    const styleSel = document.getElementById('role-image-style-input');
+    if (styleSel) styleSel.value = role.imageStyle || 'global';
     renderMemoList();
     // 加载头像预览
     editingRoleAvatar = role.avatar || null;
@@ -5941,6 +5943,8 @@ function saveRoleCard() {
     const name = document.getElementById('role-name-input').value.trim() || DEFAULT_ROLE_NAME;
     const desc = document.getElementById('role-desc-input').value.trim() || DEFAULT_ROLE_DESC;
     const opening = document.getElementById('role-opening-input').value.trim();
+    const imageStyleSel = document.getElementById('role-image-style-input');
+    const imageStyle = imageStyleSel ? imageStyleSel.value : 'global';
     const list = getRoleList();
     const currentId = getCurrentRoleId();
     const role = list.find(r => r.id === currentId);
@@ -5948,6 +5952,7 @@ function saveRoleCard() {
         role.name = name;
         role.desc = desc;
         role.opening = opening;
+        role.imageStyle = imageStyle === 'global' ? undefined : imageStyle;
         // 保存头像（null表示不修改，''表示清除）
         if (editingRoleAvatar !== null) {
             role.avatar = editingRoleAvatar || undefined;
@@ -7609,6 +7614,14 @@ function getFixedStyleByMode() {
     return style.prefix + ', ' + CORE_QUALITY_LOCK;
 }
 
+// 获取指定角色的生图画风前缀：角色卡有imageStyle就用角色卡的，否则用全局
+function getFixedStyleForRole(role) {
+    if (role && role.imageStyle && IMAGE_STYLES[role.imageStyle]) {
+        return IMAGE_STYLES[role.imageStyle].prefix + ', ' + CORE_QUALITY_LOCK;
+    }
+    return getFixedStyleByMode();
+}
+
 // 生图提示词确认弹窗：返回 {confirmed, text}
 function awaitPromptConfirm(defaultText) {
     return new Promise((resolve) => {
@@ -7991,6 +8004,8 @@ async function generatePromptWithRoleAI(conversationText, isDualMode = false, du
         const llmKey = localStorage.getItem('LLM_KEY') || '';
         const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
         const currentRole = getCurrentRole();
+        // 角色卡有独立画风就用角色卡的，否则用全局
+        const stylePrefix = getFixedStyleForRole(currentRole);
 
         // 读取用户设置里的System Prompt，让生图提示词也遵守
         const customSystem = localStorage.getItem('LLM_SYSTEM') || '';
@@ -8107,7 +8122,7 @@ ${viewRule}`;
 
         if (!response.ok) {
             console.warn('角色AI生成提示词失败，降级用原始文本:', response.status);
-            return getFixedStyleByMode() + ', ' + conversationText;
+            return stylePrefix + ', ' + conversationText;
         }
 
         const data = await response.json();
@@ -8118,15 +8133,15 @@ ${viewRule}`;
 
         // 如果清理后太短，降级用原始文本
         if (prompt.length < 20) {
-            return getFixedStyleByMode() + ', ' + conversationText;
+            return stylePrefix + ', ' + conversationText;
         }
 
         // 强制加上固定风格前缀，锁死画风；单人模式额外锁死只有1个人物
         const soloLock = isDualMode ? '' : ', solo, 1 person, only one character, no other people, no background figures';
-        return getFixedStyleByMode() + soloLock + ', ' + prompt;
+        return stylePrefix + soloLock + ', ' + prompt;
     } catch (e) {
         console.warn('角色AI生成提示词异常，降级用原始文本:', e.message);
-        return getFixedStyleByMode() + ', ' + conversationText;
+        return stylePrefix + ', ' + conversationText;
     }
 }
 
@@ -8367,8 +8382,8 @@ ${chatText}`;
         const userIdentity = userAppearance
             ? `the user, ${userAppearance}`
             : 'the user wearing a plain white t-shirt, dark blue jeans and white sneakers, natural pose';
-        // 画风跟随 AI生图页的设置（写实/动漫/日系），不再固定动漫
-        const animeStylePrefix = getFixedStyleByMode() + ', no text, no watermark, no speech bubble';
+        // 画风跟随角色卡设置（角色卡有独立画风就用角色卡的，否则用全局）
+        const animeStylePrefix = getFixedStyleForRole(role) + ', no text, no watermark, no speech bubble';
         // 背景固定：首格生成后作为后续格的背景/画风参考
         let firstFrameRef = null;
         const blobToDataURL = (blob) => new Promise((resolve, reject) => {
@@ -8570,7 +8585,7 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
             // 中文直生成：也先提炼动作/画面描述，不直接把聊天记录原文发给生图模型
             const actionDesc = await extractActionSummaryZH(conversationText, userInput, isDualMode);
             if (actionDesc) console.log('[中文提炼] 画面描述:', actionDesc.slice(0, 100));
-            const stylePrefix = getFixedStyleByMode();
+            const stylePrefix = getFixedStyleForRole(role);
             if (isDualMode && roleA && roleB) {
                 const appA = extractAppearanceFromRoleCard(roleA.desc) || roleA.desc;
                 const appB = extractAppearanceFromRoleCard(roleB.desc) || roleB.desc;
@@ -8971,7 +8986,7 @@ async function generateVideoFromChat(userInput = '') {
         if (getPromptLang() === 'zh') {
             // 中文模式：直接用中文构造（最快），和聊天生图保持同一套角色外貌/人数锁
             loadingBubble.innerHTML = '<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">正在用中文提示词生成视频...</span></div>';
-            const stylePrefix = getFixedStyleByMode();
+            const stylePrefix = getFixedStyleForRole(role);
             if (isDualMode && roleA && roleB) {
                 const appA = extractAppearanceFromRoleCard(roleA.desc) || roleA.desc;
                 const appB = extractAppearanceFromRoleCard(roleB.desc) || roleB.desc;
