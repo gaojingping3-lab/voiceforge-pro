@@ -6091,6 +6091,186 @@ function exportRoleCard() {
     sfxSuccess();
 }
 
+// ============================================
+// 导出角色卡为酒馆PNG格式（图片内嵌角色数据，可导入酒馆/Character.AI等平台）
+// ============================================
+
+// CRC32计算（PNG用）
+function crc32(bytes) {
+    let crc = 0xFFFFFFFF;
+    const table = [];
+    for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        table[n] = c;
+    }
+    for (let i = 0; i < bytes.length; i++) crc = table[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+// 给PNG二进制数据插入tEXt块（在IHDR之后）
+function pngAddTextChunk(pngBytes, keyword, value) {
+    // PNG签名 8字节 + IHDR块(4长度+4类型+13数据+4CRC=25字节)
+    // 所以前33字节是签名+IHDR，tEXt块插在第33字节处
+    const signature = pngBytes.slice(0, 8);
+    const ihdr = pngBytes.slice(8, 33);
+    const rest = pngBytes.slice(33);
+
+    // 构造tEXt块数据：keyword + \0 + value（用Latin-1编码）
+    const keywordBytes = new TextEncoder().encode(keyword);
+    // value可能是base64，用Latin-1编码
+    const valueBytes = [];
+    for (let i = 0; i < value.length; i++) valueBytes.push(value.charCodeAt(i) & 0xFF);
+    const textData = new Uint8Array(keywordBytes.length + 1 + valueBytes.length);
+    textData.set(keywordBytes, 0);
+    textData[keywordBytes.length] = 0; // null分隔符
+    textData.set(valueBytes, keywordBytes.length + 1);
+
+    // tEXt块：4长度 + 4类型 + 数据 + 4CRC
+    const typeBytes = new TextEncoder().encode('tEXt');
+    const lengthBytes = new Uint8Array(4);
+    const dv = new DataView(lengthBytes.buffer);
+    dv.setUint32(0, textData.length, false); // 大端
+
+    const crcData = new Uint8Array(typeBytes.length + textData.length);
+    crcData.set(typeBytes, 0);
+    crcData.set(textData, typeBytes.length);
+    const crcVal = crc32(crcData);
+    const crcBytes = new Uint8Array(4);
+    const crcDv = new DataView(crcBytes.buffer);
+    crcDv.setUint32(0, crcVal, false);
+
+    const textChunk = new Uint8Array(4 + 4 + textData.length + 4);
+    textChunk.set(lengthBytes, 0);
+    textChunk.set(typeBytes, 4);
+    textChunk.set(textData, 8);
+    textChunk.set(crcBytes, 8 + textData.length);
+
+    // 合并：签名 + IHDR + tEXt + 剩余数据
+    const result = new Uint8Array(signature.length + ihdr.length + textChunk.length + rest.length);
+    result.set(signature, 0);
+    result.set(ihdr, signature.length);
+    result.set(textChunk, signature.length + ihdr.length);
+    result.set(rest, signature.length + ihdr.length + textChunk.length);
+    return result;
+}
+
+// dataURL转Uint8Array
+function dataUrlToBytes(dataUrl) {
+    const base64 = dataUrl.split(',')[1];
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+}
+
+// Uint8Array转dataURL
+function bytesToDataUrl(bytes, mime) {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return 'data:' + (mime || 'image/png') + ';base64,' + btoa(binary);
+}
+
+// 构造酒馆格式的chara数据
+function buildTavernCharaData(name, desc, opening, avatar) {
+    return {
+        name: name || '角色',
+        description: desc || '',
+        personality: '',
+        first_mes: opening || '',
+        mes_example: '',
+        creator_notes: 'Exported from voiceforge-pro',
+        system_prompt: '',
+        post_history_instructions: '',
+        alternate_greetings: [],
+        tags: [],
+        creator: 'voiceforge-pro',
+        character_version: '1.0',
+        extensions: {}
+    };
+}
+
+// 导出角色卡为酒馆PNG
+async function exportRoleCardAsPNG() {
+    const name = (document.getElementById('role-name-input').value || '').trim() || DEFAULT_ROLE_NAME;
+    const desc = (document.getElementById('role-desc-input').value || '').trim() || DEFAULT_ROLE_DESC;
+    const opening = (document.getElementById('role-opening-input').value || '').trim();
+    const roleId = getCurrentRoleId();
+
+    // 获取头像
+    let avatar = null;
+    if (editingRoleAvatar !== null && editingRoleAvatar !== undefined && editingRoleAvatar !== '') {
+        avatar = editingRoleAvatar;
+    } else {
+        const role = getRoleList().find(r => r.id === roleId);
+        if (role && role.avatar) avatar = role.avatar;
+    }
+
+    // 如果没有头像，生成一个带名字首字母的占位图
+    let avatarDataUrl = avatar;
+    if (!avatar) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        // 渐变背景
+        const grad = ctx.createLinearGradient(0, 0, 512, 512);
+        grad.addColorStop(0, '#667eea');
+        grad.addColorStop(1, '#764ba2');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 512, 512);
+        // 名字首字母
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 200px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(name.charAt(0), 256, 256);
+        avatarDataUrl = canvas.toDataURL('image/png');
+    }
+
+    try {
+        // 把头像画到canvas，确保是标准PNG
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = avatarDataUrl;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        // 白色背景（防止透明PNG导入后变黑）
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, 512, 512);
+        ctx.drawImage(img, 0, 0, 512, 512);
+        const pngDataUrl = canvas.toDataURL('image/png');
+
+        // 构造酒馆chara数据并base64编码
+        const charaData = buildTavernCharaData(name, desc, opening, avatarDataUrl);
+        const charaJson = JSON.stringify(charaData);
+        const charaBase64 = btoa(unescape(encodeURIComponent(charaJson)));
+
+        // 给PNG加tEXt块（key=chara, value=base64数据）
+        const pngBytes = dataUrlToBytes(pngDataUrl);
+        const pngWithMeta = pngAddTextChunk(pngBytes, 'chara', charaBase64);
+        const finalDataUrl = bytesToDataUrl(pngWithMeta, 'image/png');
+
+        // 下载
+        const a = document.createElement('a');
+        a.href = finalDataUrl;
+        a.download = name + '_角色卡.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        sfxSuccess();
+        alert('已导出酒馆PNG角色卡：' + name + '_角色卡.png\n可导入酒馆、Character.AI等平台');
+    } catch (e) {
+        console.error('[PNG导出] 失败:', e);
+        alert('导出PNG失败：' + (e.message || e));
+    }
+}
+
 // 角色卡导入（支持本站JSON + 酒馆PNG卡）
 function importRoleCard() {
     const input = document.getElementById('role-import-file');

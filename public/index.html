@@ -948,7 +948,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         <div class="modal-action mt-4">
                             <button class="btn btn-ghost btn-sm" onclick="exportRoleCard()">
-                                <i class="fa-solid fa-download"></i> 导出这张卡
+                                <i class="fa-solid fa-download"></i> 导出JSON
+                            </button>
+                            <button class="btn btn-ghost btn-sm" onclick="exportRoleCardAsPNG()">
+                                <i class="fa-solid fa-image"></i> 导出PNG
                             </button>
                             <button class="btn btn-ghost btn-sm" onclick="document.getElementById('role-card-modal').close()">取消</button>
                             <button class="btn btn-primary btn-sm" onclick="saveRoleCard()">保存</button>
@@ -1730,6 +1733,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260925promptfix4"></script>
+    <script src="assets/js/app.js?v=20260925pngexport"></script>
 </body>
 </html>
