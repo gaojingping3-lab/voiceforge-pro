@@ -7183,23 +7183,29 @@ function clearChat() {
     const tokenKey = getTokenKey();
     localStorage.removeItem(tokenKey);
     updateTotalTokensDisplay();
-    // 清空聊天记录时，小秘密内容也一起清空（它是基于聊天生成的，重新开始）
-    try {
-        (async () => {
-            try {
-                const db = await openImageDB();
-                const appKeys = ['notes', 'chat', 'cart', 'history', 'food'];
-                for (const ak of appKeys) {
-                    const id = secretStorageId(roleId, ak);
-                    await new Promise(r => {
-                        const tx = db.transaction('SECRET_STORE', 'readwrite');
-                        tx.objectStore('SECRET_STORE').delete(id);
-                        tx.oncomplete = r; tx.onerror = r;
-                    });
-                }
-            } catch (e) { /* ignore */ }
-        })();
-    } catch (e) { /* ignore */ }
+    // 清空聊天记录时，小秘密内容也一起清空（遍历当前角色所有小秘密key）
+    (async () => {
+        try {
+            const db = await openImageDB();
+            let n = 0;
+            await new Promise((resolve) => {
+                const tx = db.transaction('SECRET_STORE', 'readwrite');
+                const store = tx.objectStore('SECRET_STORE');
+                const req = store.openCursor();
+                req.onsuccess = (e) => {
+                    const cursor = e.target.result;
+                    if (cursor) {
+                        if (cursor.key && String(cursor.key).indexOf('secret_' + roleId + '_') === 0) {
+                            cursor.delete(); n++;
+                        }
+                        cursor.continue();
+                    } else { resolve(); }
+                };
+                req.onerror = () => resolve();
+            });
+            console.log('小秘密已清空', n, '条');
+        } catch (e) { console.warn('清小秘密失败', e); }
+    })();
     stopAllAudio(); // 停止正在播放的语音
     sfxSuccess();
 }
