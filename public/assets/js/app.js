@@ -7183,6 +7183,33 @@ function clearChat() {
     const tokenKey = getTokenKey();
     localStorage.removeItem(tokenKey);
     updateTotalTokensDisplay();
+    // 保留小秘密已有内容：把它记录的聊天快照同步成清空后的新快照，避免它误判"聊天变了"自动重新生成覆盖
+    try {
+        const newSnap = secretChatSnap();
+        const appKeys = ['notes', 'chat', 'cart', 'history', 'food'];
+        (async () => {
+            try {
+                const db = await openImageDB();
+                for (const ak of appKeys) {
+                    const id = secretStorageId(roleId, ak);
+                    const rec = await new Promise(r => {
+                        const tx = db.transaction('SECRET_STORE', 'readonly');
+                        const req = tx.objectStore('SECRET_STORE').get(id);
+                        req.onsuccess = () => r(req.result);
+                        req.onerror = () => r(null);
+                    });
+                    if (rec && rec.versions && rec.versions[0]) {
+                        rec.versions[0].chatSnap = newSnap;
+                        await new Promise(r => {
+                            const tx = db.transaction('SECRET_STORE', 'readwrite');
+                            tx.objectStore('SECRET_STORE').put(rec);
+                            tx.oncomplete = r; tx.onerror = r;
+                        });
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        })();
+    } catch (e) { /* ignore */ }
     stopAllAudio(); // 停止正在播放的语音
     sfxSuccess();
 }
