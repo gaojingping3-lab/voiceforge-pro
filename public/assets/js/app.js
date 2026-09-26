@@ -6113,10 +6113,9 @@ async function generateSecretContent(role, appKey) {
 }
 
 // 渲染：备忘录
-function renderSecretNotes(data) {
-    const body = document.getElementById('secret-notes-body');
-    if (!data || !Array.isArray(data.notes)) { body.innerHTML = '<div class="s-error">内容格式有误</div>'; return; }
-    body.innerHTML = '';
+function renderSecretNotes(data, container) {
+    const body = container || document.getElementById('secret-notes-body');
+    if (!data || !Array.isArray(data.notes)) return;
     data.notes.forEach(note => {
         const item = document.createElement('div');
         item.className = 's-note-item';
@@ -6125,22 +6124,22 @@ function renderSecretNotes(data) {
         const meta = document.createElement('div'); meta.className = 's-note-meta'; meta.textContent = note.time || '';
         item.appendChild(preview); item.appendChild(meta);
         item.onclick = () => {
-            body.innerHTML = '';
+            const container2 = container || body;
+            container2.innerHTML = '';
             const detail = document.createElement('div'); detail.className = 's-note-detail';
             detail.textContent = (note.title ? note.title + '\n\n' : '') + note.content;
             const back = document.createElement('button'); back.className = 'btn btn-ghost btn-sm mt-3'; back.textContent = '‹ 返回列表';
-            back.onclick = () => renderSecretNotes(data);
-            body.appendChild(detail); body.appendChild(back);
+            back.onclick = () => { renderSecretFlow('notes'); };
+            container2.appendChild(detail); container2.appendChild(back);
         };
         body.appendChild(item);
     });
 }
 
 // 渲染：聊天会话列表
-function renderSecretChatList(data) {
-    const body = document.getElementById('secret-chatlist-body');
-    if (!data || !Array.isArray(data.conversations)) { body.innerHTML = '<div class="s-error">内容格式有误</div>'; return; }
-    body.innerHTML = '';
+function renderSecretChatList(data, container) {
+    const body = container || document.getElementById('secret-chatlist-body');
+    if (!data || !Array.isArray(data.conversations)) return;
     data.conversations.forEach(conv => {
         const item = document.createElement('div'); item.className = 's-conv-item';
         const avatar = document.createElement('div'); avatar.className = 's-conv-avatar'; avatar.textContent = conv.avatar || '👤';
@@ -6177,10 +6176,9 @@ function renderSecretChatDetail(conv) {
 }
 
 // 渲染：购物车
-function renderSecretCart(data) {
-    const body = document.getElementById('secret-cart-body');
-    if (!data || !Array.isArray(data.items)) { body.innerHTML = '<div class="s-error">内容格式有误</div>'; return; }
-    body.innerHTML = '';
+function renderSecretCart(data, container) {
+    const body = container || document.getElementById('secret-cart-body');
+    if (!data || !Array.isArray(data.items)) return;
     data.items.forEach(it => {
         const item = document.createElement('div'); item.className = 's-cart-item';
         const thumb = document.createElement('div'); thumb.className = 's-cart-thumb'; thumb.textContent = it.icon || '📦';
@@ -6195,10 +6193,9 @@ function renderSecretCart(data) {
 }
 
 // 渲染：浏览器搜索历史
-function renderSecretHistory(data) {
-    const body = document.getElementById('secret-history-body');
-    if (!data || !Array.isArray(data.history)) { body.innerHTML = '<div class="s-error">内容格式有误</div>'; return; }
-    body.innerHTML = '';
+function renderSecretHistory(data, container) {
+    const body = container || document.getElementById('secret-history-body');
+    if (!data || !Array.isArray(data.history)) return;
     data.history.forEach(h => {
         const item = document.createElement('div'); item.className = 's-hist-item';
         const icon = document.createElement('div'); icon.className = 's-hist-icon'; icon.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>';
@@ -6210,10 +6207,9 @@ function renderSecretHistory(data) {
 }
 
 // 渲染：外卖订单
-function renderSecretFood(data) {
-    const body = document.getElementById('secret-food-body');
-    if (!data || !Array.isArray(data.orders)) { body.innerHTML = '<div class="s-error">内容格式有误</div>'; return; }
-    body.innerHTML = '';
+function renderSecretFood(data, container) {
+    const body = container || document.getElementById('secret-food-body');
+    if (!data || !Array.isArray(data.orders)) return;
     data.orders.forEach(o => {
         const item = document.createElement('div'); item.className = 's-food-item';
         const head = document.createElement('div'); head.className = 's-food-head';
@@ -6250,7 +6246,7 @@ async function renderSecretAlbum() {
     body.innerHTML = ''; body.appendChild(grid);
 }
 
-// 打开某个app（先读缓存，没有才生成）
+// 打开某个app：保证有最新内容（聊天有新进展自动生成新批），然后把所有历史版本累积渲染在同一页面，往上滑即可看全部
 async function openSecretApp(appKey) {
     const role = getCurrentRole();
     const roleId = role.id || 'default';
@@ -6267,14 +6263,13 @@ async function openSecretApp(appKey) {
             const curVer = (rec && rec.versions && rec.versions[0]) ? rec.versions[0] : rec;
             if (!curVer || !curVer.chatSnap || curVer.chatSnap !== snap) {
                 const fresh = await generateSecretContent(role, 'chat');
-                if (fresh) { await saveSecretData(roleId, 'chat', fresh); data = fresh; }
+                if (fresh) await saveSecretData(roleId, 'chat', fresh);
             }
         } else {
             data = await generateSecretContent(role, 'chat');
             if (data) await saveSecretData(roleId, 'chat', data);
         }
-        if (data) renderSecretChatList(data);
-        else body.innerHTML = '<div class="s-error">没加载出来。<br><button class="btn btn-sm mt-3" onclick="refreshSecretApp(\'chat\')">重试</button></div>';
+        await renderSecretFlow('chat');
         return;
     }
     // 相册：不调AI，直接读取当前角色已有生图
@@ -6284,10 +6279,10 @@ async function openSecretApp(appKey) {
         return;
     }
     const cfg = {
-        notes: { screen: 'secret-screen-notes', body: 'secret-notes-body', loading: '正在翻开她的备忘录…', render: renderSecretNotes },
-        cart: { screen: 'secret-screen-cart', body: 'secret-cart-body', loading: '正在看她的购物车…', render: renderSecretCart },
-        history: { screen: 'secret-screen-history', body: 'secret-history-body', loading: '正在翻她的搜索记录…', render: renderSecretHistory },
-        food: { screen: 'secret-screen-food', body: 'secret-food-body', loading: '正在看她的外卖订单…', render: renderSecretFood }
+        notes: { screen: 'secret-screen-notes', body: 'secret-notes-body', loading: '正在翻开她的备忘录…' },
+        cart: { screen: 'secret-screen-cart', body: 'secret-cart-body', loading: '正在看她的购物车…' },
+        history: { screen: 'secret-screen-history', body: 'secret-history-body', loading: '正在翻她的搜索记录…' },
+        food: { screen: 'secret-screen-food', body: 'secret-food-body', loading: '正在看她的外卖订单…' }
     }[appKey];
     if (!cfg) return;
     document.getElementById(cfg.screen).style.display = 'flex';
@@ -6301,17 +6296,57 @@ async function openSecretApp(appKey) {
         const curVer = (rec && rec.versions && rec.versions[0]) ? rec.versions[0] : rec;
         if (!curVer || !curVer.chatSnap || curVer.chatSnap !== snap) {
             const fresh = await generateSecretContent(role, appKey);
-            if (fresh) { await saveSecretData(roleId, appKey, fresh); data = fresh; }
+            if (fresh) await saveSecretData(roleId, appKey, fresh);
         }
     } else {
         data = await generateSecretContent(role, appKey);
         if (data) await saveSecretData(roleId, appKey, data);
     }
-    if (data) cfg.render(data);
-    else bodyEl.innerHTML = '<div class="s-error">没加载出来，可能是网络或API问题。<br><button class="btn btn-sm mt-3" onclick="refreshSecretApp(\'' + appKey + '\')">重试</button></div>';
+    await renderSecretFlow(appKey);
 }
 
-// 强制重新生成某个app
+// 累积渲染某个app的全部历史版本（旧→新，最新在下方，批次间插入时间分隔条，往上滑看全部）
+async function renderSecretFlow(appKey) {
+    const role = getCurrentRole();
+    const roleId = role.id || 'default';
+    const bodyMap = {
+        notes: 'secret-notes-body',
+        chat: 'secret-chatlist-body',
+        cart: 'secret-cart-body',
+        history: 'secret-history-body',
+        food: 'secret-food-body'
+    };
+    const renderMap = {
+        notes: renderSecretNotes,
+        chat: renderSecretChatList,
+        cart: renderSecretCart,
+        history: renderSecretHistory,
+        food: renderSecretFood
+    };
+    const render = renderMap[appKey];
+    const body = document.getElementById(bodyMap[appKey]);
+    if (!render || !body) return;
+    const rec = await getSecretRecord(roleId, appKey);
+    const versions = (rec && rec.versions && rec.versions.length) ? rec.versions
+        : (rec && rec.data ? [{ data: rec.data, ts: rec.ts || Date.now() }] : []);
+    body.innerHTML = '';
+    if (!versions.length) {
+        body.innerHTML = '<div class="s-error">还没有内容，点右上角「换一批」生成。</div>';
+        return;
+    }
+    // 旧→新顺序：最早批次在上，最新批次在下（像聊天记录一样往上滑看历史）
+    const ordered = versions.slice().reverse();
+    ordered.forEach(v => {
+        const sep = document.createElement('div');
+        sep.className = 's-sep';
+        sep.textContent = fmtMomentTime(v.ts);
+        body.appendChild(sep);
+        render(v.data, body);
+    });
+    body.scrollTop = body.scrollHeight;
+}
+
+// 强制重新生成某个app：生成新批追加在下方，旧批保留
 async function refreshSecretApp(appKey) {
     const role = getCurrentRole();
     const roleId = role.id || 'default';
@@ -6323,78 +6358,16 @@ async function refreshSecretApp(appKey) {
         history: ['secret-screen-history', 'secret-history-body'],
         food: ['secret-screen-food', 'secret-food-body']
     }[appKey];
+    if (!map) return;
     document.getElementById(map[0]).style.display = 'flex';
     document.getElementById(map[1]).innerHTML = '<div class="s-loading"><i class="fa-solid fa-spinner fa-spin"></i> 重新生成中…</div>';
     const data = await generateSecretContent(role, appKey);
     if (data) {
         await saveSecretData(roleId, appKey, data);
-        const renderers = { chat: renderSecretChatList, notes: renderSecretNotes, cart: renderSecretCart, history: renderSecretHistory, food: renderSecretFood };
-        renderers[appKey](data);
+        await renderSecretFlow(appKey);
     } else {
         document.getElementById(map[1]).innerHTML = '<div class="s-error">生成失败，请稍后再试。<br><button class="btn btn-sm mt-3" onclick="refreshSecretApp(\'' + appKey + '\')">重试</button></div>';
     }
-}
-
-// 小秘密：历史版本列表（翻看旧批内容）
-let secretVersionAppKey = null;
-async function showSecretVersions(appKey) {
-    const role = getCurrentRole();
-    const roleId = role.id || 'default';
-    secretVersionAppKey = appKey;
-    hideAllSecretScreens();
-    document.getElementById('secret-screen-versions').style.display = 'flex';
-    const body = document.getElementById('secret-versions-body');
-    body.innerHTML = '<div class="s-loading"><i class="fa-solid fa-spinner fa-spin"></i> 加载中…</div>';
-    const rec = await getSecretRecord(roleId, appKey);
-    const versions = (rec && rec.versions && rec.versions.length) ? rec.versions
-        : (rec && rec.data ? [{ data: rec.data, ts: rec.ts || Date.now() }] : []);
-    body.innerHTML = '';
-    if (!versions.length) { body.innerHTML = '<div class="s-error">还没有历史内容<br>生成过一次后就会留档</div>'; return; }
-    const titles = { notes: '备忘录', chat: '微信', cart: '购物车', history: '浏览器', food: '外卖' };
-    document.getElementById('secret-versions-title').textContent = '历史记录 · ' + (titles[appKey] || '');
-    versions.forEach((v, idx) => {
-        const item = document.createElement('div');
-        item.className = 's-version-item';
-        const time = document.createElement('div'); time.className = 's-version-time';
-        time.textContent = fmtMomentTime(v.ts) + (idx === 0 ? ' · 当前' : '');
-        const sum = document.createElement('div'); sum.className = 's-version-sum';
-        sum.textContent = secretVersionSummary(appKey, v.data);
-        item.appendChild(time); item.appendChild(sum);
-        item.onclick = () => viewSecretVersion(appKey, idx);
-        body.appendChild(item);
-    });
-}
-function secretVersionSummary(appKey, data) {
-    try {
-        if (appKey === 'notes') return (data.notes || []).slice(0, 2).map(n => n.title || n.content || '').join(' / ') || '（空）';
-        if (appKey === 'chat') return (data.conversations || []).slice(0, 2).map(c => c.name + '：' + (c.last || '')).join(' / ') || '（空）';
-        if (appKey === 'cart') return (data.items || []).slice(0, 2).map(i => i.name || '').join(' / ') || '（空）';
-        if (appKey === 'history') return (data.history || []).slice(0, 3).map(h => h.kw || '').join(' / ') || '（空）';
-        if (appKey === 'food') return (data.orders || []).slice(0, 2).map(o => o.shop || '').join(' / ') || '（空）';
-    } catch (e) {}
-    return '（内容）';
-}
-function viewSecretVersion(appKey, idx) {
-    (async () => {
-        const role = getCurrentRole();
-        const roleId = role.id || 'default';
-        const rec = await getSecretRecord(roleId, appKey);
-        const versions = (rec && rec.versions && rec.versions.length) ? rec.versions
-            : (rec && rec.data ? [{ data: rec.data, ts: rec.ts || Date.now() }] : []);
-        const v = versions[idx];
-        if (!v) return;
-        const cfg = {
-            notes: ['secret-screen-notes', 'secret-notes-body', renderSecretNotes],
-            chat: ['secret-screen-chatlist', 'secret-chatlist-body', renderSecretChatList],
-            cart: ['secret-screen-cart', 'secret-cart-body', renderSecretCart],
-            history: ['secret-screen-history', 'secret-history-body', renderSecretHistory],
-            food: ['secret-screen-food', 'secret-food-body', renderSecretFood]
-        }[appKey];
-        if (!cfg) return;
-        hideAllSecretScreens();
-        document.getElementById(cfg[0]).style.display = 'flex';
-        cfg[2](v.data);
-    })();
 }
 
 // 心里话模式开关
