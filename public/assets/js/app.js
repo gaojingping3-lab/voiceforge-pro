@@ -6162,7 +6162,16 @@ function renderSecretChatDetail(conv) {
     const body = document.getElementById('secret-chatdetail-body');
     body.innerHTML = '';
     const role = getCurrentRole();
+    let lastTs = 0;
     (conv.messages || []).forEach(m => {
+        // 新批次开头：插微信式居中灰色时间节点（旧数据无_ts则跳过）
+        if (m._ts && m._ts !== lastTs) {
+            const sep = document.createElement('div');
+            sep.className = 's-sep';
+            sep.textContent = fmtMomentTime(m._ts);
+            body.appendChild(sep);
+            lastTs = m._ts;
+        }
         const isHer = m.from === 'her';
         const row = document.createElement('div'); row.className = 's-msg' + (isHer ? ' me' : '');
         const avatar = document.createElement('div'); avatar.className = 's-msg-avatar';
@@ -6341,11 +6350,13 @@ async function renderSecretFlow(appKey) {
         versions.slice().reverse().forEach(v => {
             (v.data.conversations || []).forEach(conv => {
                 const key = conv.id || conv.name;
+                // 给本批每条消息打上批次时间戳，详情页据此插微信式时间节点
+                const tagged = (conv.messages || []).map(msg => Object.assign({}, msg, { _ts: v.ts }));
                 if (!merged.has(key)) {
-                    merged.set(key, Object.assign({}, conv, { _msgs: (conv.messages || []).slice() }));
+                    merged.set(key, Object.assign({}, conv, { _msgs: tagged.slice() }));
                 } else {
                     const m = merged.get(key);
-                    m._msgs = m._msgs.concat(conv.messages || []);
+                    m._msgs = m._msgs.concat(tagged);
                     if (conv.last) m.last = conv.last;
                     if (conv.avatar) m.avatar = conv.avatar;
                 }
