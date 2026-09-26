@@ -6061,6 +6061,7 @@ async function pickSecretWallpaper() {
     input.type = 'file'; input.accept = 'image/*';
     input.onchange = async (e) => {
         const file = e.target.files[0];
+        input.value = ''; // 清空，否则下次选同一张图onchange不触发
         if (!file) return;
         try {
             const compressed = await compressImageFile(file, 1080, 0.7);
