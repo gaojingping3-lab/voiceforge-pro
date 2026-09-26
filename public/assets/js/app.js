@@ -5116,6 +5116,7 @@ function switchRole(id) {
         loadChatHistory();
         renderChatHistory();
         updateTotalTokensDisplay(); // 更新当前角色的token显示
+        updateSecretEntryAvatar(); // 更新小秘密入口的角色头像
         closeEmojiPanel(); // 切角色时关掉表情包面板，避免串
         loadCustomEmojis(); // 加载新角色自己的表情包
 
@@ -5993,6 +5994,18 @@ function updateSecretClock() {
     const el = document.getElementById('secret-clock');
     if (el) el.textContent = now.getHours() + ':' + now.getMinutes().toString().padStart(2, '0');
 }
+// 小秘密入口头像：显示当前角色头像，没头像就显示名字首字
+function updateSecretEntryAvatar() {
+    const el = document.getElementById('secret-entry-avatar');
+    if (!el) return;
+    const role = getCurrentRole();
+    if (role && role.avatar) {
+        el.innerHTML = '<img src="' + role.avatar + '" class="w-full h-full object-cover" alt="">';
+    } else {
+        el.innerHTML = '';
+        el.textContent = (role && role.name) ? role.name.charAt(0) : '?';
+    }
+}
 function openSecret() {
     document.getElementById('secret-overlay').style.display = 'flex';
     updateSecretClock();
@@ -6428,6 +6441,8 @@ if (innerVoiceEnabled) {
         if (btn) btn.innerHTML = '<i class="fa-solid fa-heart text-lg text-red-500"></i>';
     });
 }
+// 页面加载时初始化小秘密入口头像
+window.addEventListener('DOMContentLoaded', () => { updateSecretEntryAvatar(); });
 
 function editRoleCard() {
     const role = getCurrentRole();

@@ -500,7 +500,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     <div class="navbar bg-base-100/90 backdrop-blur sticky top-0 z-50 shadow-sm border-b border-base-content/10">
         <div class="flex-1 flex items-center">
-            <button onclick="openSecret()" class="btn btn-ghost btn-sm text-base-content/80 font-medium px-2" title="小秘密">小秘密</button>
+            <button onclick="openSecret()" class="btn btn-ghost btn-sm px-1.5 gap-1.5" title="小秘密">
+              <span id="secret-entry-avatar" class="w-7 h-7 rounded-full overflow-hidden bg-base-300 flex items-center justify-center text-xs font-bold text-base-content/70"></span>
+              <span class="text-base-content/80 font-medium">小秘密</span>
+            </button>
         </div>
         <!-- 主题切换（只显示小色点图标） -->
         <div class="theme-switch-nav flex items-center gap-1 mr-2">
@@ -1895,6 +1898,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260926mergename"></script>
+    <script src="assets/js/app.js?v=20260926secretavatar"></script>
 </body>
 </html>
