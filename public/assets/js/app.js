@@ -6679,7 +6679,10 @@ function exportRoleCard() {
         if (!avatar) { try { avatar = localStorage.getItem('AVATAR_' + name) || null; } catch(e){} }
     }
     const memos = getRoleMemos(roleId);
-    const data = { format: 'voiceforge-role-card', version: 1, role: { name, desc, opening: opening || '', avatar: avatar || null, memos: memos || [] } };
+    const curRole = getRoleList().find(r => r.id === roleId);
+    const imageStyle = (document.getElementById('role-image-style-input') ? document.getElementById('role-image-style-input').value : (curRole && curRole.imageStyle)) || 'global';
+    const appearanceVal = (document.getElementById('role-image-appearance-input') ? document.getElementById('role-image-appearance-input').value.trim() : (curRole && curRole.imageAppearance)) || '';
+    const data = { format: 'voiceforge-role-card', version: 1, role: { name, desc, opening: opening || '', avatar: avatar || null, memos: memos || [], imageStyle: imageStyle === 'global' ? undefined : imageStyle, imageAppearance: appearanceVal || undefined } };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -6921,12 +6924,16 @@ function handleRoleImportFile(input) {
                 dup.desc = roleData.desc;
                 dup.opening = roleData.opening || '';
                 if (roleData.avatar) dup.avatar = roleData.avatar;
+                if (roleData.imageStyle) dup.imageStyle = roleData.imageStyle;
+                if (roleData.imageAppearance) dup.imageAppearance = roleData.imageAppearance;
                 saveRoleList(list);
                 saveRoleMemos(dup.id, roleData.memos || []);
                 alert('已覆盖角色「' + roleData.name + '」');
             } else {
                 const newRole = { id: Date.now(), name: roleData.name, desc: roleData.desc, opening: roleData.opening || '' };
                 if (roleData.avatar) newRole.avatar = roleData.avatar;
+                if (roleData.imageStyle) newRole.imageStyle = roleData.imageStyle;
+                if (roleData.imageAppearance) newRole.imageAppearance = roleData.imageAppearance;
                 if (mode === 'copy') newRole.name = roleData.name + '（副本）';
                 list.push(newRole);
                 saveRoleList(list);
@@ -7000,7 +7007,7 @@ function normalizeImportedRole(parsed, pngAvatar) {
     // 本站格式
     if (parsed.format === 'voiceforge-role-card' && parsed.role) {
         const r = parsed.role;
-        return { name: (r.name || '').trim(), desc: r.desc || '', opening: r.opening || '', avatar: r.avatar || pngAvatar || null, memos: Array.isArray(r.memos) ? r.memos : [] };
+        return { name: (r.name || '').trim(), desc: r.desc || '', opening: r.opening || '', avatar: r.avatar || pngAvatar || null, memos: Array.isArray(r.memos) ? r.memos : [], imageStyle: r.imageStyle || 'global', imageAppearance: r.imageAppearance || '' };
     }
     // 酒馆 v2（spec + data）
     if (parsed.spec && parsed.data) {
