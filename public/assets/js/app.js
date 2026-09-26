@@ -5599,9 +5599,9 @@ ${otherRole.name}是你在对话中的同伴。了解TA的性格、语气和说�
     // 视觉模型支持：双聊历史里的图片同样带给视觉模型
     const chatLlmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
     const visionEnabled = (chatLlmModel === 'deepseek-flash') || /vision/i.test(chatLlmModel);
-    const chatImageMap = visionEnabled ? await loadRecentImageDataUrls(10) : new Map();
+    const chatImageMap = visionEnabled ? await loadRecentImageDataUrls(999) : new Map();
     const formattedHistory = [];
-    for (const msg of chatHistory.slice(-10)) {
+    for (const msg of chatHistory) {
         if (msg.type === 'image') {
             // 表情包消息：如果content里有表情说明，直接发过去
             if (msg.role === 'user' && msg.content && String(msg.content).includes('[发表情：')) {
@@ -5659,7 +5659,7 @@ ${otherRole.name}是你在对话中的同伴。了解TA的性格、语气和说�
 
     // 在最后也加一条角色提醒，AI最后看到的最有效
     const lastRoleNote = dualRoleA && dualRoleB
-        ? `【最后提醒】\n这个对话里有三个人：\n1. ${dualRoleA.name}（角色A）\n2. ${dualRoleB.name}（角色B）\n3. 用户（角色C）\n\n你现在是${currentRole.name}！绝对不要用${otherRole.name}的语气说话！严格按你的角色卡来！`
+        ? `【最后提醒·最重要】\n这个对话里有三个人：\n1. ${dualRoleA.name}（角色A）\n2. ${dualRoleB.name}（角色B）\n3. 用户（角色C）\n\n你现在必须扮演的是【${currentRole.name}】！\n- 下一条回复必须由你（${currentRole.name}）来说话\n- 绝对不要替${otherRole.name}说话，也不要替用户说话\n- 不要用${otherRole.name}的语气、口头禅、说话方式\n- 严格按你自己的角色卡性格来回复`
         : `【最后提醒】保持${currentRole.name}的性格和语气！`;
     formattedHistory.push({ role: "system", content: lastRoleNote });
 
