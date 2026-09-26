@@ -6524,6 +6524,8 @@ function editRoleCard() {
     document.getElementById('role-opening-input').value = role.opening || '';
     const styleSel = document.getElementById('role-image-style-input');
     if (styleSel) styleSel.value = role.imageStyle || 'global';
+    const appearanceInput = document.getElementById('role-image-appearance-input');
+    if (appearanceInput) appearanceInput.value = role.imageAppearance || '';
     renderMemoList();
     // 加载头像预览
     editingRoleAvatar = role.avatar || null;
@@ -6550,6 +6552,8 @@ function saveRoleCard() {
         role.desc = desc;
         role.opening = opening;
         role.imageStyle = imageStyle === 'global' ? undefined : imageStyle;
+        const appearanceInput = document.getElementById('role-image-appearance-input');
+        role.imageAppearance = appearanceInput ? appearanceInput.value.trim() : undefined;
         // 保存头像（null表示不修改，''表示清除）
         if (editingRoleAvatar !== null) {
             role.avatar = editingRoleAvatar || undefined;
@@ -9503,7 +9507,8 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
                 rolePrompt = `${stylePrefix}, ${roleA.name}（${appA}）和${roleB.name}（${appB}），${dualTag}, ${sceneDesc}`;
             } else {
                 const cur = getCurrentRole();
-                const app = cur ? (extractVisualDescFromRoleCard(cur.desc) || extractAppearanceFromRoleCard(cur.desc) || '') : '';
+                // 优先用角色卡单独的"生图外貌描述"字段（聊天不发，省token）；没填才从人设描述里提取
+                const app = cur ? (cur.imageAppearance || extractVisualDescFromRoleCard(cur.desc) || extractAppearanceFromRoleCard(cur.desc) || '') : '';
                 // 按角色卡性别确定人数标签，不再固定1girl（男角色会画成女孩）
                 const curGender = cur ? getRoleGender(cur.desc) : '';
                 const soloTag = curGender === 'female' ? '1girl' : (curGender === 'male' ? '1boy' : 'single character');
@@ -9529,9 +9534,11 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
         }
 
         // ===== 服装硬锁：从角色卡抠出服装描述，强制钉在画面描述最前；剧情明确换/脱衣服时豁免 =====
+        // 如果角色卡单独填了"生图外貌描述"（已含服装），就不再从人设描述重复提取
         if (!isDualMode) {
             const curForClothing = getCurrentRole();
-            const clothing = extractClothingFromRoleCard(curForClothing ? curForClothing.desc : '');
+            const hasCustomAppearance = curForClothing && curForClothing.imageAppearance;
+            const clothing = hasCustomAppearance ? '' : extractClothingFromRoleCard(curForClothing ? curForClothing.desc : '');
             const changing = isChangingClothingScene((userInput || '') + ' ' + (conversationText || ''));
             if (clothing && !changing) {
                 rolePrompt = `服装固定不变：${clothing}，` + rolePrompt;

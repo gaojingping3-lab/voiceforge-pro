@@ -935,6 +935,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             <option value="anime">动漫二次元</option>
                             <option value="japanese_anime">日系动漫插画</option>
                         </select>
+                        <label class="label py-1 mt-3"><span class="label-text text-sm">生图外貌描述（只生图时用，聊天不消耗token）</span></label>
+                        <textarea id="role-image-appearance-input" class="textarea textarea-bordered textarea-sm w-full" rows="4" placeholder="详细外貌+服装，生图时自动提取保持人物一致；聊天时不会发给AI"></textarea>
 
                         <!-- 角色记忆便签（手动录入） -->
                         <div class="mt-4">
@@ -1902,6 +1904,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </div>
 
-    <script src="assets/js/app.js?v=20260926clearsecret2"></script>
+    <script src="assets/js/app.js?v=20260926imgappearance"></script>
 </body>
 </html>
