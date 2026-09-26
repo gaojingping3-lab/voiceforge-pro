@@ -6941,6 +6941,22 @@ function handleRoleImportFile(input) {
                 alert('已导入角色「' + newRole.name + '」');
             }
             renderRoleList();
+            // 导入成功后把新数据回填到弹窗表单，不然输入框还是导入前的旧值
+            try {
+                const imported = (mode === 'overwrite') ? dup : (mode === 'new' ? list[list.length-1] : (mode === 'copy' ? list[list.length-1] : null));
+                if (imported) {
+                    document.getElementById('role-name-input').value = imported.name || '';
+                    document.getElementById('role-desc-input').value = imported.desc || '';
+                    document.getElementById('role-opening-input').value = imported.opening || '';
+                    const styleSel = document.getElementById('role-image-style-input');
+                    if (styleSel) styleSel.value = imported.imageStyle || 'global';
+                    const appInput = document.getElementById('role-image-appearance-input');
+                    if (appInput) appInput.value = imported.imageAppearance || '';
+                    editingRoleAvatar = imported.avatar || null;
+                    updateRoleEditAvatarPreview(imported.avatar || null);
+                    renderMemoList();
+                }
+            } catch (e) { console.warn('导入后回填表单失败', e); }
             sfxSuccess();
         } catch (err) {
             alert('导入失败：' + (err.message || err));
