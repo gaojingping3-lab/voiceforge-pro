@@ -6044,7 +6044,17 @@ async function applySecretWallpaper() {
     if (!wall) return;
     const role = getCurrentRole();
     const wp = await getSecretWallpaper(role.id || 'default');
-    wall.style.background = wp ? ('url(' + wp + ') center / cover no-repeat') : SECRET_DEFAULT_WALL;
+    if (wp) {
+        wall.style.background = 'none';
+        wall.style.backgroundColor = 'transparent';
+        wall.style.backgroundImage = 'url(' + wp + ')';
+        wall.style.backgroundSize = 'cover';
+        wall.style.backgroundPosition = 'center center';
+        wall.style.backgroundRepeat = 'no-repeat';
+    } else {
+        wall.style.backgroundImage = 'none';
+        wall.style.background = SECRET_DEFAULT_WALL;
+    }
 }
 async function pickSecretWallpaper() {
     const input = document.createElement('input');
@@ -6057,6 +6067,7 @@ async function pickSecretWallpaper() {
             const role = getCurrentRole();
             await saveSecretWallpaper(role.id || 'default', compressed);
             await applySecretWallpaper();
+            alert('壁纸已更换 ✅');
         } catch (err) { alert('图片处理失败，换一张试试'); }
     };
     input.click();
