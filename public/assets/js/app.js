@@ -6349,7 +6349,8 @@ async function renderSecretFlow(appKey) {
         // 从旧到新遍历批次，保证消息顺序（旧消息在前、新消息在后）
         versions.slice().reverse().forEach(v => {
             (v.data.conversations || []).forEach(conv => {
-                const key = conv.id || conv.name;
+                // 按联系人名字合并（不依赖AI可能瞎编的id，避免同一个人分裂成多条）
+                const key = conv.name || conv.id;
                 // 给本批每条消息打上批次时间戳，详情页据此插微信式时间节点
                 const tagged = (conv.messages || []).map(msg => Object.assign({}, msg, { _ts: v.ts }));
                 if (!merged.has(key)) {
