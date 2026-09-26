@@ -6022,14 +6022,6 @@ ${role.desc || '（无额外设定）'}
 - 关键词要暴露你嘴上不说的小心思，比如"怎么知道他是不是也喜欢我""送男生什么礼物不尴尬""他生气了怎么哄""暗恋一个人的表现"，也夹杂一些日常普通搜索（菜谱、天气、工作问题）
 - 符合你的人设和你们当前的关系`;
     }
-    if (appKey === 'music') {
-        return base + `
-
-生成你的"歌单"，JSON格式：{"songs":[{"icon":"一个emoji当封面","name":"歌名(可以虚构)","mood":"你听这首歌时的心情/想到什么"}]}
-- 生成8首
-- mood要私密、有画面感，比如"这首像他笑的样子""那晚单曲循环到三点""不敢分享到朋友圈，怕他听懂"
-- 符合你的人设和你们的故事`;
-    }
     if (appKey === 'food') {
         return base + `
 
@@ -6166,23 +6158,6 @@ function renderSecretHistory(data) {
     });
 }
 
-// 渲染：歌单
-function renderSecretMusic(data) {
-    const body = document.getElementById('secret-music-body');
-    if (!data || !Array.isArray(data.songs)) { body.innerHTML = '<div class="s-error">内容格式有误</div>'; return; }
-    body.innerHTML = '';
-    data.songs.forEach(s => {
-        const item = document.createElement('div'); item.className = 's-song';
-        const cover = document.createElement('div'); cover.className = 's-song-cover'; cover.textContent = s.icon || '🎵';
-        const info = document.createElement('div'); info.className = 's-song-info';
-        const name = document.createElement('div'); name.className = 's-song-name'; name.textContent = s.name;
-        const mood = document.createElement('div'); mood.className = 's-song-mood'; mood.textContent = s.mood || '';
-        info.appendChild(name); info.appendChild(mood);
-        item.appendChild(cover); item.appendChild(info);
-        body.appendChild(item);
-    });
-}
-
 // 渲染：外卖订单
 function renderSecretFood(data) {
     const body = document.getElementById('secret-food-body');
@@ -6249,7 +6224,6 @@ async function openSecretApp(appKey) {
         notes: { screen: 'secret-screen-notes', body: 'secret-notes-body', loading: '正在翻开她的备忘录…', render: renderSecretNotes },
         cart: { screen: 'secret-screen-cart', body: 'secret-cart-body', loading: '正在看她的购物车…', render: renderSecretCart },
         history: { screen: 'secret-screen-history', body: 'secret-history-body', loading: '正在翻她的搜索记录…', render: renderSecretHistory },
-        music: { screen: 'secret-screen-music', body: 'secret-music-body', loading: '正在听她的歌单…', render: renderSecretMusic },
         food: { screen: 'secret-screen-food', body: 'secret-food-body', loading: '正在看她的外卖订单…', render: renderSecretFood }
     }[appKey];
     if (!cfg) return;
@@ -6272,7 +6246,6 @@ async function refreshSecretApp(appKey) {
         cart: ['secret-screen-cart', 'secret-cart-body'],
         chat: ['secret-screen-chatlist', 'secret-chatlist-body'],
         history: ['secret-screen-history', 'secret-history-body'],
-        music: ['secret-screen-music', 'secret-music-body'],
         food: ['secret-screen-food', 'secret-food-body']
     }[appKey];
     document.getElementById(map[0]).style.display = 'flex';
@@ -6280,7 +6253,7 @@ async function refreshSecretApp(appKey) {
     const data = await generateSecretContent(role, appKey);
     if (data) {
         await saveSecretData(roleId, appKey, data);
-        const renderers = { chat: renderSecretChatList, notes: renderSecretNotes, cart: renderSecretCart, history: renderSecretHistory, music: renderSecretMusic, food: renderSecretFood };
+        const renderers = { chat: renderSecretChatList, notes: renderSecretNotes, cart: renderSecretCart, history: renderSecretHistory, food: renderSecretFood };
         renderers[appKey](data);
     } else {
         document.getElementById(map[1]).innerHTML = '<div class="s-error">生成失败，请稍后再试。<br><button class="btn btn-sm mt-3" onclick="refreshSecretApp(\'' + appKey + '\')">重试</button></div>';
