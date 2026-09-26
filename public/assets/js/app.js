@@ -6014,6 +6014,30 @@ ${role.desc || '（无额外设定）'}
 - 一部分是你想送给对方却不好意思直接送的（reason里体现），一部分是你自己想要的
 - 符合你的身份、审美和你们的关系，价格合理`;
     }
+    if (appKey === 'history') {
+        return base + `
+
+生成你的"浏览器搜索历史"，JSON格式：{"history":[{"kw":"搜索的关键词","time":"时间，如 刚刚/今天/昨天/3天前"}]}
+- 生成10条，时间从近到远
+- 关键词要暴露你嘴上不说的小心思，比如"怎么知道他是不是也喜欢我""送男生什么礼物不尴尬""他生气了怎么哄""暗恋一个人的表现"，也夹杂一些日常普通搜索（菜谱、天气、工作问题）
+- 符合你的人设和你们当前的关系`;
+    }
+    if (appKey === 'music') {
+        return base + `
+
+生成你的"歌单"，JSON格式：{"songs":[{"icon":"一个emoji当封面","name":"歌名(可以虚构)","mood":"你听这首歌时的心情/想到什么"}]}
+- 生成8首
+- mood要私密、有画面感，比如"这首像他笑的样子""那晚单曲循环到三点""不敢分享到朋友圈，怕他听懂"
+- 符合你的人设和你们的故事`;
+    }
+    if (appKey === 'food') {
+        return base + `
+
+生成你的"外卖订单"，JSON格式：{"orders":[{"shop":"店名","dishes":"点的菜品","addr":"收货地址或备注","status":"状态，如 已完成/配送中","price":"¥价格"}]}
+- 生成4个订单
+- 能看出你的口味和日常；addr或备注里可以藏小心思（比如有一单地址填的是他家、备注写"多放一双筷子"）
+- 符合你的人设`;
+    }
     return base;
 }
 
@@ -6127,6 +6151,79 @@ function renderSecretCart(data) {
     });
 }
 
+// 渲染：浏览器搜索历史
+function renderSecretHistory(data) {
+    const body = document.getElementById('secret-history-body');
+    if (!data || !Array.isArray(data.history)) { body.innerHTML = '<div class="s-error">内容格式有误</div>'; return; }
+    body.innerHTML = '';
+    data.history.forEach(h => {
+        const item = document.createElement('div'); item.className = 's-hist-item';
+        const icon = document.createElement('div'); icon.className = 's-hist-icon'; icon.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>';
+        const kw = document.createElement('div'); kw.className = 's-hist-kw'; kw.textContent = h.kw;
+        const time = document.createElement('div'); time.className = 's-hist-time'; time.textContent = h.time || '';
+        item.appendChild(icon); item.appendChild(kw); item.appendChild(time);
+        body.appendChild(item);
+    });
+}
+
+// 渲染：歌单
+function renderSecretMusic(data) {
+    const body = document.getElementById('secret-music-body');
+    if (!data || !Array.isArray(data.songs)) { body.innerHTML = '<div class="s-error">内容格式有误</div>'; return; }
+    body.innerHTML = '';
+    data.songs.forEach(s => {
+        const item = document.createElement('div'); item.className = 's-song';
+        const cover = document.createElement('div'); cover.className = 's-song-cover'; cover.textContent = s.icon || '🎵';
+        const info = document.createElement('div'); info.className = 's-song-info';
+        const name = document.createElement('div'); name.className = 's-song-name'; name.textContent = s.name;
+        const mood = document.createElement('div'); mood.className = 's-song-mood'; mood.textContent = s.mood || '';
+        info.appendChild(name); info.appendChild(mood);
+        item.appendChild(cover); item.appendChild(info);
+        body.appendChild(item);
+    });
+}
+
+// 渲染：外卖订单
+function renderSecretFood(data) {
+    const body = document.getElementById('secret-food-body');
+    if (!data || !Array.isArray(data.orders)) { body.innerHTML = '<div class="s-error">内容格式有误</div>'; return; }
+    body.innerHTML = '';
+    data.orders.forEach(o => {
+        const item = document.createElement('div'); item.className = 's-food-item';
+        const head = document.createElement('div'); head.className = 's-food-head';
+        const shop = document.createElement('div'); shop.className = 's-food-shop'; shop.textContent = o.shop;
+        const status = document.createElement('div'); status.className = 's-food-status'; status.textContent = o.status || '';
+        head.appendChild(shop); head.appendChild(status);
+        const dishes = document.createElement('div'); dishes.className = 's-food-dishes'; dishes.textContent = o.dishes;
+        item.appendChild(head); item.appendChild(dishes);
+        if (o.addr) { const addr = document.createElement('div'); addr.className = 's-food-addr'; addr.textContent = '📍 ' + o.addr; item.appendChild(addr); }
+        if (o.price) { const price = document.createElement('div'); price.className = 's-food-price'; price.textContent = o.price; item.appendChild(price); }
+        body.appendChild(item);
+    });
+}
+
+// 相册：点照片放大（复用全屏图片查看器）
+function viewAlbumPhoto(dataUrl) {
+    const viewer = document.getElementById('image-viewer');
+    const img = document.getElementById('image-viewer-img');
+    if (viewer && img) { img.src = dataUrl; viewer.classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+}
+
+// 渲染：相册（读取当前角色已有生图，不调AI、不花钱）
+async function renderSecretAlbum() {
+    const body = document.getElementById('secret-album-body');
+    body.innerHTML = '<div class="s-loading"><i class="fa-solid fa-spinner fa-spin"></i> 加载中…</div>';
+    const images = await loadRoleChatImages();
+    if (!images.length) { body.innerHTML = '<div class="s-album-empty">相册还是空的<br>在聊天里让她生成一些照片吧</div>'; return; }
+    const grid = document.createElement('div'); grid.className = 's-album-grid';
+    images.slice().reverse().forEach(it => {
+        const img = document.createElement('img'); img.className = 's-album-cell'; img.src = it.dataUrl;
+        img.onclick = () => viewAlbumPhoto(it.dataUrl);
+        grid.appendChild(img);
+    });
+    body.innerHTML = ''; body.appendChild(grid);
+}
+
 // 打开某个app（先读缓存，没有才生成）
 async function openSecretApp(appKey) {
     const role = getCurrentRole();
@@ -6142,9 +6239,18 @@ async function openSecretApp(appKey) {
         else body.innerHTML = '<div class="s-error">没加载出来。<br><button class="btn btn-sm mt-3" onclick="refreshSecretApp(\'chat\')">重试</button></div>';
         return;
     }
+    // 相册：不调AI，直接读取当前角色已有生图
+    if (appKey === 'album') {
+        document.getElementById('secret-screen-album').style.display = 'flex';
+        await renderSecretAlbum();
+        return;
+    }
     const cfg = {
         notes: { screen: 'secret-screen-notes', body: 'secret-notes-body', loading: '正在翻开她的备忘录…', render: renderSecretNotes },
-        cart: { screen: 'secret-screen-cart', body: 'secret-cart-body', loading: '正在看她的购物车…', render: renderSecretCart }
+        cart: { screen: 'secret-screen-cart', body: 'secret-cart-body', loading: '正在看她的购物车…', render: renderSecretCart },
+        history: { screen: 'secret-screen-history', body: 'secret-history-body', loading: '正在翻她的搜索记录…', render: renderSecretHistory },
+        music: { screen: 'secret-screen-music', body: 'secret-music-body', loading: '正在听她的歌单…', render: renderSecretMusic },
+        food: { screen: 'secret-screen-food', body: 'secret-food-body', loading: '正在看她的外卖订单…', render: renderSecretFood }
     }[appKey];
     if (!cfg) return;
     document.getElementById(cfg.screen).style.display = 'flex';
@@ -6161,15 +6267,21 @@ async function refreshSecretApp(appKey) {
     const role = getCurrentRole();
     const roleId = role.id || 'default';
     hideAllSecretScreens();
-    const map = { notes: ['secret-screen-notes', 'secret-notes-body'], cart: ['secret-screen-cart', 'secret-cart-body'], chat: ['secret-screen-chatlist', 'secret-chatlist-body'] }[appKey];
+    const map = {
+        notes: ['secret-screen-notes', 'secret-notes-body'],
+        cart: ['secret-screen-cart', 'secret-cart-body'],
+        chat: ['secret-screen-chatlist', 'secret-chatlist-body'],
+        history: ['secret-screen-history', 'secret-history-body'],
+        music: ['secret-screen-music', 'secret-music-body'],
+        food: ['secret-screen-food', 'secret-food-body']
+    }[appKey];
     document.getElementById(map[0]).style.display = 'flex';
     document.getElementById(map[1]).innerHTML = '<div class="s-loading"><i class="fa-solid fa-spinner fa-spin"></i> 重新生成中…</div>';
     const data = await generateSecretContent(role, appKey);
     if (data) {
         await saveSecretData(roleId, appKey, data);
-        if (appKey === 'chat') renderSecretChatList(data);
-        else if (appKey === 'notes') renderSecretNotes(data);
-        else renderSecretCart(data);
+        const renderers = { chat: renderSecretChatList, notes: renderSecretNotes, cart: renderSecretCart, history: renderSecretHistory, music: renderSecretMusic, food: renderSecretFood };
+        renderers[appKey](data);
     } else {
         document.getElementById(map[1]).innerHTML = '<div class="s-error">生成失败，请稍后再试。<br><button class="btn btn-sm mt-3" onclick="refreshSecretApp(\'' + appKey + '\')">重试</button></div>';
     }
