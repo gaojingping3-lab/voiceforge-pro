@@ -5566,6 +5566,14 @@ ${userRoleDesc || '用户没有填写特别设定。'}
 ${stripAppearanceFromRoleCard(currentRole.desc)}
 请严格按照这个人设说话，保持角色的性格、语气和说话风格。` });
 
+    // 对方角色的简要人设：让AI知道对面是谁、什么性格、怎么说话，不然两个角色盲聊
+    const otherBrief = stripAppearanceFromRoleCard(otherRole.desc || '');
+    if (otherBrief) {
+        messages.push({ role: 'system', content: `【和你对话的${otherRole.name}是什么样的人】
+${otherBrief}
+${otherRole.name}是你在对话中的同伴。了解TA的性格、语气和说话方式，才能自然地接话。但你不要模仿TA的风格——你始终是${currentRole.name}。` });
+    }
+
     // 加入当前角色的记忆便签
     const memoPrompt = formatMemoPrompt(currentRole.id);
     if (memoPrompt) {
@@ -5669,17 +5677,17 @@ ${stripAppearanceFromRoleCard(currentRole.desc)}
             // 你和用户的关系 - 分视角替换角色名
             if (relationAUser) {
                 let userRelation = relationAUser;
-                // 把A替换成"你"，把B替换成对方
-                userRelation = userRelation.replaceAll(dualRoleA.name, '你');
-                userRelation = userRelation.replaceAll(dualRoleB.name, otherRole.name);
+                // 按当前说话人动态替换：谁说话谁就是"你"，另一个是对方
+                userRelation = userRelation.replaceAll(currentRole.name, '你');
+                userRelation = userRelation.replaceAll(otherRole.name, otherRole.name);
                 relationPrompt += `【你和用户的关系】${userRelation}\n`;
             }
-            
+
             // 你和另一个角色的关系 - 分视角替换角色名
             if (relationAB) {
                 let abRelation = relationAB;
-                abRelation = abRelation.replaceAll(dualRoleA.name, '你');
-                abRelation = abRelation.replaceAll(dualRoleB.name, otherRole.name);
+                abRelation = abRelation.replaceAll(currentRole.name, '你');
+                abRelation = abRelation.replaceAll(otherRole.name, otherRole.name);
                 relationPrompt += `【你和${otherRole.name}的关系】${abRelation}\n`;
             }
             
