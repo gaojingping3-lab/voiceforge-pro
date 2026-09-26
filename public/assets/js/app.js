@@ -6006,10 +6006,71 @@ function updateSecretEntryAvatar() {
         el.textContent = (role && role.name) ? role.name.charAt(0) : '?';
     }
 }
+// ===== 小秘密自定义壁纸（按角色存IndexedDB，不花钱）=====
+const SECRET_DEFAULT_WALL = 'linear-gradient(165deg,#7f7fd5,#86a8e7 55%,#e0c3fc)';
+async function getSecretWallpaper(roleId) {
+    try {
+        const db = await openImageDB();
+        return await new Promise(resolve => {
+            const tx = db.transaction('SECRET_STORE', 'readonly');
+            const req = tx.objectStore('SECRET_STORE').get('wp_' + roleId);
+            req.onsuccess = () => resolve(req.result ? req.result.data : null);
+            req.onerror = () => resolve(null);
+        });
+    } catch (e) { return null; }
+}
+async function saveSecretWallpaper(roleId, dataUrl) {
+    try {
+        const db = await openImageDB();
+        await new Promise(resolve => {
+            const tx = db.transaction('SECRET_STORE', 'readwrite');
+            tx.objectStore('SECRET_STORE').put({ id: 'wp_' + roleId, data: dataUrl });
+            tx.oncomplete = resolve; tx.onerror = resolve;
+        });
+    } catch (e) {}
+}
+async function clearSecretWallpaper(roleId) {
+    try {
+        const db = await openImageDB();
+        await new Promise(resolve => {
+            const tx = db.transaction('SECRET_STORE', 'readwrite');
+            tx.objectStore('SECRET_STORE').delete('wp_' + roleId);
+            tx.oncomplete = resolve; tx.onerror = resolve;
+        });
+    } catch (e) {}
+}
+async function applySecretWallpaper() {
+    const wall = document.getElementById('secret-wallpaper');
+    if (!wall) return;
+    const role = getCurrentRole();
+    const wp = await getSecretWallpaper(role.id || 'default');
+    wall.style.background = wp ? ('url(' + wp + ') center / cover no-repeat') : SECRET_DEFAULT_WALL;
+}
+async function pickSecretWallpaper() {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*';
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+            const compressed = await compressImageFile(file, 1080, 0.7);
+            const role = getCurrentRole();
+            await saveSecretWallpaper(role.id || 'default', compressed);
+            await applySecretWallpaper();
+        } catch (err) { alert('图片处理失败，换一张试试'); }
+    };
+    input.click();
+}
+async function resetSecretWallpaper() {
+    const role = getCurrentRole();
+    await clearSecretWallpaper(role.id || 'default');
+    await applySecretWallpaper();
+}
 function openSecret() {
     document.getElementById('secret-overlay').style.display = 'flex';
     updateSecretClock();
     showSecretHome();
+    applySecretWallpaper();
 }
 function closeSecret() {
     document.getElementById('secret-overlay').style.display = 'none';
