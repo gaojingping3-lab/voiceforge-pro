@@ -6040,20 +6040,20 @@ async function clearSecretWallpaper(roleId) {
     } catch (e) {}
 }
 async function applySecretWallpaper() {
-    const home = document.getElementById('secret-screen-home');
-    if (!home) return;
+    const overlay = document.getElementById('secret-overlay');
+    if (!overlay) return;
     const role = getCurrentRole();
     const wp = await getSecretWallpaper(role.id || 'default');
     if (wp) {
-        home.style.background = 'none';
-        home.style.backgroundColor = 'transparent';
-        home.style.backgroundImage = 'url(' + wp + ')';
-        home.style.backgroundSize = 'cover';
-        home.style.backgroundPosition = 'center center';
-        home.style.backgroundRepeat = 'no-repeat';
+        overlay.style.background = 'none';
+        overlay.style.backgroundColor = '#000';
+        overlay.style.backgroundImage = 'url(' + wp + ')';
+        overlay.style.backgroundSize = 'cover';
+        overlay.style.backgroundPosition = 'center center';
+        overlay.style.backgroundRepeat = 'no-repeat';
     } else {
-        home.style.backgroundImage = 'none';
-        home.style.background = SECRET_DEFAULT_WALL;
+        overlay.style.backgroundImage = 'none';
+        overlay.style.background = SECRET_DEFAULT_WALL;
     }
 }
 async function pickSecretWallpaper() {
