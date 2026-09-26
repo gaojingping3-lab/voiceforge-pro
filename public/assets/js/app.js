@@ -2203,7 +2203,7 @@ const CHAT_IMG_RESTORE = 5;
 function openImageDB() {
     return new Promise((resolve, reject) => {
         if (!window.indexedDB) { reject(new Error('浏览器不支持IndexedDB')); return; }
-        const req = indexedDB.open(CHAT_IMG_DB, 2); // 版本升到2，加角色表
+        const req = indexedDB.open(CHAT_IMG_DB, 3); // 版本升到3，加小秘密表
         req.onupgradeneeded = () => {
             const db = req.result;
             if (!db.objectStoreNames.contains(CHAT_IMG_STORE)) {
@@ -2213,6 +2213,9 @@ function openImageDB() {
             }
             if (!db.objectStoreNames.contains('ROLE_STORE')) {
                 db.createObjectStore('ROLE_STORE', { keyPath: 'id' });
+            }
+            if (!db.objectStoreNames.contains('SECRET_STORE')) {
+                db.createObjectStore('SECRET_STORE', { keyPath: 'id' });
             }
         };
         req.onsuccess = () => resolve(req.result);
@@ -5913,6 +5916,263 @@ function formatChatText(text) {
         result = result.replace(/💭[^<]*/g, m => `<span style="color:#999;font-size:0.85em;font-style:italic;">${m}</span><br>`);
     }
     return result;
+}
+
+// ============================================
+// 小秘密：偷看她的手机（备忘录/聊天/购物车，AI生成 + IndexedDB缓存，按角色隔离）
+// ============================================
+function secretStorageId(roleId, appKey) { return 'secret_' + roleId + '_' + appKey; }
+
+async function getSecretData(roleId, appKey) {
+    try {
+        const db = await openImageDB();
+        return await new Promise((resolve) => {
+            const tx = db.transaction('SECRET_STORE', 'readonly');
+            const req = tx.objectStore('SECRET_STORE').get(secretStorageId(roleId, appKey));
+            req.onsuccess = () => resolve(req.result ? req.result.data : null);
+            req.onerror = () => resolve(null);
+        });
+    } catch (e) { return null; }
+}
+
+async function saveSecretData(roleId, appKey, data) {
+    try {
+        const db = await openImageDB();
+        await new Promise((resolve) => {
+            const tx = db.transaction('SECRET_STORE', 'readwrite');
+            tx.objectStore('SECRET_STORE').put({ id: secretStorageId(roleId, appKey), data: data, ts: Date.now() });
+            tx.oncomplete = resolve;
+            tx.onerror = resolve;
+        });
+    } catch (e) {}
+}
+
+function hideAllSecretScreens() {
+    document.querySelectorAll('#secret-overlay .secret-screen').forEach(s => s.style.display = 'none');
+}
+function showSecretHome() {
+    hideAllSecretScreens();
+    document.getElementById('secret-screen-home').style.display = 'flex';
+}
+function updateSecretClock() {
+    const now = new Date();
+    const el = document.getElementById('secret-clock');
+    if (el) el.textContent = now.getHours() + ':' + now.getMinutes().toString().padStart(2, '0');
+}
+function openSecret() {
+    document.getElementById('secret-overlay').style.display = 'flex';
+    updateSecretClock();
+    showSecretHome();
+}
+function closeSecret() {
+    document.getElementById('secret-overlay').style.display = 'none';
+}
+function backToChatList() {
+    hideAllSecretScreens();
+    document.getElementById('secret-screen-chatlist').style.display = 'flex';
+}
+
+// 从AI回复里稳妥提取JSON（直接parse → 去代码块 → 截取最外层花括号）
+function extractJSON(str) {
+    if (!str) return null;
+    try { return JSON.parse(str); } catch (e) {}
+    const codeBlock = str.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (codeBlock) { try { return JSON.parse(codeBlock[1].trim()); } catch (e) {} }
+    const start = str.indexOf('{'), end = str.lastIndexOf('}');
+    if (start !== -1 && end > start) { try { return JSON.parse(str.substring(start, end + 1)); } catch (e) {} }
+    return null;
+}
+
+function getSecretPrompt(role, appKey) {
+    const base = `你正在扮演"${role.name}"。以下是你的角色设定：
+${role.desc || '（无额外设定）'}
+
+现在要生成"你手机里的隐私内容"。这些是${role.name}本人手机里真实存在、不太想被对方（和你聊天的人，你对他有感情）轻易看到的东西。
+要求：严格符合${role.name}的性格、语气、身份和你们当前的关系；内容具体、有细节、真实可信，像真人手机里的东西；只输出JSON，不要任何解释、不要markdown代码块。`;
+    if (appKey === 'notes') {
+        return base + `
+
+生成你的"备忘录"，JSON格式：{"notes":[{"title":"标题(可为空字符串)","content":"笔记完整内容","time":"时间，如 3天前 / 今天08:12"}]}
+- 生成6条，长短不一（有的一两句，有的一大段）
+- 内容：你偷偷记录的对方的小习惯和喜好、不敢说出口的心事、小情绪、对未来的小计划、提醒自己的话、关于对方的碎碎念
+- 体现你的人设，比如表面嫌弃、备忘录里却记得很细`;
+    }
+    if (appKey === 'chat') {
+        return base + `
+
+生成你微信里和别人的聊天，JSON格式：{"conversations":[{"id":"bestie","name":"对方称呼(如 闺蜜小雅 / 妈妈)","avatar":"一个emoji当作头像","last":"最后一条消息内容","messages":[{"from":"her","text":"你发的"},{"from":"other","text":"对方发的"}]}]}
+- 生成2个会话：一个闺蜜，一个家人(妈妈或姐姐)
+- 每个会话8到12条消息，from交替，有来有回
+- 内容围绕"你和对方聊起那个他"：跟闺蜜会害羞、吐槽、炫耀、请教；跟家人会被催问、嘴硬否认
+- 自然，像真实微信聊天`;
+    }
+    if (appKey === 'cart') {
+        return base + `
+
+生成你的"购物车"，JSON格式：{"items":[{"icon":"一个emoji代表商品","name":"商品名称","reason":"你为什么加购/你的小心思","price":"¥价格"}]}
+- 生成7件商品
+- 一部分是你想送给对方却不好意思直接送的（reason里体现），一部分是你自己想要的
+- 符合你的身份、审美和你们的关系，价格合理`;
+    }
+    return base;
+}
+
+async function generateSecretContent(role, appKey) {
+    const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
+    const llmKey = localStorage.getItem('LLM_KEY') || '';
+    const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
+    const sys = getSecretPrompt(role, appKey);
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
+                body: JSON.stringify({
+                    baseUrl: llmUrl, model: llmModel, stream: false,
+                    messages: [
+                        { role: 'system', content: sys },
+                        { role: 'user', content: '请按要求输出JSON。' }
+                    ]
+                })
+            });
+            if (!res.ok) continue;
+            const data = await res.json();
+            const content = data.choices?.[0]?.message?.content || '';
+            const json = extractJSON(content);
+            if (json) return json;
+        } catch (e) {}
+    }
+    return null;
+}
+
+// 渲染：备忘录
+function renderSecretNotes(data) {
+    const body = document.getElementById('secret-notes-body');
+    if (!data || !Array.isArray(data.notes)) { body.innerHTML = '<div class="s-error">内容格式有误</div>'; return; }
+    body.innerHTML = '';
+    data.notes.forEach(note => {
+        const item = document.createElement('div');
+        item.className = 's-note-item';
+        const preview = document.createElement('div'); preview.className = 's-note-preview';
+        preview.textContent = (note.title ? note.title + '\n' : '') + note.content;
+        const meta = document.createElement('div'); meta.className = 's-note-meta'; meta.textContent = note.time || '';
+        item.appendChild(preview); item.appendChild(meta);
+        item.onclick = () => {
+            body.innerHTML = '';
+            const detail = document.createElement('div'); detail.className = 's-note-detail';
+            detail.textContent = (note.title ? note.title + '\n\n' : '') + note.content;
+            const back = document.createElement('button'); back.className = 'btn btn-ghost btn-sm mt-3'; back.textContent = '‹ 返回列表';
+            back.onclick = () => renderSecretNotes(data);
+            body.appendChild(detail); body.appendChild(back);
+        };
+        body.appendChild(item);
+    });
+}
+
+// 渲染：聊天会话列表
+function renderSecretChatList(data) {
+    const body = document.getElementById('secret-chatlist-body');
+    if (!data || !Array.isArray(data.conversations)) { body.innerHTML = '<div class="s-error">内容格式有误</div>'; return; }
+    body.innerHTML = '';
+    data.conversations.forEach(conv => {
+        const item = document.createElement('div'); item.className = 's-conv-item';
+        const avatar = document.createElement('div'); avatar.className = 's-conv-avatar'; avatar.textContent = conv.avatar || '👤';
+        const info = document.createElement('div'); info.className = 's-conv-info';
+        const name = document.createElement('div'); name.className = 's-conv-name'; name.textContent = conv.name;
+        const last = document.createElement('div'); last.className = 's-conv-last';
+        last.textContent = conv.last || (conv.messages && conv.messages.length ? conv.messages[conv.messages.length - 1].text : '');
+        info.appendChild(name); info.appendChild(last);
+        item.appendChild(avatar); item.appendChild(info);
+        item.onclick = () => renderSecretChatDetail(conv);
+        body.appendChild(item);
+    });
+}
+
+// 渲染：聊天详情（在她的手机里，她=机主=右侧绿色气泡）
+function renderSecretChatDetail(conv) {
+    document.getElementById('secret-chatdetail-title').textContent = conv.name;
+    hideAllSecretScreens();
+    document.getElementById('secret-screen-chatdetail').style.display = 'flex';
+    const body = document.getElementById('secret-chatdetail-body');
+    body.innerHTML = '';
+    const role = getCurrentRole();
+    (conv.messages || []).forEach(m => {
+        const isHer = m.from === 'her';
+        const row = document.createElement('div'); row.className = 's-msg' + (isHer ? ' me' : '');
+        const avatar = document.createElement('div'); avatar.className = 's-msg-avatar';
+        if (isHer) { avatar.textContent = role.name ? role.name.charAt(0) : '她'; avatar.style.background = '#22c55e'; }
+        else { avatar.textContent = conv.avatar || '👤'; avatar.style.background = '#576b95'; }
+        const bubble = document.createElement('div'); bubble.className = 's-msg-bubble'; bubble.textContent = m.text;
+        row.appendChild(avatar); row.appendChild(bubble);
+        body.appendChild(row);
+    });
+    body.scrollTop = body.scrollHeight;
+}
+
+// 渲染：购物车
+function renderSecretCart(data) {
+    const body = document.getElementById('secret-cart-body');
+    if (!data || !Array.isArray(data.items)) { body.innerHTML = '<div class="s-error">内容格式有误</div>'; return; }
+    body.innerHTML = '';
+    data.items.forEach(it => {
+        const item = document.createElement('div'); item.className = 's-cart-item';
+        const thumb = document.createElement('div'); thumb.className = 's-cart-thumb'; thumb.textContent = it.icon || '📦';
+        const info = document.createElement('div'); info.className = 's-cart-info';
+        const name = document.createElement('div'); name.className = 's-cart-name'; name.textContent = it.name;
+        const reason = document.createElement('div'); reason.className = 's-cart-reason'; reason.textContent = it.reason || '';
+        const price = document.createElement('div'); price.className = 's-cart-price'; price.textContent = it.price || '';
+        info.appendChild(name); info.appendChild(reason); info.appendChild(price);
+        item.appendChild(thumb); item.appendChild(info);
+        body.appendChild(item);
+    });
+}
+
+// 打开某个app（先读缓存，没有才生成）
+async function openSecretApp(appKey) {
+    const role = getCurrentRole();
+    const roleId = role.id || 'default';
+    hideAllSecretScreens();
+    if (appKey === 'chat') {
+        document.getElementById('secret-screen-chatlist').style.display = 'flex';
+        const body = document.getElementById('secret-chatlist-body');
+        body.innerHTML = '<div class="s-loading"><i class="fa-solid fa-spinner fa-spin"></i> 加载中…</div>';
+        let data = await getSecretData(roleId, 'chat');
+        if (!data) { data = await generateSecretContent(role, 'chat'); if (data) await saveSecretData(roleId, 'chat', data); }
+        if (data) renderSecretChatList(data);
+        else body.innerHTML = '<div class="s-error">没加载出来。<br><button class="btn btn-sm mt-3" onclick="refreshSecretApp(\'chat\')">重试</button></div>';
+        return;
+    }
+    const cfg = {
+        notes: { screen: 'secret-screen-notes', body: 'secret-notes-body', loading: '正在翻开她的备忘录…', render: renderSecretNotes },
+        cart: { screen: 'secret-screen-cart', body: 'secret-cart-body', loading: '正在看她的购物车…', render: renderSecretCart }
+    }[appKey];
+    if (!cfg) return;
+    document.getElementById(cfg.screen).style.display = 'flex';
+    const bodyEl = document.getElementById(cfg.body);
+    bodyEl.innerHTML = '<div class="s-loading"><i class="fa-solid fa-spinner fa-spin"></i> ' + cfg.loading + '</div>';
+    let data = await getSecretData(roleId, appKey);
+    if (!data) { data = await generateSecretContent(role, appKey); if (data) await saveSecretData(roleId, appKey, data); }
+    if (data) cfg.render(data);
+    else bodyEl.innerHTML = '<div class="s-error">没加载出来，可能是网络或API问题。<br><button class="btn btn-sm mt-3" onclick="refreshSecretApp(\'' + appKey + '\')">重试</button></div>';
+}
+
+// 强制重新生成某个app
+async function refreshSecretApp(appKey) {
+    const role = getCurrentRole();
+    const roleId = role.id || 'default';
+    hideAllSecretScreens();
+    const map = { notes: ['secret-screen-notes', 'secret-notes-body'], cart: ['secret-screen-cart', 'secret-cart-body'], chat: ['secret-screen-chatlist', 'secret-chatlist-body'] }[appKey];
+    document.getElementById(map[0]).style.display = 'flex';
+    document.getElementById(map[1]).innerHTML = '<div class="s-loading"><i class="fa-solid fa-spinner fa-spin"></i> 重新生成中…</div>';
+    const data = await generateSecretContent(role, appKey);
+    if (data) {
+        await saveSecretData(roleId, appKey, data);
+        if (appKey === 'chat') renderSecretChatList(data);
+        else if (appKey === 'notes') renderSecretNotes(data);
+        else renderSecretCart(data);
+    } else {
+        document.getElementById(map[1]).innerHTML = '<div class="s-error">生成失败，请稍后再试。<br><button class="btn btn-sm mt-3" onclick="refreshSecretApp(\'' + appKey + '\')">重试</button></div>';
+    }
 }
 
 // 心里话模式开关
