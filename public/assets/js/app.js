@@ -6305,7 +6305,7 @@ async function openSecretApp(appKey) {
     await renderSecretFlow(appKey);
 }
 
-// 累积渲染某个app的全部历史版本（旧→新，最新在下方，批次间插入时间分隔条，往上滑看全部）
+// 累积渲染某个app的全部历史版本（新→旧，最新批次在最上方，批次间插入时间分隔条，往下滑看更早的）
 async function renderSecretFlow(appKey) {
     const role = getCurrentRole();
     const roleId = role.id || 'default';
@@ -6334,16 +6334,42 @@ async function renderSecretFlow(appKey) {
         body.innerHTML = '<div class="s-error">还没有内容，点右上角「换一批」生成。</div>';
         return;
     }
-    // 旧→新顺序：最早批次在上，最新批次在下（像聊天记录一样往上滑看历史）
-    const ordered = versions.slice().reverse();
-    ordered.forEach(v => {
+    // 微信：把所有批次的会话按联系人合并成一条（聊天记录连续，像真实微信）
+    if (appKey === 'chat') {
+        const merged = new Map();
+        // 从旧到新遍历批次，保证消息顺序（旧消息在前、新消息在后）
+        versions.slice().reverse().forEach(v => {
+            (v.data.conversations || []).forEach(conv => {
+                const key = conv.id || conv.name;
+                if (!merged.has(key)) {
+                    merged.set(key, Object.assign({}, conv, { _msgs: (conv.messages || []).slice() }));
+                } else {
+                    const m = merged.get(key);
+                    m._msgs = m._msgs.concat(conv.messages || []);
+                    if (conv.last) m.last = conv.last;
+                    if (conv.avatar) m.avatar = conv.avatar;
+                }
+            });
+        });
+        const convs = Array.from(merged.values()).map(m => {
+            const c = Object.assign({}, m);
+            c.messages = c._msgs;
+            delete c._msgs;
+            return c;
+        });
+        renderSecretChatList({ conversations: convs }, body);
+        body.scrollTop = 0;
+        return;
+    }
+    // 其他app：新→旧，最新批次在上
+    versions.forEach(v => {
         const sep = document.createElement('div');
         sep.className = 's-sep';
         sep.textContent = fmtMomentTime(v.ts);
         body.appendChild(sep);
         render(v.data, body);
     });
-    body.scrollTop = body.scrollHeight;
+    body.scrollTop = 0;
 }
 
 // 强制重新生成某个app：生成新批追加在下方，旧批保留
