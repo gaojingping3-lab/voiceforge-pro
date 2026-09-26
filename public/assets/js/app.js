@@ -5933,16 +5933,20 @@ function secretChatSnap() {
 async function getSecretData(roleId, appKey) {
     try {
         const db = await openImageDB();
-        return await new Promise((resolve) => {
+        const rec = await new Promise((resolve) => {
             const tx = db.transaction('SECRET_STORE', 'readonly');
             const req = tx.objectStore('SECRET_STORE').get(secretStorageId(roleId, appKey));
-            req.onsuccess = () => resolve(req.result ? req.result.data : null);
+            req.onsuccess = () => resolve(req.result || null);
             req.onerror = () => resolve(null);
         });
+        if (!rec) return null;
+        // 新格式：versions数组（最新在前）；旧格式兼容：单份data
+        if (rec.versions && rec.versions.length) return rec.versions[0].data;
+        return rec.data || null;
     } catch (e) { return null; }
 }
 
-// 读取完整缓存记录（含生成时的聊天快照）
+// 读取完整缓存记录（含全部历史版本）
 async function getSecretRecord(roleId, appKey) {
     try {
         const db = await openImageDB();
@@ -5955,12 +5959,22 @@ async function getSecretRecord(roleId, appKey) {
     } catch (e) { return null; }
 }
 
+// 保存为多版本：新版本插最前，旧版本往后排，最多保留20批（旧格式数据自动并入）
 async function saveSecretData(roleId, appKey, data) {
     try {
         const db = await openImageDB();
+        const prev = await getSecretRecord(roleId, appKey);
+        const snap = secretChatSnap();
+        const newVer = { data: data, ts: Date.now(), chatSnap: snap };
+        let versions = [newVer];
+        if (prev) {
+            const oldVersions = (prev.versions && prev.versions.length) ? prev.versions
+                : (prev.data ? [{ data: prev.data, ts: prev.ts || Date.now(), chatSnap: prev.chatSnap || '' }] : []);
+            versions = versions.concat(oldVersions).slice(0, 20);
+        }
         await new Promise((resolve) => {
             const tx = db.transaction('SECRET_STORE', 'readwrite');
-            tx.objectStore('SECRET_STORE').put({ id: secretStorageId(roleId, appKey), data: data, ts: Date.now(), chatSnap: secretChatSnap() });
+            tx.objectStore('SECRET_STORE').put({ id: secretStorageId(roleId, appKey), versions: versions, ts: Date.now() });
             tx.oncomplete = resolve;
             tx.onerror = resolve;
         });
@@ -6250,7 +6264,8 @@ async function openSecretApp(appKey) {
             // 已有缓存：对比生成时的聊天快照，聊天有新进展就自动换新（朋友圈同款：内容随聊天走）
             const rec = await getSecretRecord(roleId, 'chat');
             const snap = secretChatSnap();
-            if (!rec || !rec.chatSnap || rec.chatSnap !== snap) {
+            const curVer = (rec && rec.versions && rec.versions[0]) ? rec.versions[0] : rec;
+            if (!curVer || !curVer.chatSnap || curVer.chatSnap !== snap) {
                 const fresh = await generateSecretContent(role, 'chat');
                 if (fresh) { await saveSecretData(roleId, 'chat', fresh); data = fresh; }
             }
@@ -6283,7 +6298,8 @@ async function openSecretApp(appKey) {
         // 已有缓存：对比生成时的聊天快照，聊天有新进展就自动换新（朋友圈同款：内容随聊天走）
         const rec = await getSecretRecord(roleId, appKey);
         const snap = secretChatSnap();
-        if (!rec || !rec.chatSnap || rec.chatSnap !== snap) {
+        const curVer = (rec && rec.versions && rec.versions[0]) ? rec.versions[0] : rec;
+        if (!curVer || !curVer.chatSnap || curVer.chatSnap !== snap) {
             const fresh = await generateSecretContent(role, appKey);
             if (fresh) { await saveSecretData(roleId, appKey, fresh); data = fresh; }
         }
@@ -6317,6 +6333,68 @@ async function refreshSecretApp(appKey) {
     } else {
         document.getElementById(map[1]).innerHTML = '<div class="s-error">生成失败，请稍后再试。<br><button class="btn btn-sm mt-3" onclick="refreshSecretApp(\'' + appKey + '\')">重试</button></div>';
     }
+}
+
+// 小秘密：历史版本列表（翻看旧批内容）
+let secretVersionAppKey = null;
+async function showSecretVersions(appKey) {
+    const role = getCurrentRole();
+    const roleId = role.id || 'default';
+    secretVersionAppKey = appKey;
+    hideAllSecretScreens();
+    document.getElementById('secret-screen-versions').style.display = 'flex';
+    const body = document.getElementById('secret-versions-body');
+    body.innerHTML = '<div class="s-loading"><i class="fa-solid fa-spinner fa-spin"></i> 加载中…</div>';
+    const rec = await getSecretRecord(roleId, appKey);
+    const versions = (rec && rec.versions && rec.versions.length) ? rec.versions
+        : (rec && rec.data ? [{ data: rec.data, ts: rec.ts || Date.now() }] : []);
+    body.innerHTML = '';
+    if (!versions.length) { body.innerHTML = '<div class="s-error">还没有历史内容<br>生成过一次后就会留档</div>'; return; }
+    const titles = { notes: '备忘录', chat: '微信', cart: '购物车', history: '浏览器', food: '外卖' };
+    document.getElementById('secret-versions-title').textContent = '历史记录 · ' + (titles[appKey] || '');
+    versions.forEach((v, idx) => {
+        const item = document.createElement('div');
+        item.className = 's-version-item';
+        const time = document.createElement('div'); time.className = 's-version-time';
+        time.textContent = fmtMomentTime(v.ts) + (idx === 0 ? ' · 当前' : '');
+        const sum = document.createElement('div'); sum.className = 's-version-sum';
+        sum.textContent = secretVersionSummary(appKey, v.data);
+        item.appendChild(time); item.appendChild(sum);
+        item.onclick = () => viewSecretVersion(appKey, idx);
+        body.appendChild(item);
+    });
+}
+function secretVersionSummary(appKey, data) {
+    try {
+        if (appKey === 'notes') return (data.notes || []).slice(0, 2).map(n => n.title || n.content || '').join(' / ') || '（空）';
+        if (appKey === 'chat') return (data.conversations || []).slice(0, 2).map(c => c.name + '：' + (c.last || '')).join(' / ') || '（空）';
+        if (appKey === 'cart') return (data.items || []).slice(0, 2).map(i => i.name || '').join(' / ') || '（空）';
+        if (appKey === 'history') return (data.history || []).slice(0, 3).map(h => h.kw || '').join(' / ') || '（空）';
+        if (appKey === 'food') return (data.orders || []).slice(0, 2).map(o => o.shop || '').join(' / ') || '（空）';
+    } catch (e) {}
+    return '（内容）';
+}
+function viewSecretVersion(appKey, idx) {
+    (async () => {
+        const role = getCurrentRole();
+        const roleId = role.id || 'default';
+        const rec = await getSecretRecord(roleId, appKey);
+        const versions = (rec && rec.versions && rec.versions.length) ? rec.versions
+            : (rec && rec.data ? [{ data: rec.data, ts: rec.ts || Date.now() }] : []);
+        const v = versions[idx];
+        if (!v) return;
+        const cfg = {
+            notes: ['secret-screen-notes', 'secret-notes-body', renderSecretNotes],
+            chat: ['secret-screen-chatlist', 'secret-chatlist-body', renderSecretChatList],
+            cart: ['secret-screen-cart', 'secret-cart-body', renderSecretCart],
+            history: ['secret-screen-history', 'secret-history-body', renderSecretHistory],
+            food: ['secret-screen-food', 'secret-food-body', renderSecretFood]
+        }[appKey];
+        if (!cfg) return;
+        hideAllSecretScreens();
+        document.getElementById(cfg[0]).style.display = 'flex';
+        cfg[2](v.data);
+    })();
 }
 
 // 心里话模式开关
