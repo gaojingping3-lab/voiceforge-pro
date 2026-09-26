@@ -6037,7 +6037,21 @@ async function generateSecretContent(role, appKey) {
     const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
     const llmKey = localStorage.getItem('LLM_KEY') || '';
     const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
-    const sys = getSecretPrompt(role, appKey);
+    // ===== 朋友圈同款上下文：注入最近聊天 + 历史去重 =====
+    const recent = (typeof chatHistory !== 'undefined' ? chatHistory : []).slice(-8);
+    const recentText = recent.map(m => (m.role === 'user' ? '【我（用户）】' : '【你】') + ': ' + String(m.content || '').slice(0, 150)).join('\n');
+    // 历史内容（去重用）：告诉AI已经生成过哪些，换新一批时不许重复
+    let existingBlock = '';
+    let oldJsonStr = null;
+    try {
+        const roleId = role.id || 'default';
+        const old = await getSecretData(roleId, appKey);
+        if (old) {
+            oldJsonStr = JSON.stringify(old);
+            existingBlock = '你已经生成过这些内容，换新一批时绝对不允许和它们重复（内容、开头、核心意思雷同都不行）：\n' + oldJsonStr.slice(0, 600) + '\n';
+        }
+    } catch (e) {}
+    const sys = getSecretPrompt(role, appKey) + '\n【怎么写】完全根据下面「最近聊天」里实际聊到的内容来写——抓取里面一个具体的点（她说的话、聊到的事、场景、情绪、称呼、互动），让这些手机里的隐私内容贴合你们最近的关系和剧情，不要写和聊天记录无关的泛泛内容。\n' + existingBlock + '最近聊天：\n' + (recentText || '（刚认识不久）');
     for (let attempt = 0; attempt < 2; attempt++) {
         try {
             const res = await fetch('/api/chat', {
@@ -6055,7 +6069,10 @@ async function generateSecretContent(role, appKey) {
             const data = await res.json();
             const content = data.choices?.[0]?.message?.content || '';
             const json = extractJSON(content);
-            if (json) return json;
+            if (!json) continue;
+            // 程序级去重：和旧内容完全雷同时重试一次
+            if (oldJsonStr && JSON.stringify(json) === oldJsonStr) continue;
+            return json;
         } catch (e) {}
     }
     return null;
