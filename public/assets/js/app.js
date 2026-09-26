@@ -5923,6 +5923,13 @@ function formatChatText(text) {
 // ============================================
 function secretStorageId(roleId, appKey) { return 'secret_' + roleId + '_' + appKey; }
 
+// 聊天快照：记录当前聊天的"状态指纹"（条数 + 最后一条内容摘要 + 时间戳），用于判断打开小秘密时聊天是否有新进展
+function secretChatSnap() {
+    const arr = (typeof chatHistory !== 'undefined') ? chatHistory : [];
+    const last = arr[arr.length - 1];
+    return (arr.length || 0) + ':' + (last ? String(last.content || '').slice(0, 80) + ':' + (last.ts || '') : '');
+}
+
 async function getSecretData(roleId, appKey) {
     try {
         const db = await openImageDB();
@@ -5935,12 +5942,25 @@ async function getSecretData(roleId, appKey) {
     } catch (e) { return null; }
 }
 
+// 读取完整缓存记录（含生成时的聊天快照）
+async function getSecretRecord(roleId, appKey) {
+    try {
+        const db = await openImageDB();
+        return await new Promise((resolve) => {
+            const tx = db.transaction('SECRET_STORE', 'readonly');
+            const req = tx.objectStore('SECRET_STORE').get(secretStorageId(roleId, appKey));
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => resolve(null);
+        });
+    } catch (e) { return null; }
+}
+
 async function saveSecretData(roleId, appKey, data) {
     try {
         const db = await openImageDB();
         await new Promise((resolve) => {
             const tx = db.transaction('SECRET_STORE', 'readwrite');
-            tx.objectStore('SECRET_STORE').put({ id: secretStorageId(roleId, appKey), data: data, ts: Date.now() });
+            tx.objectStore('SECRET_STORE').put({ id: secretStorageId(roleId, appKey), data: data, ts: Date.now(), chatSnap: secretChatSnap() });
             tx.oncomplete = resolve;
             tx.onerror = resolve;
         });
@@ -6226,7 +6246,18 @@ async function openSecretApp(appKey) {
         const body = document.getElementById('secret-chatlist-body');
         body.innerHTML = '<div class="s-loading"><i class="fa-solid fa-spinner fa-spin"></i> 加载中…</div>';
         let data = await getSecretData(roleId, 'chat');
-        if (!data) { data = await generateSecretContent(role, 'chat'); if (data) await saveSecretData(roleId, 'chat', data); }
+        if (data) {
+            // 已有缓存：对比生成时的聊天快照，聊天有新进展就自动换新（朋友圈同款：内容随聊天走）
+            const rec = await getSecretRecord(roleId, 'chat');
+            const snap = secretChatSnap();
+            if (!rec || !rec.chatSnap || rec.chatSnap !== snap) {
+                const fresh = await generateSecretContent(role, 'chat');
+                if (fresh) { await saveSecretData(roleId, 'chat', fresh); data = fresh; }
+            }
+        } else {
+            data = await generateSecretContent(role, 'chat');
+            if (data) await saveSecretData(roleId, 'chat', data);
+        }
         if (data) renderSecretChatList(data);
         else body.innerHTML = '<div class="s-error">没加载出来。<br><button class="btn btn-sm mt-3" onclick="refreshSecretApp(\'chat\')">重试</button></div>';
         return;
@@ -6248,7 +6279,18 @@ async function openSecretApp(appKey) {
     const bodyEl = document.getElementById(cfg.body);
     bodyEl.innerHTML = '<div class="s-loading"><i class="fa-solid fa-spinner fa-spin"></i> ' + cfg.loading + '</div>';
     let data = await getSecretData(roleId, appKey);
-    if (!data) { data = await generateSecretContent(role, appKey); if (data) await saveSecretData(roleId, appKey, data); }
+    if (data) {
+        // 已有缓存：对比生成时的聊天快照，聊天有新进展就自动换新（朋友圈同款：内容随聊天走）
+        const rec = await getSecretRecord(roleId, appKey);
+        const snap = secretChatSnap();
+        if (!rec || !rec.chatSnap || rec.chatSnap !== snap) {
+            const fresh = await generateSecretContent(role, appKey);
+            if (fresh) { await saveSecretData(roleId, appKey, fresh); data = fresh; }
+        }
+    } else {
+        data = await generateSecretContent(role, appKey);
+        if (data) await saveSecretData(roleId, appKey, data);
+    }
     if (data) cfg.render(data);
     else bodyEl.innerHTML = '<div class="s-error">没加载出来，可能是网络或API问题。<br><button class="btn btn-sm mt-3" onclick="refreshSecretApp(\'' + appKey + '\')">重试</button></div>';
 }
