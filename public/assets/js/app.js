@@ -9551,7 +9551,15 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
             } else {
                 const cur = getCurrentRole();
                 // 优先用角色卡单独的"生图外貌描述"字段（聊天不发，省token）；没填才从人设描述里提取
-                const app = cur ? (cur.imageAppearance || extractVisualDescFromRoleCard(cur.desc) || extractAppearanceFromRoleCard(cur.desc) || '') : '';
+                let app = cur ? (cur.imageAppearance || extractVisualDescFromRoleCard(cur.desc) || extractAppearanceFromRoleCard(cur.desc) || '') : '';
+                // 特写模式：自动过滤腰部以下服装描述（短裤/手链/鞋子/腿等特写看不到的部分）
+                const isCloseup = /特写|近景|大头/.test(userInput || '');
+                if (isCloseup && app) {
+                    app = app
+                        .replace(/[^，。；,;]*(?:短裤|长裤|裙子|下装|裤子|鞋|靴|腿|袜|手链|手环|手腕|手表|铆钉|腰|胯|臀|脚)[^，。；,;]*/g, '')
+                        .replace(/[，,]\s*[，,]+/g, ',')
+                        .replace(/^[，,\s]+|[，,\s]+$/g, '');
+                }
                 // 按角色卡性别确定人数标签，不再固定1girl（男角色会画成女孩）
                 const curGender = cur ? getRoleGender(cur.desc) : '';
                 const soloTag = curGender === 'female' ? '1girl' : (curGender === 'male' ? '1boy' : 'single character');
