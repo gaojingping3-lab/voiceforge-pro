@@ -7884,7 +7884,6 @@ async function generateGPTImageDirect(prompt, ratio = '1:1', inputImage = null, 
     }
     const model = getGPTImageModel();
     const baseURL = getGPTImageBaseURL() || 'https://api.openai.com/v1';
-    const url = baseURL + '/images/generations';
 
     // size 映射：按比例 × 清晰度档位（1K/2K/4K）
     const base = quality === '4K' ? 4096 : (quality === '2K' ? 2048 : 1024);
@@ -7898,38 +7897,51 @@ async function generateGPTImageDirect(prompt, ratio = '1:1', inputImage = null, 
         }
     }
 
-    const body = {
-        model: model,
-        prompt: prompt,
-        size: size,
-        response_format: 'b64_json'
-    };
-    // 图生图/参考头像：OpenAI 兼容接口用 image 参数（data URI）；中转站若用 extra_body.image 兼容 Agnes 写法
-    if (inputImage) {
-        if (Array.isArray(inputImage)) {
-            body.image = inputImage[0];
-        } else {
-            body.image = inputImage;
-        }
+    // data URI 转 Blob
+    function dataUriToBlob(dataUri) {
+        const arr = dataUri.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8 = new Uint8Array(n);
+        while (n--) u8[n] = bstr.charCodeAt(n);
+        return new Blob([u8], { type: mime });
     }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 180000);
     let response;
-    try {
-        response = await fetch(url, {
+
+    if (inputImage) {
+        // 图生图：用 /images/edits + multipart/form-data
+        const img = Array.isArray(inputImage) ? inputImage[0] : inputImage;
+        const formData = new FormData();
+        formData.append('model', model);
+        formData.append('prompt', prompt);
+        formData.append('size', size);
+        formData.append('image', dataUriToBlob(img), 'reference.png');
+        response = await fetch(baseURL + '/images/edits', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + apiKey },
+            body: formData,
+            signal: controller.signal
+        });
+    } else {
+        // 纯文生图：用 /images/generations + JSON
+        response = await fetch(baseURL + '/images/generations', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + apiKey
             },
-            body: JSON.stringify(body),
+            body: JSON.stringify({
+                model: model,
+                prompt: prompt,
+                size: size,
+                response_format: 'b64_json'
+            }),
             signal: controller.signal
         });
-    } catch (e) {
-        clearTimeout(timeoutId);
-        if (e.name === 'AbortError') throw new Error('GPT Image 请求超时（180秒）');
-        throw new Error('请求失败: ' + (e.message || e));
     }
     clearTimeout(timeoutId);
     if (!response.ok) {
