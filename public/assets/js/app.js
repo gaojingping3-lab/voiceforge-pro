@@ -8387,9 +8387,11 @@ async function generateImage() {
     try {
         // 如果已经手动优化过提示词，直接用当前文本，不再重复优化
         const preOptimized = isPromptOptimized ? prompt : null;
+        // 特写/近景/大头：强制1:1方形，不管上传参考图是什么比例
+        const outRatio = /特写|近景|大头/.test(prompt) ? '1:1' : uploadedImageRatio;
         const result = await generateImageWithSafety(prompt, model, (msg) => {
             if (statusText) statusText.textContent = msg;
-        }, preOptimized, uploadedImageBase64, uploadedImageRatio, getImageQuality());
+        }, preOptimized, uploadedImageBase64, outRatio, getImageQuality());
 
         // 生成完成后重置优化标记，下次输入新提示词时重新优化
         isPromptOptimized = false;
@@ -9667,9 +9669,11 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
         // 第二步：用角色AI生成的提示词直接生图（跳过独立的提示词优化）
         // silentOpts.imageModel：朋友圈等入口可强制指定模型（如GPT Image模式下自动发朋友圈仍用Agnes省钱）
         const effModel = (silentOpts && silentOpts.imageModel) || getImageModel();
+        // 特写/近景/大头：强制1:1方形，脸部特写方形构图最合适
+        const shotRatio = /特写|近景|大头/.test(userInput || '') ? '1:1' : '1:1';
         const result = await generateImageWithSafety(conversationText, effModel, (msg) => {
             if (!silent) loadingBubble.innerHTML = `<div class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span><span class="text-xs">${msg}</span></div>`;
-        }, rolePrompt, refImages, '1:1', getImageQuality());
+        }, rolePrompt, refImages, shotRatio, getImageQuality());
 
         // silent模式：不做任何聊天UI，直接把结果返回给调用方（朋友圈复用同一链路）
         if (silent) {
