@@ -9624,6 +9624,8 @@ async function generateImageFromChat(userInput = '', messageCount = 2, silentOpt
             finalKeywords += (finalKeywords ? ', ' : '') + 'wide angle shot, distant full body framing, full character entirely in frame, plenty of empty space above head, visible floor beneath feet, shoes and feet clearly visible, standing on ground, entire body visible from head to toe, no cropped limbs';
         } else if (wantFullBody) {
             finalKeywords += (finalKeywords ? ', ' : '') + 'wide angle shot, full character entirely in frame, empty space above head, visible floor beneath feet, shoes and feet clearly visible, standing on ground, no cropped head, no cropped feet';
+        } else if (/特写|近景|大头/.test(userInput || '')) {
+            finalKeywords += (finalKeywords ? ', ' : '') + 'extreme close-up on face, tight facial close-up shot, detailed eyes, detailed skin texture, shallow depth of field, only face and shoulders visible, no body below chest, face fills most of frame';
         }
         // 人物数量硬锁：单人强制只有1人，双角色强制2人，前后各加一次强化
         if (isDualMode) {
