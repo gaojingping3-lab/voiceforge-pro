@@ -6466,6 +6466,18 @@ async function renderMemoryGraph() {
         physics: { barnesHut: { gravitationalConstant: -5000, springLength: 200, avoidOverlap: 0.8 } },
         interaction: { hover: true, zoomView: true, dragView: true }
     });
+
+    // 间距滑动条
+    const slider = document.getElementById('graph-spacing');
+    if (slider && !slider._bound) {
+        slider._bound = true;
+        slider.addEventListener('input', (e) => {
+            if (!memoryGraphNetwork) return;
+            memoryGraphNetwork.setOptions({
+                physics: { barnesHut: { springLength: parseInt(e.target.value) } }
+            });
+        });
+    }
 }
 
 // 打开某个app：保证有最新内容（聊天有新进展自动生成新批），然后把所有历史版本累积渲染在同一页面，往上滑即可看全部
