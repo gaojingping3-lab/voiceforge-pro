@@ -6415,15 +6415,25 @@ async function renderMemoryGraph() {
                 const m = text.match(/\{[\s\S]*\}/);
                 if (m) {
                     const fresh = JSON.parse(m[0]);
-                    // 追加新节点（去重：相同label不加）
+                    // 追加新节点（去重：相同label不加；id加前缀避免和旧节点冲突）
                     const newLabels = new Set(existing.nodes.map(n => n.label));
+                    const idMap = {}; // 新id -> 旧id的映射
                     (fresh.nodes || []).forEach(n => {
-                        if (!newLabels.has(n.label) && existing.nodes.length < MAX_NODES) {
-                            existing.nodes.push(n);
-                        }
+                        if (newLabels.has(n.label)) return;
+                        if (existing.nodes.length >= MAX_NODES) return;
+                        const newId = 'g' + Date.now() + '_' + n.id;
+                        idMap[n.id] = newId;
+                        existing.nodes.push({ ...n, id: newId });
+                        newLabels.add(n.label);
                     });
-                    // 追加新关系
-                    (fresh.edges || []).forEach(e => existing.edges.push(e));
+                    // 追加新关系，from/to做id映射
+                    (fresh.edges || []).forEach(e => {
+                        existing.edges.push({
+                            from: idMap[e.from] || e.from,
+                            to: idMap[e.to] || e.to,
+                            label: e.label
+                        });
+                    });
                     existing.chatSnap = snap;
                     await saveSecretData(roleId, 'graph', existing);
                 }
