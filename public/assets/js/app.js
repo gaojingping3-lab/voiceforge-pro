@@ -6491,8 +6491,17 @@ async function renderMemoryGraph() {
         physics: { barnesHut: { gravitationalConstant: -5000, springLength: 200, avoidOverlap: 0.8 } },
         interaction: { hover: true, zoomView: true, dragView: true }
     });
-    // 自动合并零散离群节点——不需要，直接过滤掉
-    memoryGraphNetwork.once('stabilizationIterationsDone', () => {});
+    // 把零散节点合并成一个"零散记忆"按钮
+    memoryGraphNetwork.once('stabilizationIterationsDone', () => {
+        memoryGraphNetwork.clusterOutliers({
+            clusterNodeProperties: {
+                label: '零散记忆',
+                color: '#6b7280',
+                font: { color: '#fff', size: 12 },
+                shape: 'ellipse'
+            }
+        });
+    });
 
     // 间距滑动条
     const slider = document.getElementById('graph-spacing');
