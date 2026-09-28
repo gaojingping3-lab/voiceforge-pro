@@ -6382,8 +6382,12 @@ async function renderMemoryGraph() {
 
     const MAX_NODES = 9999;
 
-    // 如果节点还没到上限，调AI提取新记忆追加
-    if (existing.nodes.length < MAX_NODES) {
+    // 如果聊天没变化，直接显示缓存不调AI
+    const snap = secretChatSnap();
+    const needRefresh = !existing.chatSnap || existing.chatSnap !== snap;
+
+    // 只有聊天有新内容才调AI提取新记忆
+    if (needRefresh && existing.nodes.length < MAX_NODES) {
         try {
             const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
             const llmKey = localStorage.getItem('LLM_KEY') || '';
@@ -6419,6 +6423,7 @@ async function renderMemoryGraph() {
                     });
                     // 追加新关系
                     (fresh.edges || []).forEach(e => existing.edges.push(e));
+                    existing.chatSnap = snap;
                     await saveSecretData(roleId, 'graph', existing);
                 }
             }
