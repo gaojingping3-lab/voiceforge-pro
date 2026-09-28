@@ -6440,6 +6440,11 @@ async function renderMemoryGraph() {
     }
 
     // 用vis-network画图
+    if (typeof vis === 'undefined' || !vis.DataSet) {
+        emptyEl.style.display = 'flex';
+        emptyEl.innerHTML = '<span style="font-size:40px;">🕸️</span><span>图谱组件加载失败<br>请检查网络后刷新重试</span>';
+        return;
+    }
     const groupColors = { event: '#f59e0b', person: '#3b82f6', place: '#22c55e', feeling: '#ec4899' };
     const nodes = new vis.DataSet(existing.nodes.map(n => ({
         id: n.id,
