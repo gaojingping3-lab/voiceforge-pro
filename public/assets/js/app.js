@@ -6465,12 +6465,16 @@ async function renderMemoryGraph() {
         return true;
     });
     existing.nodes = uniqueNodes;
-    // 过滤：只保留两端节点都存在的连线，再过滤孤立节点
+    // 过滤：只保留两端节点都存在的连线，再过滤连接数<=1的零散节点
     const nodeIds = new Set(uniqueNodes.map(n => n.id));
     const validEdges = (existing.edges || []).filter(e => nodeIds.has(e.from) && nodeIds.has(e.to));
-    const connectedIds = new Set();
-    validEdges.forEach(e => { connectedIds.add(e.from); connectedIds.add(e.to); });
-    const visibleNodes = uniqueNodes.filter(n => connectedIds.has(n.id));
+    // 计算每个节点的连接数
+    const connCount = {};
+    validEdges.forEach(e => { connCount[e.from]=(connCount[e.from]||0)+1; connCount[e.to]=(connCount[e.to]||0)+1; });
+    // 只保留连接数>=2的节点
+    const visibleNodes = uniqueNodes.filter(n => (connCount[n.id]||0) >= 2);
+    const visibleIds = new Set(visibleNodes.map(n=>n.id));
+    const filteredEdges = validEdges.filter(e => visibleIds.has(e.from) && visibleIds.has(e.to));
     const nodes = new vis.DataSet(visibleNodes.map(n => ({
         id: n.id,
         label: n.label,
@@ -6479,7 +6483,7 @@ async function renderMemoryGraph() {
         shape: 'box',
         margin: 8
     })));
-    const edges = new vis.DataSet(validEdges.map(e => ({
+    const edges = new vis.DataSet(filteredEdges.map(e => ({
         from: e.from, to: e.to,
         label: e.label || '',
         font: { color: '#888', size: 10 },
@@ -6491,27 +6495,7 @@ async function renderMemoryGraph() {
         physics: { barnesHut: { gravitationalConstant: -5000, springLength: 200, avoidOverlap: 0.8 } },
         interaction: { hover: true, zoomView: true, dragView: true }
     });
-    // 手动把连接数<=1的零散节点合并成一个"零散记忆"按钮
-    memoryGraphNetwork.once('stabilizationIterationsDone', () => {
-        const allNodes = memoryGraphNetwork.body.data.nodes.get();
-        const connectedCounts = {};
-        memoryGraphNetwork.body.data.edges.get().forEach(e => {
-            connectedCounts[e.from] = (connectedCounts[e.from] || 0) + 1;
-            connectedCounts[e.to] = (connectedCounts[e.to] || 0) + 1;
-        });
-        const outliers = allNodes.filter(n => (connectedCounts[n.id] || 0) <= 1).map(n => n.id);
-        if (outliers.length > 0) {
-            memoryGraphNetwork.cluster({
-                joinCondition: (nodeOpts) => outliers.includes(nodeOpts.id),
-                clusterNodeProperties: {
-                    label: '零散记忆(' + outliers.length + ')',
-                    color: '#6b7280',
-                    font: { color: '#fff', size: 12 },
-                    shape: 'ellipse'
-                }
-            });
-        }
-    });
+    // 零散节点已在数据层过滤，不需要额外合并
 
     // 间距滑动条
     const slider = document.getElementById('graph-spacing');
