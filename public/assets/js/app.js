@@ -6349,6 +6349,97 @@ async function renderSecretAlbum() {
     body.innerHTML = ''; body.appendChild(grid);
 }
 
+// ===== 记忆图谱：从聊天记录提取节点和关系，画网络图 =====
+let memoryGraphNetwork = null;
+async function renderMemoryGraph() {
+    const loadingEl = document.getElementById('graph-loading');
+    const emptyEl = document.getElementById('graph-empty');
+    const container = document.getElementById('memory-graph-network');
+    loadingEl.style.display = 'flex';
+    emptyEl.style.display = 'none';
+
+    const role = getCurrentRole();
+    const roleId = role.id || 'default';
+
+    // 取最近聊天记录
+    const history = chatHistory.slice(-80).map(m => {
+        const who = m.role === 'user' ? '我' : role.name;
+        return who + ': ' + (m.content || '').slice(0, 200);
+    }).join('\n');
+
+    if (history.length < 50) {
+        loadingEl.style.display = 'none';
+        emptyEl.style.display = 'flex';
+        return;
+    }
+
+    // 先读缓存
+    let graphData = null;
+    try {
+        const cached = await getSecretData(roleId, 'graph');
+        if (cached && cached.nodes && cached.nodes.length >= 3) graphData = cached;
+    } catch(e) {}
+
+    // 没有缓存或缓存太旧，调AI提取
+    if (!graphData) {
+        try {
+            const llmKey = localStorage.getItem('LLM_API_KEY');
+            const llmUrl = localStorage.getItem('LLM_BASE_URL') || 'https://api.deepseek.com/v1';
+            const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-chat';
+            const res = await fetch(llmUrl.replace(/\/$/, '') + '/chat/completions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
+                body: JSON.stringify({
+                    model: llmModel,
+                    messages: [
+                        { role: 'system', content: '你是记忆提取器。从聊天记录中提取重要记忆节点和它们之间的关系，输出纯JSON。格式：{"nodes":[{"id":"1","label":"简短记忆标题","group":"event|person|place|feeling"}],"edges":[{"from":"1","to":"2","label":"关系描述"}]}。节点10-20个，关系15-30条。group分类：event=事件，person=人物，place=地点，feeling=感受。label要简短（4-10字）。只输出JSON，不要其他文字。' },
+                        { role: 'user', content: '从以下聊天记录提取记忆：\n' + history }
+                    ],
+                    temperature: 0.3,
+                    stream: false
+                })
+            });
+            const data = await res.json();
+            let text = data.choices?.[0]?.message?.content?.trim() || '';
+            // 提取JSON
+            const m = text.match(/\{[\s\S]*\}/);
+            if (m) graphData = JSON.parse(m[0]);
+            if (graphData && graphData.nodes) await saveSecretData(roleId, 'graph', graphData);
+        } catch(e) {
+            console.warn('[记忆图谱] 生成失败:', e);
+        }
+    }
+
+    loadingEl.style.display = 'none';
+    if (!graphData || !graphData.nodes || graphData.nodes.length < 3) {
+        emptyEl.style.display = 'flex';
+        return;
+    }
+
+    // 用vis-network画图
+    const groupColors = { event: '#f59e0b', person: '#3b82f6', place: '#22c55e', feeling: '#ec4899' };
+    const nodes = new vis.DataSet(graphData.nodes.map(n => ({
+        id: n.id,
+        label: n.label,
+        color: { background: groupColors[n.group] || '#8b5cf6', border: '#fff' },
+        font: { color: '#fff', size: 13, face: 'sans-serif' },
+        shape: 'box',
+        margin: 8
+    })));
+    const edges = new vis.DataSet((graphData.edges || []).map(e => ({
+        from: e.from, to: e.to,
+        label: e.label || '',
+        font: { color: '#888', size: 10 },
+        arrows: 'to'
+    })));
+
+    if (memoryGraphNetwork) { memoryGraphNetwork.destroy(); memoryGraphNetwork = null; }
+    memoryGraphNetwork = new vis.Network(container, { nodes, edges }, {
+        physics: { barnesHut: { gravitationalConstant: -3000, springLength: 120 } },
+        interaction: { hover: true, zoomView: true, dragView: true }
+    });
+}
+
 // 打开某个app：保证有最新内容（聊天有新进展自动生成新批），然后把所有历史版本累积渲染在同一页面，往上滑即可看全部
 async function openSecretApp(appKey) {
     const role = getCurrentRole();
@@ -6379,6 +6470,12 @@ async function openSecretApp(appKey) {
     if (appKey === 'album') {
         document.getElementById('secret-screen-album').style.display = 'flex';
         await renderSecretAlbum();
+        return;
+    }
+    // 记忆图谱：从聊天记录提取节点和关系，画网络图
+    if (appKey === 'graph') {
+        document.getElementById('secret-screen-graph').style.display = 'flex';
+        await renderMemoryGraph();
         return;
     }
     const cfg = {
@@ -6482,6 +6579,12 @@ async function renderSecretFlow(appKey) {
 async function refreshSecretApp(appKey) {
     const role = getCurrentRole();
     const roleId = role.id || 'default';
+    if (appKey === 'graph') {
+        try { await deleteSecretData(roleId, 'graph'); } catch(e) {}
+        document.getElementById('secret-screen-graph').style.display = 'flex';
+        await renderMemoryGraph();
+        return;
+    }
     hideAllSecretScreens();
     const map = {
         notes: ['secret-screen-notes', 'secret-notes-body'],
