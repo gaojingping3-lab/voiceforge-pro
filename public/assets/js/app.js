@@ -6349,7 +6349,7 @@ async function renderSecretAlbum() {
     body.innerHTML = ''; body.appendChild(grid);
 }
 
-// ===== 记忆图谱：从聊天记录提取节点和关系，画网络图 =====
+// ===== 记忆图谱（累积型）：旧节点保留，新记忆追加 =====
 let memoryGraphNetwork = null;
 async function renderMemoryGraph() {
     const loadingEl = document.getElementById('graph-loading');
@@ -6373,43 +6373,62 @@ async function renderMemoryGraph() {
         return;
     }
 
-    // 先读缓存
-    let graphData = null;
+    // 读已有缓存（累积）
+    let existing = { nodes: [], edges: [] };
     try {
         const cached = await getSecretData(roleId, 'graph');
-        if (cached && cached.nodes && cached.nodes.length >= 3) graphData = cached;
+        if (cached && cached.nodes) existing = cached;
     } catch(e) {}
 
-    // 没有缓存或缓存太旧，调AI提取（和其他app一样走/api/chat中转）
-    if (!graphData) {
+    const MAX_NODES = 80;
+
+    // 如果节点还没到上限，调AI提取新记忆追加
+    if (existing.nodes.length < MAX_NODES) {
         try {
             const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
             const llmKey = localStorage.getItem('LLM_KEY') || '';
             const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
-            if (!llmKey) throw new Error('未配置LLM_KEY');
-            const res = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
-                body: JSON.stringify({
-                    baseUrl: llmUrl, model: llmModel, stream: false,
-                    messages: [
-                        { role: 'system', content: '你是记忆提取器。从聊天记录中提取重要记忆节点和它们之间的关系，输出纯JSON。格式：{"nodes":[{"id":"1","label":"简短记忆标题","group":"event|person|place|feeling"}],"edges":[{"from":"1","to":"2","label":"关系描述"}]}。节点10-20个，关系15-30条。group分类：event=事件，person=人物，place=地点，feeling=感受。label要简短（4-10字）。只输出JSON，不要其他文字。' },
-                        { role: 'user', content: '从以下聊天记录提取记忆：\n' + history }
-                    ]
-                })
-            });
-            const data = await res.json();
-            let text = data.choices?.[0]?.message?.content?.trim() || '';
-            const m = text.match(/\{[\s\S]*\}/);
-            if (m) graphData = JSON.parse(m[0]);
-            if (graphData && graphData.nodes) await saveSecretData(roleId, 'graph', graphData);
+            if (llmKey) {
+                // 告诉AI已有哪些节点，只提取新的
+                const existingLabels = existing.nodes.map(n => n.label).join('、');
+                const sysPrompt = existing.nodes.length > 0
+                    ? '你是记忆提取器。从聊天记录中提取新的重要记忆节点和关系，输出纯JSON。已有这些记忆，不要重复提取：' + existingLabels + '。只提取上面没有的新记忆。格式：{"nodes":[{"id":"新id","label":"简短记忆标题","group":"event|person|place|feeling"}],"edges":[{"from":"已有id或新id","to":"已有id或新id","label":"关系描述"}]}。新节点5-10个，新关系5-15条。id用"n"+数字。label简短4-10字。只输出JSON。'
+                    : '你是记忆提取器。从聊天记录中提取重要记忆节点和它们之间的关系，输出纯JSON。格式：{"nodes":[{"id":"1","label":"简短记忆标题","group":"event|person|place|feeling"}],"edges":[{"from":"1","to":"2","label":"关系描述"}]}。节点10-20个，关系15-30条。group：event=事件，person=人物，place=地点，feeling=感受。label简短4-10字。只输出JSON。';
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
+                    body: JSON.stringify({
+                        baseUrl: llmUrl, model: llmModel, stream: false,
+                        messages: [
+                            { role: 'system', content: sysPrompt },
+                            { role: 'user', content: '从以下聊天记录提取记忆：\n' + history }
+                        ]
+                    })
+                });
+                const data = await res.json();
+                let text = data.choices?.[0]?.message?.content?.trim() || '';
+                const m = text.match(/\{[\s\S]*\}/);
+                if (m) {
+                    const fresh = JSON.parse(m[0]);
+                    // 追加新节点（去重：相同label不加）
+                    const existingLabels = new Set(existing.nodes.map(n => n.label));
+                    (fresh.nodes || []).forEach(n => {
+                        if (!existingLabels.has(n.label) && existing.nodes.length < MAX_NODES) {
+                            existing.nodes.push(n);
+                        }
+                    });
+                    // 追加新关系
+                    (fresh.edges || []).forEach(e => existing.edges.push(e));
+                    await saveSecretData(roleId, 'graph', existing);
+                }
+            }
         } catch(e) {
-            console.warn('[记忆图谱] 生成失败:', e);
+            console.warn('[记忆图谱] 追加新记忆失败:', e);
         }
     }
 
     loadingEl.style.display = 'none';
-    if (!graphData || !graphData.nodes || graphData.nodes.length < 3) {
+    if (!existing.nodes || existing.nodes.length < 3) {
         emptyEl.style.display = 'flex';
         emptyEl.innerHTML = '<span style="font-size:40px;">🕸️</span><span>图谱生成失败<br>点右上角刷新重试</span>';
         return;
@@ -6417,7 +6436,7 @@ async function renderMemoryGraph() {
 
     // 用vis-network画图
     const groupColors = { event: '#f59e0b', person: '#3b82f6', place: '#22c55e', feeling: '#ec4899' };
-    const nodes = new vis.DataSet(graphData.nodes.map(n => ({
+    const nodes = new vis.DataSet(existing.nodes.map(n => ({
         id: n.id,
         label: n.label,
         color: { background: groupColors[n.group] || '#8b5cf6', border: '#fff' },
@@ -6425,7 +6444,7 @@ async function renderMemoryGraph() {
         shape: 'box',
         margin: 8
     })));
-    const edges = new vis.DataSet((graphData.edges || []).map(e => ({
+    const edges = new vis.DataSet((existing.edges || []).map(e => ({
         from: e.from, to: e.to,
         label: e.label || '',
         font: { color: '#888', size: 10 },
