@@ -6463,7 +6463,7 @@ async function renderMemoryGraph() {
 
     if (memoryGraphNetwork) { memoryGraphNetwork.destroy(); memoryGraphNetwork = null; }
     memoryGraphNetwork = new vis.Network(container, { nodes, edges }, {
-        physics: { barnesHut: { gravitationalConstant: -2000, springLength: 100 } },
+        physics: { barnesHut: { gravitationalConstant: -5000, springLength: 200, avoidOverlap: 0.8 } },
         interaction: { hover: true, zoomView: true, dragView: true }
     });
 }
