@@ -6457,7 +6457,15 @@ async function renderMemoryGraph() {
         return;
     }
     const groupColors = { event: '#f59e0b', person: '#3b82f6', place: '#22c55e', feeling: '#ec4899' };
-    const nodes = new vis.DataSet(existing.nodes.map(n => ({
+    // 按id去重，避免vis-network报错
+    const seenIds = new Set();
+    const uniqueNodes = existing.nodes.filter(n => {
+        if (seenIds.has(n.id)) return false;
+        seenIds.add(n.id);
+        return true;
+    });
+    existing.nodes = uniqueNodes;
+    const nodes = new vis.DataSet(uniqueNodes.map(n => ({
         id: n.id,
         label: n.label,
         color: { background: groupColors[n.group] || '#8b5cf6', border: '#fff' },
