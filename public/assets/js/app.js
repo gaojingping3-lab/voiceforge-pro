@@ -6415,9 +6415,9 @@ async function renderMemoryGraph() {
                 if (m) {
                     const fresh = JSON.parse(m[0]);
                     // 追加新节点（去重：相同label不加）
-                    const existingLabels = new Set(existing.nodes.map(n => n.label));
+                    const newLabels = new Set(existing.nodes.map(n => n.label));
                     (fresh.nodes || []).forEach(n => {
-                        if (!existingLabels.has(n.label) && existing.nodes.length < MAX_NODES) {
+                        if (!newLabels.has(n.label) && existing.nodes.length < MAX_NODES) {
                             existing.nodes.push(n);
                         }
                     });
