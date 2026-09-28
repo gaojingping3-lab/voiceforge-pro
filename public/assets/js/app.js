@@ -6367,7 +6367,7 @@ async function renderMemoryGraph() {
         return who + ': ' + (m.content || '').slice(0, 200);
     }).join('\n');
 
-    if (history.length < 50) {
+    if (history.length < 30) {
         loadingEl.style.display = 'none';
         emptyEl.style.display = 'flex';
         return;
@@ -6383,10 +6383,11 @@ async function renderMemoryGraph() {
     // 没有缓存或缓存太旧，调AI提取
     if (!graphData) {
         try {
-            const llmKey = localStorage.getItem('LLM_API_KEY');
-            const llmUrl = localStorage.getItem('LLM_BASE_URL') || 'https://api.deepseek.com/v1';
+            const llmKey = localStorage.getItem('LLM_KEY') || '';
+            const llmUrl = (localStorage.getItem('LLM_URL') || 'https://api.deepseek.com').replace(/\/$/, '');
             const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-chat';
-            const res = await fetch(llmUrl.replace(/\/$/, '') + '/chat/completions', {
+            if (!llmKey) throw new Error('未配置LLM_KEY');
+            const res = await fetch(llmUrl + '/chat/completions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
                 body: JSON.stringify({
@@ -6413,6 +6414,7 @@ async function renderMemoryGraph() {
     loadingEl.style.display = 'none';
     if (!graphData || !graphData.nodes || graphData.nodes.length < 3) {
         emptyEl.style.display = 'flex';
+        emptyEl.innerHTML = '<span style="font-size:40px;">🕸️</span><span>图谱生成失败<br>点右上角刷新重试</span>';
         return;
     }
 
