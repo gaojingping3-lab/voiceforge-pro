@@ -6380,7 +6380,7 @@ async function renderMemoryGraph() {
         if (cached && cached.nodes) existing = cached;
     } catch(e) {}
 
-    const MAX_NODES = 80;
+    const MAX_NODES = 9999;
 
     // 如果节点还没到上限，调AI提取新记忆追加
     if (existing.nodes.length < MAX_NODES) {
