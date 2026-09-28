@@ -6471,8 +6471,8 @@ async function renderMemoryGraph() {
     // 计算每个节点的连接数
     const connCount = {};
     validEdges.forEach(e => { connCount[e.from]=(connCount[e.from]||0)+1; connCount[e.to]=(connCount[e.to]||0)+1; });
-    // 只保留连接数>=2的节点
-    const visibleNodes = uniqueNodes.filter(n => (connCount[n.id]||0) >= 2);
+    // 只保留连接数>=2的节点，同时过滤掉之前残留的"零散记忆"聚类节点
+    const visibleNodes = uniqueNodes.filter(n => (connCount[n.id]||0) >= 2 && !String(n.label||'').startsWith('零散记忆'));
     const visibleIds = new Set(visibleNodes.map(n=>n.id));
     const filteredEdges = validEdges.filter(e => visibleIds.has(e.from) && visibleIds.has(e.to));
     const nodes = new vis.DataSet(visibleNodes.map(n => ({
