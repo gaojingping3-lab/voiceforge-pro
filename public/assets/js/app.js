@@ -6491,16 +6491,26 @@ async function renderMemoryGraph() {
         physics: { barnesHut: { gravitationalConstant: -5000, springLength: 200, avoidOverlap: 0.8 } },
         interaction: { hover: true, zoomView: true, dragView: true }
     });
-    // 把零散节点合并成一个"零散记忆"按钮
+    // 手动把连接数<=1的零散节点合并成一个"零散记忆"按钮
     memoryGraphNetwork.once('stabilizationIterationsDone', () => {
-        memoryGraphNetwork.clusterOutliers({
-            clusterNodeProperties: {
-                label: '零散记忆',
-                color: '#6b7280',
-                font: { color: '#fff', size: 12 },
-                shape: 'ellipse'
-            }
+        const allNodes = memoryGraphNetwork.body.data.nodes.get();
+        const connectedCounts = {};
+        memoryGraphNetwork.body.data.edges.get().forEach(e => {
+            connectedCounts[e.from] = (connectedCounts[e.from] || 0) + 1;
+            connectedCounts[e.to] = (connectedCounts[e.to] || 0) + 1;
         });
+        const outliers = allNodes.filter(n => (connectedCounts[n.id] || 0) <= 1).map(n => n.id);
+        if (outliers.length > 0) {
+            memoryGraphNetwork.cluster({
+                joinCondition: (nodeOpts) => outliers.includes(nodeOpts.id),
+                clusterNodeProperties: {
+                    label: '零散记忆(' + outliers.length + ')',
+                    color: '#6b7280',
+                    font: { color: '#fff', size: 12 },
+                    shape: 'ellipse'
+                }
+            });
+        }
     });
 
     // 间距滑动条
