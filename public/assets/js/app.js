@@ -6380,29 +6380,26 @@ async function renderMemoryGraph() {
         if (cached && cached.nodes && cached.nodes.length >= 3) graphData = cached;
     } catch(e) {}
 
-    // 没有缓存或缓存太旧，调AI提取
+    // 没有缓存或缓存太旧，调AI提取（和其他app一样走/api/chat中转）
     if (!graphData) {
         try {
+            const llmUrl = localStorage.getItem('LLM_URL') || 'https://api.deepseek.com';
             const llmKey = localStorage.getItem('LLM_KEY') || '';
-            const llmUrl = (localStorage.getItem('LLM_URL') || 'https://api.deepseek.com').replace(/\/$/, '');
-            const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-chat';
+            const llmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
             if (!llmKey) throw new Error('未配置LLM_KEY');
-            const res = await fetch(llmUrl + '/chat/completions', {
+            const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + llmKey },
                 body: JSON.stringify({
-                    model: llmModel,
+                    baseUrl: llmUrl, model: llmModel, stream: false,
                     messages: [
                         { role: 'system', content: '你是记忆提取器。从聊天记录中提取重要记忆节点和它们之间的关系，输出纯JSON。格式：{"nodes":[{"id":"1","label":"简短记忆标题","group":"event|person|place|feeling"}],"edges":[{"from":"1","to":"2","label":"关系描述"}]}。节点10-20个，关系15-30条。group分类：event=事件，person=人物，place=地点，feeling=感受。label要简短（4-10字）。只输出JSON，不要其他文字。' },
                         { role: 'user', content: '从以下聊天记录提取记忆：\n' + history }
-                    ],
-                    temperature: 0.3,
-                    stream: false
+                    ]
                 })
             });
             const data = await res.json();
             let text = data.choices?.[0]?.message?.content?.trim() || '';
-            // 提取JSON
             const m = text.match(/\{[\s\S]*\}/);
             if (m) graphData = JSON.parse(m[0]);
             if (graphData && graphData.nodes) await saveSecretData(roleId, 'graph', graphData);
