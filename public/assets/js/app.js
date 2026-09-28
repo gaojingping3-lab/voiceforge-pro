@@ -6355,6 +6355,7 @@ async function renderMemoryGraph() {
     const loadingEl = document.getElementById('graph-loading');
     const emptyEl = document.getElementById('graph-empty');
     const container = document.getElementById('memory-graph-network');
+    try {
     loadingEl.style.display = 'flex';
     emptyEl.style.display = 'none';
 
@@ -6477,6 +6478,12 @@ async function renderMemoryGraph() {
                 physics: { barnesHut: { springLength: parseInt(e.target.value) } }
             });
         });
+    }
+    } catch(err) {
+        console.error('[记忆图谱]', err);
+        loadingEl.style.display = 'none';
+        emptyEl.style.display = 'flex';
+        emptyEl.innerHTML = '<span style="font-size:40px;">🕸️</span><span>出错了：' + String(err.message||err).slice(0,80) + '<br>点右上角刷新重试</span>';
     }
 }
 
