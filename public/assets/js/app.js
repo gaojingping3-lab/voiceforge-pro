@@ -6465,7 +6465,13 @@ async function renderMemoryGraph() {
         return true;
     });
     existing.nodes = uniqueNodes;
-    const nodes = new vis.DataSet(uniqueNodes.map(n => ({
+    // 过滤：只保留两端节点都存在的连线，再过滤孤立节点
+    const nodeIds = new Set(uniqueNodes.map(n => n.id));
+    const validEdges = (existing.edges || []).filter(e => nodeIds.has(e.from) && nodeIds.has(e.to));
+    const connectedIds = new Set();
+    validEdges.forEach(e => { connectedIds.add(e.from); connectedIds.add(e.to); });
+    const visibleNodes = uniqueNodes.filter(n => connectedIds.has(n.id));
+    const nodes = new vis.DataSet(visibleNodes.map(n => ({
         id: n.id,
         label: n.label,
         color: { background: groupColors[n.group] || '#8b5cf6', border: '#fff' },
@@ -6473,7 +6479,7 @@ async function renderMemoryGraph() {
         shape: 'box',
         margin: 8
     })));
-    const edges = new vis.DataSet((existing.edges || []).map(e => ({
+    const edges = new vis.DataSet(validEdges.map(e => ({
         from: e.from, to: e.to,
         label: e.label || '',
         font: { color: '#888', size: 10 },
