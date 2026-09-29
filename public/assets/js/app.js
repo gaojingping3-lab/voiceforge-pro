@@ -10979,12 +10979,10 @@ function buildMomentsMemoryPrompt() {
 }
 
 // ============================================
-
-// ============================================
 // 我的服饰仓库（IndexedDB 存储，编辑角色卡可快速选择）
-// 每件服饰 = 一整段"整套服饰"描述，选择后整段替换生图外貌描述
+// 每件服饰 = 名称（列表显示）+ 一整段"整套服饰"描述（选择后整段替换生图外貌描述）
 // ============================================
-let wardrobeListCache = null;   // [{id, desc, createdAt}]
+let wardrobeListCache = null;   // [{id, name, desc, createdAt}]
 let wardrobeEditingId = null;   // 表单正在编辑的条目id（null=新增）
 
 function getWardrobeList() { return wardrobeListCache || []; }
@@ -11062,7 +11060,7 @@ function showWardrobeListView() {
     renderWardrobeList();
 }
 
-// 渲染服饰列表（每条 = 一套完整描述）
+// 渲染服饰列表（每条显示名称，描述单行截断）
 function renderWardrobeList() {
     const container = document.getElementById('wardrobe-list');
     if (!container) return;
@@ -11074,7 +11072,8 @@ function renderWardrobeList() {
     container.innerHTML = list.map(item => `
         <div class="bg-base-200/60 rounded-xl p-3 flex items-center gap-3">
             <div class="flex-1 min-w-0">
-                <div class="text-sm leading-relaxed">${escapeHtml(item.desc || '')}</div>
+                <div class="font-bold text-sm">${escapeHtml(item.name || (item.desc || '').slice(0, 10))}</div>
+                <div class="text-xs text-base-content/50 truncate mt-1">${escapeHtml(item.desc || '')}</div>
             </div>
             <div class="flex flex-col gap-1 flex-none">
                 <button class="btn btn-ghost btn-xs" onclick="showWardrobeForm(${item.id})" title="编辑"><i class="fa-solid fa-pen"></i></button>
@@ -11087,8 +11086,10 @@ function renderWardrobeList() {
 function showWardrobeForm(id) {
     const item = id ? getWardrobeList().find(x => x.id === id) : null;
     wardrobeEditingId = item ? item.id : null;
+    const nameInput = document.getElementById('wardrobe-form-name');
     const descInput = document.getElementById('wardrobe-form-desc');
-    if (!descInput) return;
+    if (!nameInput || !descInput) return;
+    nameInput.value = item ? (item.name || '') : '';
     descInput.value = item ? (item.desc || '') : '';
     document.getElementById('wardrobe-list-view').classList.add('hidden');
     document.getElementById('wardrobe-form-view').classList.remove('hidden');
@@ -11101,12 +11102,16 @@ function cancelWardrobeForm() {
 
 // 保存表单（新增或更新）
 async function saveWardrobeForm() {
+    const nameInput = document.getElementById('wardrobe-form-name');
     const descInput = document.getElementById('wardrobe-form-desc');
-    if (!descInput) return;
+    if (!nameInput || !descInput) return;
+    const name = nameInput.value.trim();
     const desc = descInput.value.trim();
+    if (!name) { alert('请填写服饰名称'); return; }
     if (!desc) { alert('请填写整套服饰描述'); return; }
     const item = {
         id: wardrobeEditingId || Date.now(),
+        name: name,
         desc: desc,
         createdAt: Date.now()
     };
@@ -11121,7 +11126,7 @@ async function saveWardrobeForm() {
 async function deleteWardrobeConfirm(id) {
     const item = getWardrobeList().find(x => x.id === id);
     if (!item) return;
-    if (!confirm('确定删除这套服饰吗？')) return;
+    if (!confirm(`确定删除「${item.name || '这套服饰'}」吗？`)) return;
     await deleteWardrobeItem(id);
     renderWardrobeList();
     sfxSave();
@@ -11148,7 +11153,8 @@ function renderWardrobePicker() {
     }
     container.innerHTML = list.map(item => `
         <button class="w-full text-left bg-base-200/60 rounded-xl p-2.5 hover:bg-base-200 transition" onclick="pickWardrobeItem(${item.id})">
-            <div class="text-sm leading-relaxed">${escapeHtml(item.desc || '')}</div>
+            <div class="font-bold text-sm">${escapeHtml(item.name || (item.desc || '').slice(0, 10))}</div>
+            <div class="text-xs text-base-content/50 truncate mt-0.5">${escapeHtml(item.desc || '')}</div>
         </button>`).join('');
 }
 
