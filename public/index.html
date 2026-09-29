@@ -1605,11 +1605,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h3 class="font-bold text-lg"><i class="fa-solid fa-shirt text-secondary"></i> 我的服饰</h3>
                 <button class="btn btn-ghost btn-md btn-circle" onclick="document.getElementById('wardrobe-modal').close()" title="关闭"><i class="fa-solid fa-xmark text-xl"></i></button>
             </div>
-            <p class="text-xs text-base-content/60 mb-3 flex-shrink-0">服饰保存在浏览器本地（IndexedDB），不会上传服务器。</p>
 
             <!-- 列表视图 -->
             <div id="wardrobe-list-view" class="flex-1 min-h-0 flex flex-col">
-                <div id="wardrobe-cat-bar" class="flex gap-1.5 flex-wrap mb-3 flex-shrink-0"></div>
                 <div class="flex-1 overflow-y-auto pr-1 -mr-1 min-h-0 space-y-2" id="wardrobe-list"></div>
                 <div class="pt-3 border-t border-base-content/10 flex-shrink-0 mt-3">
                     <button class="btn btn-primary btn-sm w-full" onclick="showWardrobeForm(null)"><i class="fa-solid fa-plus mr-1"></i> 新增服饰</button>
@@ -1618,22 +1616,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             <!-- 新增/编辑表单视图 -->
             <div id="wardrobe-form-view" class="hidden flex-1 min-h-0 overflow-y-auto pr-1 -mr-1">
-                <div class="flex items-center gap-4 mb-3">
-                    <div id="wardrobe-form-image-preview" class="w-16 h-16 rounded-xl overflow-hidden flex items-center justify-center bg-base-200 cursor-pointer hover:ring-2 hover:ring-primary transition" onclick="wardrobeImageUpload()">
-                        <i class="fa-solid fa-shirt text-xl text-base-content/40"></i>
-                    </div>
-                    <div>
-                        <div class="text-sm font-bold">服饰图片（可选）</div>
-                        <div class="text-xs text-base-content/50 mt-1">点击上传缩略图，仅用于仓库展示</div>
-                        <button class="btn btn-ghost btn-xs text-error mt-1" onclick="clearWardrobeImage()">清除图片</button>
-                    </div>
-                </div>
-                <label class="label py-1"><span class="label-text text-sm">服饰名称</span></label>
-                <input type="text" id="wardrobe-form-name" class="input input-bordered input-sm w-full mb-3" placeholder="例如：白衬衫+百褶裙" />
-                <label class="label py-1"><span class="label-text text-sm">分类</span></label>
-                <select id="wardrobe-form-category" class="select select-bordered select-sm w-full mb-3"></select>
-                <label class="label py-1"><span class="label-text text-sm">描述（整段外貌+服装，选中后整段替换生图外貌描述）</span></label>
-                <textarea id="wardrobe-form-desc" class="textarea textarea-bordered textarea-sm w-full h-40" placeholder="英文描述，例如：long black hair, white oversized shirt, black pleated skirt, white sneakers, soft smile..."></textarea>
+                <label class="label py-1"><span class="label-text text-sm">整套服饰描述（选中后整段替换生图外貌描述）</span></label>
+                <textarea id="wardrobe-form-desc" class="textarea textarea-bordered textarea-sm w-full h-56" placeholder="填写整套服饰，例如：长发，白衬衫+黑色百褶裙+小白鞋，温柔微笑"></textarea>
                 <div class="flex gap-2 mt-4">
                     <button class="btn btn-ghost btn-sm flex-1" onclick="cancelWardrobeForm()">取消</button>
                     <button class="btn btn-primary btn-sm flex-1" onclick="saveWardrobeForm()">保存服饰</button>
@@ -1648,7 +1632,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <h3 class="font-bold text-xl mb-2 flex items-center gap-2">
                 <i class="fa-solid fa-shirt text-secondary"></i> 从我的服饰选择
             </h3>
-            <p class="text-xs text-base-content/60 mb-3">选中后会把该服饰描述整段替换到「生图外貌描述」，点下方「保存」角色卡即生效。</p>
+            <p class="text-xs text-base-content/60 mb-3">选中后会把该服饰整段替换到「生图外貌描述」，点下方「保存」角色卡即生效。</p>
             <div id="wardrobe-picker-list" class="space-y-2 max-h-64 overflow-y-auto"></div>
             <div class="modal-action mt-4">
                 <button class="btn btn-ghost btn-sm" onclick="document.getElementById('wardrobe-picker-modal').close(); openWardrobeModal();"><i class="fa-solid fa-plus mr-1"></i> 去管理服饰</button>
