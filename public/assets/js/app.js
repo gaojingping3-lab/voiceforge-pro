@@ -2203,7 +2203,7 @@ const CHAT_IMG_RESTORE = 5;
 function openImageDB() {
     return new Promise((resolve, reject) => {
         if (!window.indexedDB) { reject(new Error('浏览器不支持IndexedDB')); return; }
-        const req = indexedDB.open(CHAT_IMG_DB, 3); // 版本升到3，加小秘密表
+        const req = indexedDB.open(CHAT_IMG_DB, 4); // 版本升到4，加我的服饰表
         req.onupgradeneeded = () => {
             const db = req.result;
             if (!db.objectStoreNames.contains(CHAT_IMG_STORE)) {
@@ -2216,6 +2216,9 @@ function openImageDB() {
             }
             if (!db.objectStoreNames.contains('SECRET_STORE')) {
                 db.createObjectStore('SECRET_STORE', { keyPath: 'id' });
+            }
+            if (!db.objectStoreNames.contains('WARDROBE_STORE')) {
+                db.createObjectStore('WARDROBE_STORE', { keyPath: 'id' });
             }
         };
         req.onsuccess = () => resolve(req.result);
@@ -10973,4 +10976,269 @@ function buildMomentsMemoryPrompt() {
     });
     return '【你最近发的朋友圈（含评论互动），你本人要记得这些内容】\n' + lines.join('\n') +
         '\n\n用户如果提起你的朋友圈、状态、配图、或者他评论过什么，你要自然地接上梗，不要装不知道自己发过什么、也不要装不知道他评论过。';
+}
+
+// ============================================
+// 我的服饰仓库（IndexedDB 存储，几百MB空间；编辑角色卡可快速选择）
+// ============================================
+const WARDROBE_CATEGORIES = ['套装', '上衣', '连衣裙', '下装', '外套', '鞋子', '配饰', '其他'];
+let wardrobeListCache = null;   // [{id,name,category,desc,image,createdAt}]
+let wardrobeFilterCat = 'all';  // 当前分类筛选
+let wardrobeEditingId = null;   // 表单正在编辑的条目id（null=新增）
+let wardrobeEditingImage = null;// 表单当前图片dataURL（null=无图）
+
+function getWardrobeList() { return wardrobeListCache || []; }
+
+// 从 IndexedDB 读取全部服饰（内存缓存）
+async function loadWardrobe(force) {
+    if (wardrobeListCache && !force) return wardrobeListCache;
+    try {
+        const db = await openImageDB();
+        const list = await new Promise((resolve) => {
+            const tx = db.transaction('WARDROBE_STORE', 'readonly');
+            const req = tx.objectStore('WARDROBE_STORE').getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => resolve([]);
+        });
+        list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        wardrobeListCache = list;
+    } catch (e) {
+        console.warn('[Wardrobe] 读取失败:', e.message);
+        wardrobeListCache = wardrobeListCache || [];
+    }
+    return wardrobeListCache;
+}
+
+// 保存/新增一条服饰（IndexedDB）
+async function saveWardrobeItem(item) {
+    try {
+        const db = await openImageDB();
+        await new Promise((resolve) => {
+            const tx = db.transaction('WARDROBE_STORE', 'readwrite');
+            tx.objectStore('WARDROBE_STORE').put(item);
+            tx.oncomplete = resolve;
+            tx.onerror = () => resolve();
+        });
+        const idx = wardrobeListCache.findIndex(x => x.id === item.id);
+        if (idx >= 0) { wardrobeListCache[idx] = item; }
+        else { wardrobeListCache.unshift(item); }
+    } catch (e) {
+        console.error('[Wardrobe] 保存失败:', e);
+        alert('服饰保存失败：本地存储空间不足');
+        throw e;
+    }
+}
+
+// 删除一条服饰（IndexedDB）
+async function deleteWardrobeItem(id) {
+    try {
+        const db = await openImageDB();
+        await new Promise((resolve) => {
+            const tx = db.transaction('WARDROBE_STORE', 'readwrite');
+            tx.objectStore('WARDROBE_STORE').delete(id);
+            tx.oncomplete = resolve;
+            tx.onerror = () => resolve();
+        });
+        wardrobeListCache = wardrobeListCache.filter(x => x.id !== id);
+    } catch (e) {
+        console.error('[Wardrobe] 删除失败:', e);
+    }
+}
+
+// 打开我的服饰仓库（导航栏入口）
+async function openWardrobeModal() {
+    const modal = document.getElementById('wardrobe-modal');
+    if (!modal) return;
+    await loadWardrobe();
+    wardrobeFilterCat = 'all';
+    showWardrobeListView();
+    modal.showModal();
+    sfxClick();
+}
+
+// 切回列表视图
+function showWardrobeListView() {
+    document.getElementById('wardrobe-list-view').classList.remove('hidden');
+    document.getElementById('wardrobe-form-view').classList.add('hidden');
+    renderWardrobeList();
+}
+
+// 分类筛选
+function wardrobeFilter(cat) {
+    wardrobeFilterCat = cat;
+    renderWardrobeList();
+}
+
+// 渲染服饰列表 + 分类筛选按钮
+function renderWardrobeList() {
+    const catBar = document.getElementById('wardrobe-cat-bar');
+    if (catBar) {
+        catBar.innerHTML = ['all', ...WARDROBE_CATEGORIES].map(c =>
+            `<button class="btn btn-xs ${wardrobeFilterCat === c ? 'btn-primary' : ''}" onclick="wardrobeFilter('${c}')">${c === 'all' ? '全部' : c}</button>`
+        ).join('');
+    }
+    const container = document.getElementById('wardrobe-list');
+    if (!container) return;
+    const list = getWardrobeList();
+    const filtered = wardrobeFilterCat === 'all' ? list : list.filter(x => x.category === wardrobeFilterCat);
+    if (!filtered.length) {
+        container.innerHTML = '<div class="text-center text-gray-400 text-sm py-8">还没有服饰，点下面「新增服饰」添加一件吧</div>';
+        return;
+    }
+    container.innerHTML = filtered.map(item => `
+        <div class="bg-base-200/60 rounded-xl p-3 flex items-center gap-3">
+            ${item.image
+                ? `<div class="w-12 h-12 rounded-lg overflow-hidden flex-none"><img src="${item.image}" class="w-full h-full object-cover" alt=""></div>`
+                : '<div class="w-12 h-12 rounded-lg bg-base-300 flex-none flex items-center justify-center"><i class="fa-solid fa-shirt text-base-content/40"></i></div>'}
+            <div class="flex-1 min-w-0">
+                <div class="font-bold text-sm flex items-center gap-2">${escapeHtml(item.name)} <span class="badge badge-xs badge-ghost">${escapeHtml(item.category || '其他')}</span></div>
+                <div class="text-xs text-base-content/50 truncate mt-1">${escapeHtml(item.desc || '')}</div>
+            </div>
+            <div class="flex flex-col gap-1 flex-none">
+                <button class="btn btn-ghost btn-xs" onclick="showWardrobeForm(${item.id})" title="编辑"><i class="fa-solid fa-pen"></i></button>
+                <button class="btn btn-ghost btn-xs text-error" onclick="deleteWardrobeConfirm(${item.id})" title="删除"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        </div>`).join('');
+}
+
+// 显示新增/编辑表单
+function showWardrobeForm(id) {
+    const item = id ? getWardrobeList().find(x => x.id === id) : null;
+    wardrobeEditingId = item ? item.id : null;
+    wardrobeEditingImage = item ? (item.image || null) : null;
+    const nameInput = document.getElementById('wardrobe-form-name');
+    const catSel = document.getElementById('wardrobe-form-category');
+    const descInput = document.getElementById('wardrobe-form-desc');
+    if (!nameInput || !catSel || !descInput) return;
+    // 分类下拉只初始化一次
+    if (!catSel.dataset.bound) {
+        catSel.dataset.bound = '1';
+        catSel.innerHTML = WARDROBE_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+    nameInput.value = item ? item.name : '';
+    catSel.value = item ? (item.category || '其他') : '套装';
+    descInput.value = item ? (item.desc || '') : '';
+    updateWardrobeImagePreview();
+    document.getElementById('wardrobe-list-view').classList.add('hidden');
+    document.getElementById('wardrobe-form-view').classList.remove('hidden');
+}
+
+// 取消表单，回列表
+function cancelWardrobeForm() {
+    showWardrobeListView();
+}
+
+// 上传服饰缩略图（压缩到512px，存dataURL）
+function wardrobeImageUpload() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+            wardrobeEditingImage = await compressImageFile(file, 512, 0.8);
+            updateWardrobeImagePreview();
+        } catch (err) {
+            alert('图片压缩失败: ' + (err.message || err));
+        }
+    };
+    input.click();
+}
+
+function clearWardrobeImage() {
+    wardrobeEditingImage = null;
+    updateWardrobeImagePreview();
+}
+
+function updateWardrobeImagePreview() {
+    const preview = document.getElementById('wardrobe-form-image-preview');
+    if (!preview) return;
+    if (wardrobeEditingImage) {
+        preview.innerHTML = `<img src="${wardrobeEditingImage}" class="w-full h-full object-cover">`;
+        preview.style.background = 'transparent';
+    } else {
+        preview.innerHTML = '<i class="fa-solid fa-shirt text-xl text-base-content/40"></i>';
+        preview.style.background = '';
+    }
+}
+
+// 保存表单（新增或更新）
+async function saveWardrobeForm() {
+    const nameInput = document.getElementById('wardrobe-form-name');
+    const catSel = document.getElementById('wardrobe-form-category');
+    const descInput = document.getElementById('wardrobe-form-desc');
+    if (!nameInput || !catSel || !descInput) return;
+    const name = nameInput.value.trim();
+    const category = catSel.value;
+    const desc = descInput.value.trim();
+    if (!name) { alert('请填写服饰名称'); return; }
+    if (!desc) { alert('请填写服饰描述（整段外貌+服装英文描述，生图时使用）'); return; }
+    const item = {
+        id: wardrobeEditingId || Date.now(),
+        name: name,
+        category: category,
+        desc: desc,
+        image: wardrobeEditingImage || undefined,
+        createdAt: Date.now()
+    };
+    try {
+        await saveWardrobeItem(item);
+        showWardrobeListView();
+        sfxSuccess();
+    } catch (e) {}
+}
+
+// 删除确认
+async function deleteWardrobeConfirm(id) {
+    const item = getWardrobeList().find(x => x.id === id);
+    if (!item) return;
+    if (!confirm(`确定删除「${item.name}」吗？`)) return;
+    await deleteWardrobeItem(id);
+    renderWardrobeList();
+    sfxSave();
+}
+
+// 打开服饰选择器（编辑角色卡内调用）
+async function openWardrobePicker() {
+    const modal = document.getElementById('wardrobe-picker-modal');
+    if (!modal) return;
+    await loadWardrobe();
+    renderWardrobePicker();
+    modal.showModal();
+    sfxClick();
+}
+
+// 渲染服饰选择器列表
+function renderWardrobePicker() {
+    const container = document.getElementById('wardrobe-picker-list');
+    if (!container) return;
+    const list = getWardrobeList();
+    if (!list.length) {
+        container.innerHTML = '<div class="text-center text-gray-400 text-sm py-6">仓库还没有服饰，点下方「去管理服饰」添加一件</div>';
+        return;
+    }
+    container.innerHTML = list.map(item => `
+        <button class="w-full text-left bg-base-200/60 rounded-xl p-2.5 flex items-center gap-3 hover:bg-base-200 transition" onclick="pickWardrobeItem(${item.id})">
+            ${item.image
+                ? `<div class="w-10 h-10 rounded-lg overflow-hidden flex-none"><img src="${item.image}" class="w-full h-full object-cover" alt=""></div>`
+                : '<div class="w-10 h-10 rounded-lg bg-base-300 flex-none flex items-center justify-center"><i class="fa-solid fa-shirt text-base-content/40"></i></div>'}
+            <div class="flex-1 min-w-0">
+                <div class="font-bold text-sm">${escapeHtml(item.name)} <span class="badge badge-xs badge-ghost ml-1">${escapeHtml(item.category || '其他')}</span></div>
+                <div class="text-xs text-base-content/50 truncate mt-0.5">${escapeHtml(item.desc || '')}</div>
+            </div>
+        </button>`).join('');
+}
+
+// 选中某件服饰：整段替换「生图外貌描述」
+function pickWardrobeItem(id) {
+    const item = getWardrobeList().find(x => x.id === id);
+    if (!item) return;
+    const input = document.getElementById('role-image-appearance-input');
+    if (input) {
+        input.value = item.desc || '';
+    }
+    const modal = document.getElementById('wardrobe-picker-modal');
+    if (modal) modal.close();
+    sfxSuccess();
 }

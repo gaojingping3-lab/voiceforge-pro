@@ -515,6 +515,9 @@ document.addEventListener('DOMContentLoaded', () => {
             <button class="btn btn-ghost btn-circle" id="inner-voice-btn" onclick="toggleInnerVoice()" title="心里话模式">
                 <i class="fa-regular fa-heart text-lg"></i>
             </button>
+            <button class="btn btn-ghost btn-circle" onclick="openWardrobeModal()" title="我的服饰">
+                <i class="fa-solid fa-shirt text-lg"></i>
+            </button>
             <button class="btn btn-ghost btn-circle" onclick="help_modal.showModal()" title="使用说明">
                 <i class="fa-solid fa-circle-question text-lg"></i>
             </button>
@@ -937,6 +940,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         </select>
                         <label class="label py-1 mt-3"><span class="label-text text-sm">生图外貌描述（只生图时用，聊天不消耗token）</span></label>
                         <textarea id="role-image-appearance-input" class="textarea textarea-bordered textarea-sm w-full" rows="4" placeholder="详细外貌+服装，生图时自动提取保持人物一致；聊天时不会发给AI"></textarea>
+                        <div class="flex items-center justify-between mt-2">
+                            <button class="btn btn-secondary btn-xs" onclick="openWardrobePicker()">
+                                <i class="fa-solid fa-shirt mr-1"></i> 从我的服饰选择
+                            </button>
+                            <span class="text-xs text-base-content/40">选中后整段替换外貌描述</span>
+                        </div>
 
                         <!-- 角色记忆便签（手动录入） -->
                         <div class="mt-4">
@@ -1582,6 +1591,67 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p class="text-gray-500 text-sm text-center py-4">暂无收藏的声音</p>
             </div>
             <div class="modal-action mt-4">
+                <form method="dialog">
+                    <button class="btn btn-sm">关闭</button>
+                </form>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 我的服饰仓库 -->
+    <dialog id="wardrobe-modal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box glass-panel flex flex-col" style="max-height: 85vh;">
+            <div class="flex items-center justify-between border-b border-base-content/10 pb-2 mb-3 flex-shrink-0">
+                <h3 class="font-bold text-lg"><i class="fa-solid fa-shirt text-secondary"></i> 我的服饰</h3>
+                <button class="btn btn-ghost btn-md btn-circle" onclick="document.getElementById('wardrobe-modal').close()" title="关闭"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <p class="text-xs text-base-content/60 mb-3 flex-shrink-0">服饰保存在浏览器本地（IndexedDB），不会上传服务器。</p>
+
+            <!-- 列表视图 -->
+            <div id="wardrobe-list-view" class="flex-1 min-h-0 flex flex-col">
+                <div id="wardrobe-cat-bar" class="flex gap-1.5 flex-wrap mb-3 flex-shrink-0"></div>
+                <div class="flex-1 overflow-y-auto pr-1 -mr-1 min-h-0 space-y-2" id="wardrobe-list"></div>
+                <div class="pt-3 border-t border-base-content/10 flex-shrink-0 mt-3">
+                    <button class="btn btn-primary btn-sm w-full" onclick="showWardrobeForm(null)"><i class="fa-solid fa-plus mr-1"></i> 新增服饰</button>
+                </div>
+            </div>
+
+            <!-- 新增/编辑表单视图 -->
+            <div id="wardrobe-form-view" class="hidden flex-1 min-h-0 overflow-y-auto pr-1 -mr-1">
+                <div class="flex items-center gap-4 mb-3">
+                    <div id="wardrobe-form-image-preview" class="w-16 h-16 rounded-xl overflow-hidden flex items-center justify-center bg-base-200 cursor-pointer hover:ring-2 hover:ring-primary transition" onclick="wardrobeImageUpload()">
+                        <i class="fa-solid fa-shirt text-xl text-base-content/40"></i>
+                    </div>
+                    <div>
+                        <div class="text-sm font-bold">服饰图片（可选）</div>
+                        <div class="text-xs text-base-content/50 mt-1">点击上传缩略图，仅用于仓库展示</div>
+                        <button class="btn btn-ghost btn-xs text-error mt-1" onclick="clearWardrobeImage()">清除图片</button>
+                    </div>
+                </div>
+                <label class="label py-1"><span class="label-text text-sm">服饰名称</span></label>
+                <input type="text" id="wardrobe-form-name" class="input input-bordered input-sm w-full mb-3" placeholder="例如：白衬衫+百褶裙" />
+                <label class="label py-1"><span class="label-text text-sm">分类</span></label>
+                <select id="wardrobe-form-category" class="select select-bordered select-sm w-full mb-3"></select>
+                <label class="label py-1"><span class="label-text text-sm">描述（整段外貌+服装，选中后整段替换生图外貌描述）</span></label>
+                <textarea id="wardrobe-form-desc" class="textarea textarea-bordered textarea-sm w-full h-40" placeholder="英文描述，例如：long black hair, white oversized shirt, black pleated skirt, white sneakers, soft smile..."></textarea>
+                <div class="flex gap-2 mt-4">
+                    <button class="btn btn-ghost btn-sm flex-1" onclick="cancelWardrobeForm()">取消</button>
+                    <button class="btn btn-primary btn-sm flex-1" onclick="saveWardrobeForm()">保存服饰</button>
+                </div>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 从我的服饰选择（编辑角色卡内调用） -->
+    <dialog id="wardrobe-picker-modal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box bg-base-100 max-w-lg">
+            <h3 class="font-bold text-xl mb-2 flex items-center gap-2">
+                <i class="fa-solid fa-shirt text-secondary"></i> 从我的服饰选择
+            </h3>
+            <p class="text-xs text-base-content/60 mb-3">选中后会把该服饰描述整段替换到「生图外貌描述」，点下方「保存」角色卡即生效。</p>
+            <div id="wardrobe-picker-list" class="space-y-2 max-h-64 overflow-y-auto"></div>
+            <div class="modal-action mt-4">
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('wardrobe-picker-modal').close(); openWardrobeModal();"><i class="fa-solid fa-plus mr-1"></i> 去管理服饰</button>
                 <form method="dialog">
                     <button class="btn btn-sm">关闭</button>
                 </form>
