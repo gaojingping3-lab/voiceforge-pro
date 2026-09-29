@@ -941,7 +941,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <label class="label py-1 mt-3"><span class="label-text text-sm">生图外貌描述（只生图时用，聊天不消耗token）</span></label>
                         <textarea id="role-image-appearance-input" class="textarea textarea-bordered textarea-sm w-full" rows="4" placeholder="详细外貌+服装，生图时自动提取保持人物一致；聊天时不会发给AI"></textarea>
                         <div class="flex items-center justify-between mt-2">
-                            <button class="btn btn-secondary btn-xs" onclick="openWardrobePicker()">
+                            <button class="btn btn-primary btn-xs" onclick="openWardrobePicker()">
                                 <i class="fa-solid fa-shirt mr-1"></i> 从我的服饰选择
                             </button>
                             <span class="text-xs text-base-content/40">选中后整段替换外貌描述</span>
@@ -1602,7 +1602,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <dialog id="wardrobe-modal" class="modal modal-bottom sm:modal-middle">
         <div class="modal-box glass-panel flex flex-col" style="max-height: 85vh;">
             <div class="flex items-center justify-between border-b border-base-content/10 pb-2 mb-3 flex-shrink-0">
-                <h3 class="font-bold text-lg"><i class="fa-solid fa-shirt text-secondary"></i> 我的服饰</h3>
+                <h3 class="font-bold text-lg"><i class="fa-solid fa-shirt text-primary"></i> 我的服饰</h3>
                 <button class="btn btn-ghost btn-md btn-circle" onclick="document.getElementById('wardrobe-modal').close()" title="关闭"><i class="fa-solid fa-xmark text-xl"></i></button>
             </div>
 
@@ -1632,7 +1632,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <dialog id="wardrobe-picker-modal" class="modal modal-bottom sm:modal-middle">
         <div class="modal-box bg-base-100 max-w-lg">
             <h3 class="font-bold text-xl mb-2 flex items-center gap-2">
-                <i class="fa-solid fa-shirt text-secondary"></i> 从我的服饰选择
+                <i class="fa-solid fa-shirt text-primary"></i> 从我的服饰选择
             </h3>
             <p class="text-xs text-base-content/60 mb-3">选中后会把该服饰整段替换到「生图外貌描述」，点下方「保存」角色卡即生效。</p>
             <div id="wardrobe-picker-list" class="space-y-2 max-h-64 overflow-y-auto"></div>
