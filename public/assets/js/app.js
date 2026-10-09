@@ -804,11 +804,6 @@ const ttsQueueManager = {
                 try { source.disconnect(); } catch (e) {}
                 if (this.currentSource === source) this.currentSource = null;
                 if (this.taskToken === currentToken) {
-                    // 冷战挂断：愤怒台词真正播完的瞬间执行挂断序列（忙音→震动→挂断→提示）
-                    if (pendingHangup && this.queue.length === 0) {
-                        executeHangupSequence();
-                        return;
-                    }
                     // 安全延迟500ms，防止TTS连续请求触发429限流
                     setTimeout(() => this.processNext(), 500);
                 }
@@ -852,73 +847,6 @@ function sfxSave() { if (!soundEnabled()) return; playTone(600, 0.08, 'triangle'
 function sfxSend() { if (!soundEnabled()) return; playTone(800, 0.08, 'sine', 0.04); playTone(1000, 0.06, 'sine', 0.03, 0.05); }
 function sfxReceive() { if (!soundEnabled()) return; playTone(880, 0.1, 'sine', 0.05); playTone(1100, 0.15, 'sine', 0.04, 0.08); }
 function soundEnabled() { return localStorage.getItem('SOUND_ENABLED') !== '0'; }
-
-// ============================================
-// 冷战冷静期（AI挂断/拒接/冷淡）——纯前端状态机
-// ============================================
-// 通话特权规则（只在通话模式注入）
-const HANGUP_INSTRUCTION = `【通话特权】如果对方的话触碰了你的核心底线、严重侮辱你、不可理喻、或者彻底把你激怒：
-1. 请完全按照人设发脾气，说出你生气的最后一句话（短一点，口语化，比如“不可理喻，挂了！”、“随便你怎么想，别再找我了”）。
-2. 在该回复的最末尾，强制输出动作标签：[HANGUP:分钟数]，分钟数建议在 15~120 之间（取决于严重程度）。
-3. 如果没有严重激怒，严禁输出该标签。`;
-
-// 待执行的挂断动作（通话模式下由 waitForAISpeechEnd 在 TTS 播完后消费）
-let pendingHangup = null;
-
-// 冷战状态戳：localStorage COLD_WAR_UNTIL_{roleId} 存结束时间戳(ms)
-function getColdWarUntil(roleId) {
-    const id = roleId || getCurrentRoleId();
-    return parseInt(localStorage.getItem('COLD_WAR_UNTIL_' + id) || '0', 10) || 0;
-}
-function setColdWar(roleId, minutes) {
-    localStorage.setItem('COLD_WAR_UNTIL_' + roleId, (Date.now() + minutes * 60 * 1000).toString());
-}
-function clearColdWar(roleId) {
-    localStorage.removeItem('COLD_WAR_UNTIL_' + roleId);
-}
-function getColdWarRemainMin(roleId) {
-    const until = getColdWarUntil(roleId);
-    if (until <= Date.now()) return 0;
-    return Math.ceil((until - Date.now()) / 60000);
-}
-
-// 播放电话挂断忙音（450Hz 断续3声，复用playTone合成，无需外部音频）
-function playHangupBusyTone() {
-    if (!soundEnabled()) return;
-    [0, 0.7, 1.4].forEach(t => {
-        playTone(450, 0.35, 'sine', 0.3, t);
-    });
-}
-
-// 顶部轻量提示横幅（避免alert打断，3.5秒自动消失）
-function showColdWarToast(text) {
-    try {
-        let toast = document.getElementById('coldwar-toast');
-        if (!toast) {
-            toast = document.createElement('div');
-            toast.id = 'coldwar-toast';
-            toast.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;max-width:86vw;background:rgba(17,24,39,.92);color:#fff;padding:10px 16px;border-radius:12px;font-size:13px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.25);text-align:center;transition:opacity .3s;pointer-events:none;';
-            document.body.appendChild(toast);
-        }
-        toast.textContent = text;
-        toast.style.opacity = '1';
-        clearTimeout(toast._t);
-        toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 3500);
-    } catch (e) {}
-}
-
-// 执行挂断序列：忙音 → 震动 → 挂断通话 → 提示冷战
-function executeHangupSequence() {
-    if (!pendingHangup) return;
-    const p = pendingHangup;
-    pendingHangup = null;
-    playHangupBusyTone();
-    if (navigator.vibrate) { try { navigator.vibrate([100, 50, 100]); } catch (e) {} }
-    if (isCallMode) {
-        exitVoiceCallMode();
-    }
-    showColdWarToast(`📵 ${p.roleName}生气地挂了电话，进入冷静期（约${p.minutes}分钟）。${p.minutes >= 30 ? '真诚道歉才有可能破冰。' : ''}`);
-}
 
 // Theme toggler（已替换为高级主题切换，保留旧代码备用）
 // const themeToggle = document.getElementById('theme-toggle');
@@ -4033,11 +3961,6 @@ function waitForAISpeechEnd() {
             clearInterval(checkInterval);
             isCallAISpeaking = false;
             callSending = false;
-            // 兜底：TTS播放异常未能触发onended时，冷战挂断也要执行
-            if (pendingHangup) {
-                executeHangupSequence();
-                return;
-            }
             if (isCallMode) {
                 updateCallStatus('请继续说话...', 'listening');
                 setTimeout(() => startCallListening(), 200);
@@ -4156,18 +4079,6 @@ function toggleVoiceCallMode() {
         return;
     }
 
-    // 冷战期拒接：先响半声铃，再忙音拒接，展示冷静倒计时
-    const coldRemain = getColdWarRemainMin();
-    if (coldRemain > 0) {
-        const coldRole = getCurrentRole();
-        sfxStart();
-        setTimeout(() => {
-            playHangupBusyTone();
-            showColdWarToast(`📵 ${coldRole ? coldRole.name : '对方'}拒接了电话。还在冷静期（约剩${coldRemain}分钟），现在发消息可能被冷淡回应，真诚道歉才能破冰。`);
-        }, 800);
-        return;
-    }
-
     // 检查双角色模式（通话模式只支持单人）
     const isDual = document.getElementById('dual-role-toggle')?.checked;
     if (isDual) {
@@ -4237,8 +4148,6 @@ function toggleVoiceCallMode() {
 // 退出语音通话模式
 async function exitVoiceCallMode() {
     isCallMode = false;
-    // 手动挂断：清掉待执行的冷战挂断动作（冷战状态戳保留，拒接仍生效）
-    pendingHangup = null;
     isCallListening = false;
     isCallAISpeaking = false;
     callSending = false;
@@ -4508,15 +4417,6 @@ async function sendChatMessage() {
         if (useConstraint) {
             messages.push({ role: 'system', content: roleConstraints });
         }
-        // 通话特权：AI 有权在通话中被激怒后挂断（只在通话模式注入，避免污染普通聊天）
-        if (isCallMode) {
-            messages.push({ role: 'system', content: HANGUP_INSTRUCTION });
-        }
-        // 冷战状态：挂断后的冷静期，AI 冷淡对待 / 真诚道歉可破冰
-        const coldRemain = getColdWarRemainMin();
-        if (coldRemain > 0) {
-            messages.push({ role: 'system', content: `【冷战状态】你正在和用户冷战生气中（冷静期还剩约${coldRemain}分钟），原则上不想理TA。如果TA态度敷衍，你只回复冷冰冰的一两个字（如“……”、“别烦我”）；但如果TA的道歉极其真诚深刻、真正认识到了错误，你可以傲娇地原谅TA，并在回复末尾输出 [FORGIVE] 标签。` });
-        }
         // 视觉模型：把chatHistory里的图片条目从空content转换成多模态content（带图）
         const singleLlmModel = localStorage.getItem('LLM_MODEL') || 'deepseek-v4-flash';
         const singleVisionEnabled = (singleLlmModel === 'deepseek-flash') || /vision/i.test(singleLlmModel);
@@ -4775,33 +4675,6 @@ async function sendChatMessage() {
         // 如果流式返回为空，尝试用非流式方式兜底
         if (!fullReply) {
             throw new Error('流式响应为空，请重试');
-        }
-
-        // ===== 冷战标签解析：必须在渲染气泡/写入历史/TTS朗读之前剥离 =====
-        const hangupMatch = fullReply.match(/\[HANGUP:?\s*(\d+)?\]/i);
-        let coldWarMinutes = 0;
-        if (hangupMatch) {
-            coldWarMinutes = parseInt(hangupMatch[1], 10) || 30;
-            fullReply = fullReply.replace(/\[HANGUP:?\s*(\d+)?\]/gi, '').trim();
-        }
-        // 真诚道歉破冰：AI 在回复末尾输出 [FORGIVE] 即解除冷战
-        if (/\[FORGIVE\]/i.test(fullReply)) {
-            fullReply = fullReply.replace(/\[FORGIVE\]/gi, '').trim();
-            if (getColdWarUntil(requestRoleId) > 0) {
-                clearColdWar(requestRoleId);
-                showColdWarToast('💛 ' + role.name + '原谅了你，冷战解除了。');
-            }
-        }
-        // 触发冷战：写入状态戳 + 标记待挂断（通话模式下由 waitForAISpeechEnd 在TTS播完后执行挂断序列）
-        if (coldWarMinutes > 0) {
-            setColdWar(requestRoleId, coldWarMinutes);
-            pendingHangup = { roleId: requestRoleId, roleName: role.name, minutes: coldWarMinutes };
-            if (!isCallMode) {
-                // 文字模式：没有通话可挂断，立即提示（不播忙音避免突兀）
-                const p = pendingHangup;
-                pendingHangup = null;
-                showColdWarToast(`😠 ${p.roleName}生气了，进入冷静期（约${p.minutes}分钟）。${p.minutes >= 30 ? '真诚道歉才有可能破冰。' : ''}`);
-            }
         }
 
         // 流式结束后，只做一次完整的格式化（动作描写上色），避免过程中重复解析
