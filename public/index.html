@@ -438,6 +438,10 @@
     background: #ededed !important;
   }
     body.theme-midnight #chat-messages { background: rgba(15, 23, 42, 0.72) !important; border: 1px solid rgba(255, 255, 255, 0.08) !important; }
+        .chat-input-bar { background: #f7f7f7; }
+        .chat-input-bar > button { background: #fff; border: 1px solid #e5e5e5; color: #555; }
+        body.theme-hydrogen .btn-primary { background: linear-gradient(135deg, #2563eb, #38bdf8) !important; border-color: transparent !important; color: #ffffff !important; }
+        body.theme-hydrogen .range-primary { --range-shdw: #2563eb; accent-color: #2563eb; }
     body.theme-midnight .chat-input-bar { background: rgba(15, 23, 42, 0.88) !important; border-top: 1px solid rgba(255, 255, 255, 0.08) !important; }
     body.theme-midnight #chat-input { background: rgba(30, 41, 59, 0.92) !important; color: #f0f6fc !important; border: 1px solid rgba(255, 255, 255, 0.12) !important; }
     body.theme-midnight .chat-input-bar > button, body.theme-midnight #btn-reasoning { background: rgba(30, 41, 59, 0.92) !important; border-color: rgba(255, 255, 255, 0.12) !important; }
@@ -1020,10 +1024,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button id="scroll-to-bottom-btn" onclick="scrollToBottom()" class="absolute bottom-20 right-6 z-20 btn btn-circle btn-sm bg-base-200/90 backdrop-blur shadow-lg opacity-0 pointer-events-none transition-all duration-200 hover:scale-110" title="回到底部">
                     <i class="fa-solid fa-arrow-down text-sm"></i>
                 </button>
-                <div class="flex gap-2 items-center" style="padding-bottom: env(safe-area-inset-bottom); padding: 10px 12px; background: #f7f7f7;">
+                <div class="chat-input-bar flex gap-2 items-center" style="padding-bottom: env(safe-area-inset-bottom); padding: 10px 12px;">
                     <!-- 语音通话按钮 -->
-                    <button class="btn btn-ghost btn-sm btn-circle flex-shrink-0" onclick="toggleVoiceCallMode()" title="语音通话" style="width: 40px; height: 40px; background: #fff; border: 1px solid #e5e5e5;">
-                        <i class="fa-solid fa-phone text-base" style="color: #555;"></i>
+                    <button class="btn btn-ghost btn-sm btn-circle flex-shrink-0" onclick="toggleVoiceCallMode()" title="语音通话" style="width: 40px; height: 40px;">
+                        <i class="fa-solid fa-phone text-base"></i>
                     </button>
                     <!-- 输入框 -->
                     <textarea id="chat-input" placeholder="" class="flex-1 resize-none" rows="1" style="max-height: 100px; min-height: 40px; border-radius: 20px; background: #fff; border: none; padding: 10px 16px; font-size: 16px; outline: none;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" oninput="autoResizeInput();" onkeydown="handleChatKeydown(event)"></textarea>
@@ -1042,8 +1046,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
                     <!-- +按钮 -->
-                    <button class="btn btn-ghost btn-sm btn-circle flex-shrink-0" onclick="togglePlusMenu(event)" title="更多" style="width: 40px; height: 40px; background: #fff; border: 1px solid #e5e5e5;">
-                        <i class="fa-solid fa-plus text-base" style="color: #555;"></i>
+                    <button class="btn btn-ghost btn-sm btn-circle flex-shrink-0" onclick="togglePlusMenu(event)" title="更多" style="width: 40px; height: 40px;">
+                        <i class="fa-solid fa-plus text-base"></i>
                     </button>
                 </div>
             </div>
