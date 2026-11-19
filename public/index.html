@@ -19,13 +19,13 @@
             background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.25); transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
         }
         [data-theme="dark"] .glass-panel {
             background: rgba(30, 30, 30, 0.8);
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
-        body { transition: background-color 0.3s ease; }
+        body { transition: background-color 0.35s ease, color 0.35s ease; }
     </style>
 </head>
 <body class="bg-base-200 text-base-content" style="overflow: hidden; height: 100dvh;">
@@ -34,37 +34,38 @@
 <style>
   #premium-bg-layer {
     position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
-    z-index: -1; transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: -1; transition: all 0.35s ease;
     pointer-events: none;
   }
-  body.theme-pearl, body.theme-obsidian, body.theme-amber {
+  body.theme-pearl, body.theme-midnight, body.theme-hydrogen {
     background-image: none !important; background-color: transparent !important;
   }
   .theme-pearl #premium-bg-layer {
     background: radial-gradient(circle at 15% 50%, rgba(255,255,255,0.9), rgba(240,242,245,0.9)),
                 linear-gradient(135deg, #fcfcfc 0%, #eef0f3 100%);
   }
-  .theme-obsidian #premium-bg-layer {
+  .theme-midnight #premium-bg-layer {
     background: radial-gradient(circle at 85% 20%, rgba(45,48,56,1), rgba(15,17,20,1)),
                 linear-gradient(135deg, #1c2128 0%, #0d1117 100%);
   }
-  body.theme-obsidian { color: #f0f6fc !important; }
-  body.theme-obsidian .glass-panel {
+  body.theme-midnight { color: #f0f6fc !important; }
+  body.theme-midnight .glass-panel {
     background: rgba(30, 35, 45, 0.5) !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important; color: #e5e7eb !important;
   }
-  body.theme-obsidian .text-base-content, body.theme-obsidian .card-title, body.theme-obsidian .label-text { color: #e5e7eb !important; }
-  body.theme-obsidian .navbar { background: rgba(13, 17, 23, 0.6) !important; border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important; }
-  .theme-amber #premium-bg-layer {
-    background: radial-gradient(circle at 50% 0%, rgba(253,245,235,1), rgba(240,230,215,1)),
-                linear-gradient(135deg, #f5efe6 0%, #e8decb 100%);
+  body.theme-midnight .text-base-content, body.theme-midnight .card-title, body.theme-midnight .label-text { color: #f0f6fc !important; }
+  body.theme-midnight .navbar { background: rgba(13, 17, 23, 0.6) !important; border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important; }
+  .theme-hydrogen #premium-bg-layer {
+    background: radial-gradient(circle at 50% 0%, rgba(255,255,255,0.85), rgba(215,235,255,0.4) 60%, transparent 100%),
+                linear-gradient(135deg, #f6faff 0%, #e4f0fc 50%, #d5e7fa 100%);
   }
-  body.theme-amber .glass-panel {
-    background: rgba(255, 255, 255, 0.6) !important;
-    border: 1px solid rgba(255, 255, 255, 0.5) !important;
-    box-shadow: 0 10px 30px rgba(160, 140, 120, 0.08) !important;
+  body.theme-hydrogen .glass-panel {
+    background: rgba(255, 255, 255, 0.68) !important;
+    border: 1px solid rgba(66, 133, 244, 0.14) !important;
+    box-shadow: 0 10px 30px rgba(30, 90, 180, 0.07) !important;
   }
-  /* 导航栏主题切换按钮 */
+  body.theme-hydrogen .theme-dot-btn.active { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25); }
+    /* 导航栏主题切换按钮 */
   .theme-switch-nav { display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 20px; background: rgba(128,128,128,0.1); }
   .theme-dot-btn {
     appearance: none; border: 2px solid transparent; background: transparent;
@@ -76,8 +77,8 @@
   .theme-dot-btn.active { border-color: currentColor; }
   .theme-dot { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2); }
   .dot-pearl { background: linear-gradient(135deg, #fdfbfb, #ebedee); }
-  .dot-obsidian { background: linear-gradient(135deg, #434343, #000000); }
-  .dot-amber { background: linear-gradient(135deg, #f6d365, #fda085); }
+  .dot-midnight { background: linear-gradient(135deg, #434343, #000000); }
+  .dot-hydrogen { background: linear-gradient(135deg, #e8f4ff, #8ec5fc); }
 
   /* ===== 细节优化样式 ===== */
   /* 聊天气泡圆角不一致 */
@@ -187,13 +188,13 @@
   }
 
   /* 4. 深色模式优化 */
-  body.theme-obsidian .chat-bubble { background: rgba(55, 65, 81, 0.8) !important; color: #f3f4f6 !important; }
-  body.theme-obsidian .chat-end .chat-bubble { background: rgba(99, 102, 241, 0.7) !important; }
-  body.theme-obsidian .bg-base-100\/60, body.theme-obsidian .bg-base-100\/80 { background: rgba(30, 41, 59, 0.7) !important; }
-  body.theme-obsidian .bg-base-200\/50 { background: rgba(51, 65, 85, 0.5) !important; }
-  body.theme-obsidian .text-gray-400, body.theme-obsidian .text-gray-500 { color: #9ca3af !important; }
-  body.theme-obsidian .border-base-300 { border-color: rgba(75, 85, 99, 0.5) !important; }
-  body.theme-obsidian .input, body.theme-obsidian .textarea, body.theme-obsidian .select {
+  body.theme-midnight .chat-bubble { background: rgba(55, 65, 81, 0.8) !important; color: #f3f4f6 !important; }
+  body.theme-midnight .chat-end .chat-bubble { background: rgba(99, 102, 241, 0.7) !important; }
+  body.theme-midnight .bg-base-100\/60, body.theme-midnight .bg-base-100\/80 { background: rgba(30, 41, 59, 0.7) !important; }
+  body.theme-midnight .bg-base-200\/50 { background: rgba(51, 65, 85, 0.5) !important; }
+  body.theme-midnight .text-gray-400, body.theme-midnight .text-gray-500 { color: #9ca3af !important; }
+  body.theme-midnight .border-base-300 { border-color: rgba(75, 85, 99, 0.5) !important; }
+  body.theme-midnight .input, body.theme-midnight .textarea, body.theme-midnight .select {
     background: rgba(30, 41, 59, 0.8) !important;
     border-color: rgba(75, 85, 99, 0.5) !important;
     color: #f3f4f6 !important;
@@ -202,16 +203,16 @@
   #moment-comment-input, .moment-inline-input {
     background: #f0f0f0 !important; color: #1f2937 !important;
   }
-  body.theme-obsidian #moment-comment-input,
-  body.theme-obsidian .moment-inline-input {
+  body.theme-midnight #moment-comment-input,
+  body.theme-midnight .moment-inline-input {
     background: rgba(55, 65, 81, 0.85) !important;
     color: #f3f4f6 !important;
   }
-  body.theme-obsidian #moment-comment-input::placeholder,
-  body.theme-obsidian .moment-inline-input::placeholder { color: #9ca3af !important; }
-  body.theme-obsidian .tabs-boxed { background: rgba(30, 41, 59, 0.6) !important; }
-  body.theme-obsidian .tab { color: #9ca3af !important; }
-  body.theme-obsidian .tab.tab-active { color: #a5b4fc !important; background: rgba(99, 102, 241, 0.15) !important; }
+  body.theme-midnight #moment-comment-input::placeholder,
+  body.theme-midnight .moment-inline-input::placeholder { color: #9ca3af !important; }
+  body.theme-midnight .tabs-boxed { background: rgba(30, 41, 59, 0.6) !important; }
+  body.theme-midnight .tab { color: #9ca3af !important; }
+  body.theme-midnight .tab.tab-active { color: #a5b4fc !important; background: rgba(99, 102, 241, 0.15) !important; }
 
   /* 5. 下拉刷新 */
   .pull-refresh-indicator {
@@ -235,7 +236,7 @@
     padding: 6px; min-width: 140px;
     animation: menuPop 0.15s ease-out;
   }
-  body.theme-obsidian .msg-context-menu { background: rgba(30, 41, 59, 0.95) !important; }
+  body.theme-midnight .msg-context-menu { background: rgba(30, 41, 59, 0.95) !important; }
   @keyframes menuPop {
     from { opacity: 0; transform: scale(0.9); }
     to { opacity: 1; transform: scale(1); }
@@ -247,7 +248,7 @@
     color: inherit; text-align: left;
   }
   .msg-context-menu button:hover { background: rgba(0,0,0,0.05); }
-  body.theme-obsidian .msg-context-menu button:hover { background: rgba(255,255,255,0.1); }
+  body.theme-midnight .msg-context-menu button:hover { background: rgba(255,255,255,0.1); }
   .msg-context-menu button.danger { color: #ef4444; }
   .msg-long-press-active { background: rgba(99, 102, 241, 0.1) !important; border-radius: 8px; }
 
@@ -301,7 +302,7 @@
   }
   /* 3. 聊天容器 - 消除白底圆角盒中盒 */
   html body.chat-fullscreen #chat-messages,
-  body.chat-fullscreen:not(.theme-obsidian):not(.theme-dark) #chat-messages {
+  body.chat-fullscreen:not(.theme-midnight):not(.theme-dark) #chat-messages {
     border: none;
     box-shadow: none;
     border-radius: 0;
@@ -339,16 +340,16 @@
     /* 展开时高度由JS设置为内容实际高度，动画完成后设为auto */
   }
   /* 白色主题卡片优化：增加背景色、边框、阴影，提升辨识度 */
-  body:not(.theme-obsidian):not(.theme-dark) #dual-role-bar {
+  body:not(.theme-midnight):not(.theme-dark) #dual-role-bar {
     background: #f1f5f9 !important;
     border: 1px solid #e2e8f0 !important;
     box-shadow: 0 2px 10px rgba(0,0,0,0.08) !important;
   }
-  body:not(.theme-obsidian):not(.theme-dark) #chat-messages {
+  body:not(.theme-midnight):not(.theme-dark) #chat-messages {
     border: 1px solid #e2e8f0;
     box-shadow: inset 0 2px 8px rgba(0,0,0,0.04);
   }
-  body:not(.theme-obsidian):not(.theme-dark) .chat-bubble {
+  body:not(.theme-midnight):not(.theme-dark) .chat-bubble {
     box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
   }
   /* 微信风头像布局：确保左右并排不重叠，顶部完美对齐 */
@@ -474,17 +475,19 @@
 
 <script>
 function switchPremiumTheme(themeClass) {
-  document.querySelectorAll('.theme-dot-btn').forEach(b => b.classList.remove('active'));
-  document.body.classList.remove('theme-pearl', 'theme-obsidian', 'theme-amber');
+  if (themeClass === 'theme-obsidian') themeClass = 'theme-midnight';
+    if (themeClass === 'theme-amber') themeClass = 'theme-hydrogen';
+    document.querySelectorAll('.theme-dot-btn').forEach(b => b.classList.remove('active'));
+  document.body.classList.remove('theme-pearl', 'theme-midnight', 'theme-hydrogen');
   document.body.classList.add(themeClass);
   document.querySelector(`.theme-dot-btn[data-theme-class="${themeClass}"]`).classList.add('active');
-  document.documentElement.setAttribute('data-theme', themeClass === 'theme-obsidian' ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', themeClass === 'theme-midnight' ? 'dark' : 'light');
   localStorage.setItem('PREMIUM_THEME', themeClass);
   // 动态切换iOS状态栏颜色，跟随主题
   const themeColors = {
     'theme-pearl': '#ffffff',
-    'theme-obsidian': '#0d1117',
-    'theme-amber': '#fdf5eb'
+    'theme-midnight': '#0b0f1a',
+    'theme-hydrogen': '#f4f9ff'
   };
   const metaThemeColor = document.querySelector('meta[name="theme-color"]');
   if (metaThemeColor && themeColors[themeClass]) {
@@ -493,8 +496,10 @@ function switchPremiumTheme(themeClass) {
 }
 // 页面加载时恢复主题
 document.addEventListener('DOMContentLoaded', () => {
-  const saved = localStorage.getItem('PREMIUM_THEME') || 'theme-pearl';
-  switchPremiumTheme(saved);
+  let saved = localStorage.getItem('PREMIUM_THEME') || 'theme-pearl';
+  if (saved === 'theme-obsidian') saved = 'theme-midnight';
+    if (saved === 'theme-amber') saved = 'theme-hydrogen';
+    switchPremiumTheme(saved);
 });
 </script>
 
@@ -508,8 +513,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <!-- 主题切换（只显示小色点图标） -->
         <div class="theme-switch-nav flex items-center gap-1 mr-2">
             <button class="theme-dot-btn" data-theme-class="theme-pearl" onclick="switchPremiumTheme('theme-pearl')" title="雅白"><div class="theme-dot dot-pearl"></div></button>
-            <button class="theme-dot-btn" data-theme-class="theme-obsidian" onclick="switchPremiumTheme('theme-obsidian')" title="曜石"><div class="theme-dot dot-obsidian"></div></button>
-            <button class="theme-dot-btn" data-theme-class="theme-amber" onclick="switchPremiumTheme('theme-amber')" title="琥珀"><div class="theme-dot dot-amber"></div></button>
+            <button class="theme-dot-btn" data-theme-class="theme-midnight" onclick="switchPremiumTheme('theme-midnight')" title="深空"><div class="theme-dot dot-midnight"></div></button>
+            <button class="theme-dot-btn" data-theme-class="theme-hydrogen" onclick="switchPremiumTheme('theme-hydrogen')" title="氢蓝"><div class="theme-dot dot-hydrogen"></div></button>
         </div>
         <div class="flex-none gap-2">
             <button class="btn btn-ghost btn-circle" id="inner-voice-btn" onclick="toggleInnerVoice()" title="心里话模式">
