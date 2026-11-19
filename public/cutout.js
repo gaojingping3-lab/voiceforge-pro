@@ -138,9 +138,9 @@
     const mw = cm.width, mh = cm.height;
 
     // 类别值的量纲不确定（可能是 0/1，也可能被拉到 0~255），按实测最大值归一化
-    let mx = 1;
+    let mx = 0;
     for (let i = 0; i < src.length; i++) if (src[i] > mx) mx = src[i];
-    if (mx <= 1) { res.close && res.close(); throw new Error('蒙版是全空的，没检出前景'); }
+    if (mx === 0) { res.close && res.close(); throw new Error('蒙版是全空的，没检出前景'); }
 
     const w = canvas.width, h = canvas.height;
     const g = canvas.getContext('2d');
@@ -204,7 +204,7 @@
     onProgress && onProgress('正在检测…');
     const res = V.pose.detect(canvas);
     const lm = res.landmarks && res.landmarks[0];
-    if (!lm) return null;
+    if (!lm) { res.close && res.close(); return null; }
     const out = lm.map(p => ({ x: p.x, y: p.y, z: p.z, v: p.visibility }));
     res.close && res.close();
     return out;
