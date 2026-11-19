@@ -24,6 +24,7 @@ export async function onRequest(context) {
 
     // 2. 从请求体读取动态 Base URL（支持切换任意 OpenAI 兼容接口）
     let baseUrl = body.baseUrl || "https://api.deepseek.com";
+    baseUrl = baseUrl.replace(/\/+$/, "");
     // 移除 baseUrl 字段，不转发给目标 API
     delete body.baseUrl;
 
