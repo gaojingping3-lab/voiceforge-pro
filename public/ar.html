@@ -2766,7 +2766,7 @@ async function setArMic(on){
 arMicBtn.onclick = () => setArMic(!arMicOn);
 
 // ── TTS 播放：和聊天页同一通道（Fish 克隆音色 / Edge），不是浏览器自带朗读 ──
-let arAudioCtx = null;
+let arAudioCtx = null, arAudioOsc = null;
 function initArAudio(){
   if (arAudioCtx){ if (arAudioCtx.state === 'suspended') arAudioCtx.resume(); return; }
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -2779,9 +2779,9 @@ function initArAudio(){
     const g = arAudioCtx.createGain();
     g.gain.value = 0.00001;
     osc.connect(g); g.connect(arAudioCtx.destination);
-    osc.start();
+    osc.start(); arAudioOsc = osc;
   } catch(e){}
-}
+} document.addEventListener('visibilitychange', () => { if (document.hidden) { if (arAutoPoseTimer) { clearInterval(arAutoPoseTimer); clearTimeout(arAutoPoseTimer); arAutoPoseTimer = null; } if (arAudioCtx && arAudioCtx.state === 'running') { try { arAudioCtx.suspend(); } catch(e){} } } }); window.addEventListener('pagehide', () => { if (arAutoPoseTimer) { clearInterval(arAutoPoseTimer); clearTimeout(arAutoPoseTimer); arAutoPoseTimer = null; } if (arAudioOsc) { try { arAudioOsc.stop(); } catch(e){} arAudioOsc = null; } if (arAudioCtx) { try { arAudioCtx.close(); } catch(e){} arAudioCtx = null; } });
 async function arTTS(text){
   // 和单角色聊天一致：默认 Edge（免费、默认音色 shimmer），不依赖密钥配置持久化
   const voiceId = localStorage.getItem('SINGLE_CHAT_VOICE') || 'shimmer';
