@@ -7363,7 +7363,7 @@ function applyChatBg() {
     if (!chatContainer) return;
     
     if (bg === 'default') {
-        chatContainer.style.cssText += ';background: #f8fafc !important';
+        chatContainer.style.removeProperty('background');
     } else if (bg === 'pink') {
         chatContainer.style.cssText += ';background: linear-gradient(135deg,#ffdde1,#ee9ca7) !important';
     } else if (bg === 'blue') {
