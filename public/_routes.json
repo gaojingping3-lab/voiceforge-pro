@@ -1,13 +1,5 @@
 {
   "version": 1,
-  "include": ["/*"],
-  "exclude": [
-    "/assets/*",
-    "/manifest.json",
-    "/index.html",
-    "/ar.html",
-    "/cutout.js",
-    "/chars/*",
-    "/favicon.ico"
-  ]
+  "include": ["/api/*"],
+  "exclude": []
 }
