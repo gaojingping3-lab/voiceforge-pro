@@ -437,7 +437,12 @@
   #chat-messages {
     background: #ededed !important;
   }
-
+    body.theme-midnight #chat-messages { background: rgba(15, 23, 42, 0.72) !important; border: 1px solid rgba(255, 255, 255, 0.08) !important; }
+    body.theme-midnight .chat-input-bar { background: rgba(15, 23, 42, 0.88) !important; border-top: 1px solid rgba(255, 255, 255, 0.08) !important; }
+    body.theme-midnight #chat-input { background: rgba(30, 41, 59, 0.92) !important; color: #f0f6fc !important; border: 1px solid rgba(255, 255, 255, 0.12) !important; }
+    body.theme-midnight .chat-input-bar > button, body.theme-midnight #btn-reasoning { background: rgba(30, 41, 59, 0.92) !important; border-color: rgba(255, 255, 255, 0.12) !important; }
+    body.theme-midnight .chat-input-bar > button i, body.theme-midnight #btn-reasoning i { color: #cbd5e1 !important; }
+    body.theme-hydrogen .tab.tab-active { background: linear-gradient(135deg, #2563eb, #38bdf8) !important; color: #ffffff !important; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.22); }
   /* === 语音通话模式 === */
   #voice-call-overlay {
     transition: opacity 0.3s ease;
@@ -665,7 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div id="chat-section" class="card glass-panel shadow-xl hidden flex-1 min-h-0 tab-content-section">
             <div class="card-body p-4 sm:p-6 flex flex-col h-full relative">
                 <div class="flex items-center justify-between mb-3">
-                    <h2 class="card-title text-lg flex items-center gap-2">
+                    <h2 class="card-title text-lg flex items-center gap-2" style="white-space: nowrap; font-size: 1rem;">
                         <span id="moments-entry-avatar" onclick="openMoments()" title="看看她的朋友圈" style="width:34px;height:34px;border-radius:9999px;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:bold;color:#fff;flex:none;"></span>
                         <i class="fa-solid fa-comments text-primary"></i> <span id="chat-title-role">与乐 语音对话</span>
                     </h2>
@@ -990,14 +995,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             <button class="btn btn-ghost btn-sm btn-circle" onclick="toggleChatMoreMenu(event)" title="更多">
                                 <i class="fa-solid fa-ellipsis text-lg"></i>
                             </button>
-                            <div id="chat-more-menu" class="hidden absolute top-full right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 py-1 w-40 z-[1001]">
-                                <button class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100" onclick="openArFromChat(); closeChatMoreMenu();">
+                            <div id="chat-more-menu" class="hidden absolute top-full right-0 mt-2 bg-base-100 text-base-content rounded-xl shadow-xl border border-base-300 py-1 w-40 z-[1001]">
+                                <button class="w-full text-left px-4 py-2 text-sm hover:bg-base-200" onclick="openArFromChat(); closeChatMoreMenu();">
                                     <i class="fa-solid fa-camera mr-2" style="color:#f43f5e"></i> AR出屏
                                 </button>
-                                <button class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100" onclick="openChatBgPicker(); closeChatMoreMenu();">
+                                <button class="w-full text-left px-4 py-2 text-sm hover:bg-base-200" onclick="openChatBgPicker(); closeChatMoreMenu();">
                                     <i class="fa-solid fa-image mr-2" style="color:#10b981"></i> 聊天背景
                                 </button>
-                                <button class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-error" onclick="clearChat(); closeChatMoreMenu();">
+                                <button class="w-full text-left px-4 py-2 text-sm hover:bg-base-200 text-error" onclick="clearChat(); closeChatMoreMenu();">
                                     <i class="fa-solid fa-eraser mr-2"></i> 清空聊天
                                 </button>
                             </div>
@@ -1028,12 +1033,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button id="btn-reasoning" class="btn btn-ghost btn-sm btn-circle" onclick="toggleReasoningMenu()" title="思考程度" style="width: 40px; height: 40px; background: #fff; border: 1px solid #e5e5e5;">
                             <i class="fa-solid fa-brain text-base" style="color: #555;"></i>
                         </button>
-                        <div id="reasoning-menu" class="hidden absolute bottom-full right-0 mb-2 bg-white rounded-xl shadow-xl border border-gray-200 py-1 w-36 z-[1001]">
-                            <div class="px-3 py-1 text-xs font-bold text-gray-500 border-b border-gray-200 mb-1">思考程度</div>
-                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 reasoning-option" data-level="off" onclick="setReasoning('off')">关闭（秒回）</button>
-                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 reasoning-option" data-level="low" onclick="setReasoning('low')">低</button>
-                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 reasoning-option" data-level="high" onclick="setReasoning('high')">高</button>
-                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 reasoning-option" data-level="max" onclick="setReasoning('max')">Max</button>
+                        <div id="reasoning-menu" class="hidden absolute bottom-full right-0 mb-2 bg-base-100 text-base-content rounded-xl shadow-xl border border-base-300 py-1 w-36 z-[1001]">
+                            <div class="px-3 py-1 text-xs font-bold text-gray-500 border-b border-base-300 mb-1">思考程度</div>
+                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-base-200 reasoning-option" data-level="off" onclick="setReasoning('off')">关闭（秒回）</button>
+                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-base-200 reasoning-option" data-level="low" onclick="setReasoning('low')">低</button>
+                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-base-200 reasoning-option" data-level="high" onclick="setReasoning('high')">高</button>
+                            <button class="w-full text-left px-3 py-2 text-sm hover:bg-base-200 reasoning-option" data-level="max" onclick="setReasoning('max')">Max</button>
                         </div>
                     </div>
                     <!-- +按钮 -->
