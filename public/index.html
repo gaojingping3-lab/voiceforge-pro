@@ -1964,7 +1964,7 @@ document.addEventListener('DOMContentLoaded', () => {
     </style>
 
     <!-- 微信式+号菜单（fixed定位，动态跟随+按钮） -->
-    <div id="plus-menu" class="hidden fixed z-[1001] bg-white border border-gray-200 rounded-box shadow-xl p-2 w-40" style="bottom:100px;right:12px;">
+    <div id="plus-menu" class="hidden fixed z-[1001] bg-base-100 border border-base-300 rounded-box shadow-xl p-2 w-40" style="bottom:100px;right:12px;">
         <button class="btn btn-ghost btn-sm w-full justify-start mb-1" onclick="document.getElementById('user-photo-input').click(); closePlusMenu()">
             <i class="fa-regular fa-image mr-2"></i>发照片
         </button>
@@ -1980,9 +1980,9 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
 
     <!-- 表情面板 -->
-    <div id="emoji-panel" class="hidden fixed z-[1001] bg-white border-t border-gray-200 shadow-xl" style="bottom:0;left:0;right:0;height:320px;flex-direction:column;">
-        <div class="flex justify-between items-center px-4 py-3 border-b border-gray-100">
-            <span class="text-sm font-bold text-gray-700">选个表情</span>
+    <div id="emoji-panel" class="hidden fixed z-[1001] bg-base-100 border-t border-base-300 shadow-xl" style="bottom:0;left:0;right:0;height:320px;flex-direction:column;">
+        <div class="flex justify-between items-center px-4 py-3 border-b border-base-300">
+            <span class="text-sm font-bold text-base-content">选个表情</span>
             <button class="btn btn-ghost btn-sm btn-circle" onclick="closeEmojiPanel()">
                 <i class="fa-solid fa-xmark"></i>
             </button>
